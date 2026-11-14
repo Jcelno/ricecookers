@@ -26,7 +26,7 @@ export interface PhotoSet {
 
 const AI_OR_ART = /\b(ai[- ]generated|generative ai|stable diffusion|midjourney|dall[·\-‐ ]?e|text[- ]to[- ]image)\b/i;
 const NOT_A_PHOTO_NASA =
-  /illustrat|artist|concept|animation|render|simulat|infographic|graphic|poster|logo|diagram|chart|\bmap\b|mock-?up|replica|model of|full-scale|test bed|testbed|mission control|press conference|briefing|portrait|clean ?room|celebrat|team members|engineers|students|patch|emblem|sketch|painting|hardware|instrument|camera|spacecraft|assembl|engineering|wheel|parachute|heat shield|launch|cruise stage|full-size|prototype|annotat|labell?ed|figure|graph|\\bplot\\b|spectr/i;
+  /illustrat|artist|concept|animation|render|simulat|infographic|graphic|poster|logo|diagram|chart|\bmap\b|mock-?up|replica|model of|full-scale|test bed|testbed|mission control|press conference|briefing|portrait|clean ?room|celebrat|team members|engineers|students|patch|emblem|sketch|painting|hardware|instrument|camera|spacecraft|assembl|engineering|wheel|parachute|heat shield|launch|cruise stage|full-size|prototype|annotat|labell?ed|figure|graph|sampling sites|sites on mars|sites through|map of|traverse|route|timeline|comparison|\\bplot\\b|spectr/i;
 const ART_IN_DESCRIPTION = /artist'?s? (concept|rendering|illustration|impression)|illustration|computer[- ]generated|animation|simulated view|rendering of/i;
 const NOT_A_PHOTO_COMMONS = /\b(map|locator|location|flag|logo|diagram|chart|coat of arms|emblem|seal|graph|plan|relief|topographic|satellite image of the world)\b/i;
 
