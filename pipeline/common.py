@@ -28,7 +28,9 @@ def save_grid(grid: str, name: str, arr: np.ndarray) -> None:
     d = OUT / grid
     d.mkdir(parents=True, exist_ok=True)
     a = np.asarray(arr, dtype=np.float32)
-    np.save(d / f"{name}.npy", a)
+    # Compressed (lossless): mostly-empty grids shrink about 3x, which keeps the deployed bundle small.
+    np.savez_compressed(d / f"{name}.npz", a=a)
+    (d / f"{name}.npy").unlink(missing_ok=True)
     finite = np.isfinite(a)
     cov = float(finite.mean()) if a.size else 0.0
     lo = float(np.nanmin(a)) if finite.any() else float("nan")
@@ -42,6 +44,10 @@ def save_json(path: Path, obj) -> None:
 
 
 def load_grid(grid: str, name: str) -> np.ndarray:
+    p = OUT / grid / f"{name}.npz"
+    if p.exists():
+        with np.load(p) as z:
+            return z["a"]
     return np.load(OUT / grid / f"{name}.npy")
 
 

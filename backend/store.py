@@ -22,6 +22,9 @@ class Grid:
         self.body = self.meta["body"]
         self.kind = self.meta["type"]
         self.a = {p.stem: np.load(p) for p in sorted(d.glob("*.npy"))}
+        for p in sorted(d.glob("*.npz")):  # grids are stored compressed (pipeline.common.save_grid)
+            with np.load(p) as z:
+                self.a[p.stem] = z["a"]
         self.vars = catalog.VARS[gid]
         self.radius_km = RADIUS_KM[self.body]
         if self.kind == "latlon":
