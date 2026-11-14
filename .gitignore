@@ -17,3 +17,7 @@ public/maplibre/
 .env
 .env.*
 .claude/settings.local.json
+
+# web build copied into public/ by the Vercel build command (pyproject.toml)
+/public/index.html
+/public/assets/

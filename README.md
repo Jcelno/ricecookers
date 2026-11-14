@@ -26,6 +26,15 @@ python3 -m venv .venv                         # Python environment for the data 
 npm run dev                                   # starts the data service (port 8000) and the web app
 ```
 
+`requirements.txt` holds only what the app needs to run. To run the tests or rebuild the data, also install
+the pipeline packages: `.venv/bin/pip install -r requirements-pipeline.txt`.
+
+**Deploying to Vercel.** Import the repository; `pyproject.toml` and `vercel.json` already configure it. The
+build installs `requirements.txt`, builds the web app into `public/` for Vercel's CDN, and runs
+`backend/app.py` as one Python function (about 380 MB, under Vercel's 500 MB limit). Leave the project's
+Framework Preset, Build Command and Output Directory on their defaults, because dashboard settings override
+`pyproject.toml`.
+
 Open <http://localhost:3000>. `npm run dev` runs both processes; stop it with Ctrl-C.
 
 The clone includes the processed grids the app needs (`data/processed/`, about 215 MB on disk and 75 MB to
