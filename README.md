@@ -134,6 +134,73 @@ npm run pipeline                               # fetch (resumable) + build, abou
   Explore and use "Find its Earth twins".
 - Grades are RADIUM's own scale for comparing options. They are not a NASA rating.
 
+## Use of AI tools
+
+RADIUM's concept, requirements and scientific rules are our team's work. We chose the challenge and specified
+the product in detail before any code was written:
+
+- two separate, explainable scores (how well a site suits a chosen mission, and how closely a place on Earth
+  resembles it) that are never merged, shown as letter grades;
+- three mission types with priorities the user can adjust, and hard limits that rule sites out;
+- Earth Twin as the signature feature: matches found from data rather than from a list of famous sites, with
+  a side-by-side view of where the analogy holds and where it breaks down;
+- the ground rules: use only authentic space-agency data, never invent a value, show "data unavailable" where
+  a dataset is silent, and label every figure as observed, modelled or computed with its source and limits.
+
+We also set the visual direction, including real orbital imagery on the Moon and Mars globes, and directed
+the build.
+
+We used Claude Code (Anthropic's AI coding assistant) as our implementation tool. Working from our
+specification and under our direction, it wrote the code for the data pipeline, the scoring service, the web
+app and the automated tests, and drafted the documentation. It also proposed which public datasets to use,
+the default scoring weights and thresholds, and the reference list of published analog sites. The datasets,
+weights and thresholds are documented in the app's Data sources and Methodology pages so they can be checked.
+
+No measurement in RADIUM is AI-generated. Every value comes from the public NASA and partner-agency datasets
+listed under Data sources, and all imagery is real orbital and satellite data.
+
+## Licence
+
+RADIUM's own code and documentation are released under the [Apache License 2.0](LICENSE).
+Copyright 2026 the RADIUM authors.
+
+Third-party data, imagery and software keep their own terms, listed below. The citation for each dataset is
+in the app's Data sources page and in `backend/registry.py`.
+
+**Data stored in this repository** (as derived grids and name lists in `data/processed/`)
+
+| Source | Provider | Terms |
+| --- | --- | --- |
+| LOLA elevation and polar illumination, Diviner temperatures, Lunar Prospector hydrogen and elements | NASA (PDS, GSFC PGDA) | Public domain |
+| MOLA elevation, Mars Odyssey GRS elements | NASA (PDS) | Public domain |
+| Mars Climate Database v6.2 | LMD (CNRS), Open University, IAA-CSIC, with ESA and CNES | Free for scientific use with attribution; commercial use needs the MCD team's authorisation |
+| ETOPO 2022 relief | NOAA NCEI | Public domain |
+| POWER climatology (MERRA-2, CERES) | NASA Langley | Open (NASA Earth science data policy) |
+| MODIS land cover and NDVI, via GIBS | NASA EOSDIS | Open |
+| GLiM lithology | Hartmann & Moosdorf, via PANGAEA | CC BY 3.0 |
+| Planetary nomenclature | IAU and USGS Astrogeology | Public domain |
+| Natural Earth boundaries | Natural Earth | Public domain |
+
+**Imagery and labels streamed while the app runs** (not stored here)
+
+| Source | Provider | Terms |
+| --- | --- | --- |
+| Moon and Mars mosaics (LROC WAC, Kaguya Terrain Camera, Viking MDIM 2.1 and others) | NASA Solar System Treks; Kaguya data from JAXA | NASA imagery is public domain; Kaguya mosaic courtesy of JAXA/SELENE |
+| Blue Marble | NASA GIBS | Public domain |
+| Sentinel-2 cloudless 2016 | EOX IT Services, with Copernicus Sentinel data | CC BY 4.0 |
+| Borders and place names | OpenFreeMap, OpenMapTiles, OpenStreetMap contributors | OpenStreetMap data under ODbL 1.0 |
+
+**Software** (direct dependencies; each is open source)
+
+| Licence | Components |
+| --- | --- |
+| MIT | React, React DOM, Zustand, Vite, @vitejs/plugin-react, Tailwind CSS, concurrently, type definitions (`@types/*`), FastAPI, Pydantic, netCDF4, zarr, numcodecs, pyshp, watchfiles, pytest |
+| Apache-2.0 | CesiumJS, TypeScript, Puppeteer, Requests, aiohttp (Apache-2.0 AND MIT) |
+| BSD-3-Clause | MapLibre GL JS, NumPy, SciPy, Shapely, Starlette, Uvicorn, fsspec, tifffile, imagecodecs |
+| ISC | lucide-react |
+| MIT-CMU | Pillow |
+| SIL OFL 1.1 | Newsreader, IBM Plex Sans and IBM Plex Sans Condensed fonts (via Fontsource) |
+
 ## Credits
 
 Imagery and data: NASA (LRO LOLA, Diviner and LROC teams; MGS MOLA; Mars Odyssey GRS; Lunar Prospector;
