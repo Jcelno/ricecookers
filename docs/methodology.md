@@ -1,0 +1,141 @@
+# RADIUM methodology
+
+This is the long-form record of how RADIUM turns public data into grades. The app's Methodology page shows the
+same rules read live from the code; this file adds the reasoning and the data problems found along the way.
+
+## 1. Two questions, never merged
+
+| | Site suitability | Earth analog similarity |
+| --- | --- | --- |
+| Question | How well does this Moon or Mars cell serve a defined mission? | Which Earth cells share the characteristics of this planetary cell that matter for research and testing? |
+| Code | `backend/suitability.py` | `backend/similarity.py` |
+| Inputs | Planetary data only | Planetary data and Earth data |
+| Output | Grade per cell per mission | Grade per Earth cell per planetary cell per purpose |
+
+A good analog need not resemble a good landing site. The two scores are never combined.
+
+## 2. Analysis grids
+
+| Grid | Cells | Cell size | Why |
+| --- | --- | --- | --- |
+| Moon, global | 720 × 360 | 0.5° ≈ 15 km | Native grid of Diviner and Lunar Prospector products |
+| Moon, each pole | 254 × 254 | 2.4 km, polar stereographic | Latitude–longitude cells shrink to slivers near the poles; light and cold traps vary over kilometres |
+| Mars | 720 × 360 | 0.5° ≈ 30 km | 256 MOLA pixels per cell |
+| Earth | 1440 × 720 | 0.25° ≈ 28 km | 225 ETOPO pixels per cell; only cells at least half land are analysed |
+
+Global cells that fall inside a lunar polar square are withheld from the global grid, so no place is ranked twice.
+A map click returns the values of the cell under the pointer. Nothing is interpolated to a point.
+
+## 3. Rules for handling data
+
+1. **No invented values.** Missing data is stored as NaN and shown as "Data unavailable".
+2. **Evidence is labelled.** Observed, inferred, modelled, computed or interpreted, per variable and, where the
+   method changes with location, per cell (lunar sunlight is modelled poleward of 65° and computed from geometry
+   elsewhere).
+3. **Native resolution is kept on the label.** A 5° gamma-ray value is repeated across the cells it covers and
+   still says "5° ≈ 300 km".
+4. **Interpolation is used once**, for smooth reanalysis and climate-model fields that are coarser than the grid
+   (NASA POWER, Mars Climate Database), and is stated on the label.
+5. **Uncertainty is shown when the source provides it**: one-sigma values for Lunar Prospector and Odyssey
+   gamma-ray products; local-time coverage for Diviner; laser-shot coverage for MOLA.
+
+## 4. Terrain
+
+Computed by `pipeline/common.py::terrain_cells`, identically for the Moon (LOLA 16 px/deg), Mars (MOLA 32 px/deg)
+and Earth (ETOPO 2022, 60 arc-seconds). All three have pixels of about 1.9 km.
+
+- **Slope.** Central differences on the sphere over two pixels (≈ 3.7 km). The east–west step is `round(1/cos φ)`
+  pixels so the metric baseline is the same at every latitude.
+- **Roughness.** Height minus the mean of its four neighbours at the same baselines (zero for a tilted plane),
+  summarised as an inter-quartile range. This follows the curvature idea of Kreslavsky & Head (2000).
+- **Per cell.** Median slope, 90th-percentile slope, roughness IQR, mean elevation.
+
+Tests confirm the method returns the exact slope of a tilted plane and stays accurate at 60° latitude.
+Against LOLA's own slope product the correlation is 0.94; RADIUM's values are about half as large because its
+baseline is twice as long.
+
+For the lunar poles two kinds of slope are kept: *local* (480 m baseline, statistics inside the 2.4 km cell) for
+buildability, and *regional* (the same 3.8 km definition as everywhere else, over a 29 km window) for comparison
+with Earth.
+
+## 5. Site suitability
+
+`score = Σ wᵢ·sᵢ / Σ wᵢ`, over criteria with data. Criteria, transfer functions, mission weights and hard limits
+are defined in `backend/suitability.py` and printed in the app. The design choices:
+
+- **Transfer functions are ramps between two stated values** (one trapezoid, for lunar peak temperature).
+  The end points were chosen from the physical meaning of the quantity and from the observed distribution of the
+  data, then fixed. They are RADIUM's choices, not agency standards.
+- **Polar base criteria ask whether a cell contains usable ground**, not whether the whole cell is usable:
+  "buildable ground" is the share of 240 m pixels at 10° slope or less, and sunlight is taken at the best-lit
+  buildable pixel. A cell-median slope wrongly rejected ridge-top sites such as the rim beside Shackleton.
+- **Permanent shadow counts only in regions of at least 1 km²** when measuring distance to cold traps.
+- **Missing data.** A criterion without data is dropped and weights are rescaled; coverage is reported; below
+  60% coverage there is no grade.
+- **Hard limits** exclude a cell regardless of score. Each has a stated reason and can be switched off.
+- **Ranking** uses greedy non-maximum suppression so listed sites are distinct places (25 km apart on the lunar
+  polar grids, 60 km on the lunar global grid, 400 km on Mars).
+
+What the default rankings show, as a sanity check rather than a target: the best Mars robotic sites include Gale,
+Meridiani and the Oxia/Mawrth region; on the Moon, the ridge beside Shackleton and Mons Mouton rank in the top
+0.05% of south-polar cells. North-polar sites score slightly higher overall because the terrain is gentler and
+Lunar Prospector hydrogen is slightly higher there. RADIUM's criteria do not include the size and temperature of
+cold traps or the science value of the South Pole–Aitken basin, which favour the south.
+
+## 6. Earth analog similarity
+
+For planetary cell P and Earth cell E: `similarity = Σ w_d·s_d / Σ w_d` over dimensions with data on both sides.
+
+| Dimension | How it is compared |
+| --- | --- |
+| Terrain | Log-ratio of slope and roughness; a factor of two apart scores 0.61 |
+| Rock type | Measured planetary chemistry mapped to Earth lithology classes through an affinity table (expert rule) |
+| Ice and frozen ground | Planetary ice-evidence index against an Earth frozen-ground index; 1 − difference |
+| Bare, dry ground | Share of exposed rock or soil and low precipitation on Earth; a precondition, the same for every site |
+| Ground temperature | Mars only; Gaussian, 40 K tolerance |
+| Airborne dust | Mars only; log-ratio of dust optical depth and aerosol optical depth |
+
+Design choices:
+
+- **Not comparable means not scored.** Gravity, pressure, radiation and lunar temperature are listed with numbers
+  for both places and never enter the score.
+- **Mars ice index.** Shallow ground ice persists where the annual-mean surface temperature is about 198 K or
+  colder (Mellon & Jakosky 1993). Thermal stability earns half the index; hydrogen enrichment inside the stable
+  zone earns the rest. Hydrogen in warm ground is not counted as ice, since it is more likely bound in hydrated
+  minerals. Poleward of about 57° the gamma-ray product reports no value because the ground is too ice-rich for
+  its retrieval (Boynton et al. 2002); there the index uses thermal stability alone.
+- **Glacier ice hides the ground** as vegetation does, so ice-sheet interiors do not count as bare ground.
+- **Purposes.** The same pair of places is graded once per purpose. A purpose that is irrelevant to the planetary
+  site (ice drilling where there is no ice evidence) is reported as not applicable.
+- **Discovery.** All Earth land cells are ranked from data alone. The reference list of 36 documented analog
+  sites (`backend/reference.py`) labels results and shows how known sites score. A test confirms that emptying
+  the list changes no score.
+
+## 7. Data problems found and how they were handled
+
+| Problem | Evidence | Handling |
+| --- | --- | --- |
+| The north-polar Diviner PRP table lists longitudes mirrored | PRP triangle altitudes correlate with LOLA at r = 0.11 as listed and r = 0.999 with `lon = 180° − lon`; LOLA's orientation confirmed with 21 IAU crater positions | Correction applied in `build_moon_polar.py`; recorded in the grid's validation block |
+| MODIS land cover labels bright salt flats as permanent snow | Aral seabed, Bonneville, Lop Nur classed as ice at mean ground temperatures above 10 °C | 122 cells reassigned to barren where mean ground temperature exceeds 10 °C |
+| One Lunar Prospector hydrogen bin holds a Fortran overflow marker | `**********` at 43.0–43.5°N, 153.5–154.0°E | Stored as no data |
+| ETOPO download ended early without an error | 118 MB of 478 MB | Downloader checks size and resumes |
+| NASA NEO float archive is no longer served | URL redirects to a general page | MODIS values read from NASA GIBS through its published colour maps instead (99.99% of pixels match a colour-map entry exactly) |
+| Reanalysis soil wetness reads "saturated" over ice sheets | Value 1.0 across Antarctica | Blanked where the cell is mostly permanent ice |
+| NASA GIBS reference label layers return blank tiles; CARTO label tiles now need a key | Tile probes | Earth labels use OpenFreeMap vector tiles |
+
+## 8. Known limits
+
+See the app's Methodology page ("What RADIUM cannot tell you") and each dataset's "Limits" entry under Data
+sources. The most important: cells are kilometres across; no indicator is a detection of ice; Mars climate values
+come from a model; composition products are tens to hundreds of kilometres coarse.
+
+## References
+
+Boynton, W. V. et al. (2002), Science 297, 81–85. · Boynton, W. V. et al. (2007), J. Geophys. Res. 112, E12S99. ·
+Feldman, W. C. et al. (2001), J. Geophys. Res. 106, 23231–23251. · Forget, F. et al. (1999), J. Geophys. Res. 104,
+24155–24175. · Gelaro, R. et al. (2017), J. Climate 30, 5419–5454. · Hartmann, J. & Moosdorf, N. (2012), Geochem.
+Geophys. Geosyst. 13, Q12004. · Kreslavsky, M. A. & Head, J. W. (2000), J. Geophys. Res. 105, 26695–26711. ·
+Mazarico, E. et al. (2011), Icarus 211, 1066–1081. · Mellon, M. T. & Jakosky, B. M. (1993), J. Geophys. Res. 98,
+3345–3364. · Paige, D. A. et al. (2010), Science 330, 479–482. · Prettyman, T. H. et al. (2006), J. Geophys. Res.
+111, E12007. · Smith, D. E. et al. (2001), J. Geophys. Res. 106, 23689–23722. · Smith, D. E. et al. (2010),
+Geophys. Res. Lett. 37, L18204. · Williams, J.-P. et al. (2017), Icarus 283, 300–325.

@@ -1,0 +1,28 @@
+{
+ "id": "moon_sp",
+ "body": "moon",
+ "type": "polar",
+ "south": true,
+ "n": 254,
+ "cell_m": 2400.0,
+ "half_m": 304800.0,
+ "radius_m": 1737400.0,
+ "cell_km": 2.4,
+ "validation": {
+  "psr_regions_total": 16208,
+  "psr_regions_ge_1km2": 2549,
+  "psr_pixel_share_in_regions_ge_1km2": 0.9111010113401212,
+  "max_avg_illumination": 0.9347599744796753,
+  "max_avg_illumination_lat": -89.44549551291367,
+  "max_avg_illumination_lon_e": 222.68627750217578,
+  "psr_area_km2_poleward_80": 18316.219705271906,
+  "prp_triangles_in_grid": 2880000,
+  "prp_ice_depth_values": {
+   "min": -999.0,
+   "max": 1.77381,
+   "frac_surface_stable": 0.006380208333333333,
+   "frac_not_stable_flag": 0.6763048611111111
+  },
+  "orientation_check_r_prp_alt_vs_lola": 0.9997168978182609
+ }
+}

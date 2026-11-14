@@ -1,0 +1,40 @@
+{
+ "id": "moon",
+ "body": "moon",
+ "type": "latlon",
+ "n_lat": 360,
+ "n_lon": 720,
+ "cell_deg": 0.5,
+ "cell_km": 15.16,
+ "radius_m": 1737400.0,
+ "validation": {
+  "terrain": {
+   "slope_vs_ldsm16_r": 0.9353357142489714,
+   "slope_vs_ldsm16_median_ratio": 0.48755669593811035,
+   "dem_min_m": -8981.5,
+   "dem_max_m": 10685.5
+  },
+  "prospector": {
+   "h_ppm_south_pole": 146.13539123535156,
+   "h_ppm_global_median": 59.88800048828125,
+   "feo_wt_range": [
+    0.0,
+    30.749000549316406
+   ]
+  },
+  "illumination": {
+   "pgda_S_cells": 35996,
+   "pgda_S_max_cell_mean_illum": 0.4930059313774109,
+   "pgda_S_psr_area_frac": 0.04367753490805626,
+   "pgda_N_cells": 35996,
+   "pgda_N_max_cell_mean_illum": 0.4940134286880493,
+   "pgda_N_psr_area_frac": 0.031839240342378616
+  },
+  "diviner": {
+   "equator_tmax_K": 391.0970153808594,
+   "equator_tmin_K": 94.81364440917969,
+   "equator_tmean_K": 217.0108642578125,
+   "median_bin_coverage": 0.6458333333333334
+  }
+ }
+}

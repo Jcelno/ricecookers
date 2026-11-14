@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en" data-world="moon">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="RADIUM evaluates Moon and Mars locations for exploration missions and finds the places on Earth that resemble them, using public NASA and partner-agency data." />
+    <meta name="theme-color" content="#000000" />
+    <title>RADIUM — planetary sites and their Earth twins</title>
+    <link rel="icon" type="image/svg+xml" href="/radium.svg" />
+    <script>
+      // CesiumJS loads its workers and star map from here (copied by scripts/copy-assets.mjs).
+      window.CESIUM_BASE_URL = "/cesium";
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

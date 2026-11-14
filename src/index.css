@@ -1,0 +1,216 @@
+@import "tailwindcss";
+@import "@fontsource-variable/newsreader/opsz.css";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans-condensed/400.css";
+@import "@fontsource/ibm-plex-sans-condensed/500.css";
+@import "@fontsource/ibm-plex-sans-condensed/600.css";
+
+/*
+  RADIUM design tokens
+  --------------------
+  Stage      true black: the globes sit in space.
+  Basalt     slate surfaces for panels (base → raised → floating).
+  Regolith   warm light greys for ink, taken from sunlit lunar soil.
+  World      one accent that changes with the body in view: Moon silver,
+             Mars ochre, Earth ocean blue. Chrome stays neutral so that
+             colour on screen means data: grades and map layers.
+  Type       Newsreader italic for place names, the way physical features are
+             lettered on maps; IBM Plex Sans (tabular figures) for everything
+             that is read as data.
+*/
+@theme {
+  --color-void: #000000;
+  --color-basalt-950: #101216;
+  --color-basalt-900: #171a20;
+  --color-basalt-800: #1e222a;
+  --color-basalt-700: #272c36;
+  --color-basalt-600: #333a46;
+  --color-basalt-500: #454d5c;
+  --color-basalt-400: #5d6677;
+  --color-regolith-50: #f6f2e9;
+  --color-regolith-100: #e9e4d6;
+  --color-regolith-200: #d3cfc2;
+  --color-regolith-300: #b4b1a6;
+  --color-regolith-400: #94938a;
+  --color-regolith-500: #76766f;
+  --color-world: var(--world);
+  --color-world-ink: var(--world-ink);
+  --color-grade-a: #56c8f5;
+  --color-grade-b: #86d6b9;
+  --color-grade-c: #ecdf9a;
+  --color-grade-d: #f0a55a;
+  --color-grade-f: #de5d57;
+  --color-alert: #f0a55a;
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-cond: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-serif: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
+
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.625rem;
+  --text-2xl: 2.125rem;
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --shadow-raised: 0 1px 0 rgb(246 242 233 / 0.05) inset, 0 1px 2px rgb(3 6 12 / 0.5), 0 6px 16px -6px rgb(3 6 12 / 0.55);
+  --shadow-float: 0 1px 0 rgb(246 242 233 / 0.07) inset, 0 2px 4px rgb(3 6 12 / 0.45), 0 14px 32px -10px rgb(3 6 12 / 0.7), 0 32px 72px -24px rgb(3 6 12 / 0.65);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+:root {
+  --world: #dfe3ea;
+  --world-ink: #101216;
+  --hair: rgb(233 228 214 / 0.11);
+  --hair-strong: rgb(233 228 214 / 0.2);
+  --panel-w: 372px;
+  --rail-w: 316px;
+  --top-h: 52px;
+  color-scheme: dark;
+}
+:root[data-world="moon"] { --world: #dfe3ea; --world-ink: #101216; }
+:root[data-world="mars"] { --world: #e7935a; --world-ink: #1b0f06; }
+:root[data-world="earth"] { --world: #62b9dc; --world-ink: #04151d; }
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-void);
+  color: var(--color-regolith-100);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.45;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* Place names: lettered like physical features on a map. */
+.placename {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 440;
+  letter-spacing: -0.012em;
+  font-variation-settings: "opsz" 28;
+}
+.placename-lg { font-size: var(--text-xl); line-height: 1.12; letter-spacing: -0.03em; font-variation-settings: "opsz" 48; }
+.cond { font-family: var(--font-cond); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Surfaces: slate with faint grain so large flat panels do not look plastic. */
+.surface {
+  background-color: var(--color-basalt-900);
+  background-image:
+    radial-gradient(120% 60% at 0% 0%, rgb(246 242 233 / 0.035), transparent 60%),
+    radial-gradient(90% 50% at 100% 100%, color-mix(in srgb, var(--world) 5%, transparent), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.surface-raised { background-color: var(--color-basalt-800); box-shadow: var(--shadow-raised); }
+.surface-float { background-color: color-mix(in srgb, var(--color-basalt-800) 94%, transparent); box-shadow: var(--shadow-float); backdrop-filter: blur(10px) saturate(1.1); }
+.hair-b { border-bottom: 1px solid var(--hair); }
+.hair-t { border-top: 1px solid var(--hair); }
+.hair-l { border-left: 1px solid var(--hair); }
+.hair-r { border-right: 1px solid var(--hair); }
+
+/* Every interactive element: hover, focus-visible and active states. */
+/* State changes are drawn by a wash layer whose opacity animates, plus a small
+   press scale: only transform and opacity ever transition. */
+.ctl, .row-ctl {
+  position: relative;
+  isolation: isolate;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 140ms var(--ease-spring), opacity 140ms var(--ease-out);
+}
+.ctl::before, .row-ctl::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--color-regolith-50);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms var(--ease-out);
+}
+.ctl:hover::before { opacity: 0.08; }
+.ctl:active::before { opacity: 0.15; }
+.ctl:active { transform: scale(0.97); }
+.ctl:focus-visible, .focusable:focus-visible { outline: 2px solid var(--world); outline-offset: 2px; }
+.ctl[aria-pressed="true"], .ctl[aria-selected="true"], .ctl[data-on="true"] { background-color: var(--world); color: var(--world-ink); }
+.ctl[aria-pressed="true"]:hover::before, .ctl[aria-selected="true"]:hover::before, .ctl[data-on="true"]:hover::before { opacity: 0.22; }
+.ctl:disabled, .ctl[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; transform: none; }
+.ctl:disabled::before, .ctl[aria-disabled="true"]::before { opacity: 0; }
+.row-ctl:hover::before { opacity: 0.055; }
+.row-ctl:active::before { opacity: 0.11; }
+.row-ctl:active { transform: scale(0.995); }
+.row-ctl:focus-visible { outline: 2px solid var(--world); outline-offset: -2px; }
+.row-ctl[aria-current="true"] { box-shadow: inset 2px 0 0 var(--world); }
+.row-ctl[aria-current="true"]::before { opacity: 0.085; }
+a.link { color: var(--color-regolith-50); text-decoration: underline; text-decoration-color: var(--hair-strong); text-underline-offset: 3px; transition: opacity 120ms var(--ease-out); }
+a.link:hover { text-decoration-color: var(--world); color: var(--world); }
+a.link:active { opacity: 0.75; }
+a.link:focus-visible { outline: 2px solid var(--world); outline-offset: 2px; border-radius: 2px; }
+
+/* Scrollbars that stay out of the way. */
+.scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--color-basalt-500) transparent; }
+.scroll::-webkit-scrollbar { width: 8px; }
+.scroll::-webkit-scrollbar-thumb { background: var(--color-basalt-600); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+
+/* Range slider */
+input[type="range"].slider { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; cursor: pointer; }
+input[type="range"].slider::-webkit-slider-runnable-track { height: 3px; border-radius: 3px; background: linear-gradient(to right, var(--world) var(--fill, 50%), var(--color-basalt-500) var(--fill, 50%)); }
+input[type="range"].slider::-moz-range-track { height: 3px; border-radius: 3px; background: var(--color-basalt-500); }
+input[type="range"].slider::-moz-range-progress { height: 3px; border-radius: 3px; background: var(--world); }
+input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -5.5px; border-radius: 50%; background: var(--color-regolith-50); border: 2px solid var(--color-basalt-900); box-shadow: 0 0 0 1px var(--world), 0 2px 6px rgb(3 6 12 / 0.6); transition: transform 140ms var(--ease-spring); }
+input[type="range"].slider::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--color-regolith-50); border: 2px solid var(--color-basalt-900); box-shadow: 0 0 0 1px var(--world); }
+input[type="range"].slider:hover::-webkit-slider-thumb { transform: scale(1.15); }
+input[type="range"].slider:active::-webkit-slider-thumb { transform: scale(0.95); }
+input[type="range"].slider:focus-visible { outline: 2px solid var(--world); outline-offset: 3px; border-radius: 4px; }
+
+/* Motion: transform and opacity only. */
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
+.anim-rise { animation: rise 260ms var(--ease-out) both; }
+.anim-fade { animation: fade 200ms var(--ease-out) both; }
+.anim-sheet { animation: sheet-in 300ms var(--ease-out) both; }
+.spin { animation: spin 900ms linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise, .anim-fade, .anim-sheet { animation: none; }
+  .ctl, .row-ctl { transition: none; }
+}
+
+/* Long-form reading (methodology, sources). */
+.prose-radium { font-size: 0.9375rem; line-height: 1.7; color: var(--color-regolith-200); }
+.prose-radium > p, .prose-radium > ul, .prose-radium > h3, .prose-radium > h4 { max-width: 70ch; }
+.prose-radium h3 { font-family: var(--font-serif); font-weight: 500; font-size: 1.375rem; letter-spacing: -0.02em; line-height: 1.2; color: var(--color-regolith-50); margin: 2.2em 0 0.5em; font-variation-settings: "opsz" 36; }
+.prose-radium h4 { font-weight: 600; font-size: 0.9375rem; color: var(--color-regolith-50); margin: 1.6em 0 0.3em; }
+.prose-radium p { margin: 0 0 0.9em; }
+.prose-radium code { font-family: var(--font-cond); font-size: 0.95em; background: var(--color-basalt-700); padding: 0.1em 0.35em; border-radius: 3px; }
+.prose-radium ul { margin: 0 0 1em; padding-left: 1.1em; list-style: disc; }
+.prose-radium li { margin-bottom: 0.3em; }
+
+/* Third-party map chrome */
+.cesium-viewer, .cesium-widget, .cesium-widget canvas { width: 100%; height: 100%; }
+.cesium-widget canvas { outline: none; touch-action: none; display: block; }
+.cesium-viewer-bottom, .cesium-credit-lightbox-overlay { display: none !important; }
+.maplibregl-map { font-family: var(--font-sans); background: #05080c; }
+.maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-top-right, .maplibregl-ctrl-top-left { display: none; }
+.maplibregl-canvas { outline: none; }
+.maplibregl-canvas-container.maplibregl-interactive { cursor: crosshair; }
+.maplibregl-marker { will-change: transform; }

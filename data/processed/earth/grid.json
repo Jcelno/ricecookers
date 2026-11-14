@@ -1,0 +1,102 @@
+{
+ "id": "earth",
+ "body": "earth",
+ "type": "latlon",
+ "n_lat": 720,
+ "n_lon": 1440,
+ "cell_deg": 0.25,
+ "cell_km": 27.8,
+ "radius_m": 6371008.8,
+ "validation": {
+  "landcover": {
+   "unmatched_colour_fraction": 8.630401234567901e-05,
+   "global_barren_cells": 24240,
+   "classified_fraction": 0.9999136959876543
+  },
+  "glim": {
+   "classes": {
+    "1": "su",
+    "2": "vb",
+    "3": "ss",
+    "4": "pb",
+    "5": "sm",
+    "6": "sc",
+    "7": "va",
+    "8": "mt",
+    "9": "pa",
+    "10": "vi",
+    "11": "wb",
+    "12": "py",
+    "13": "pi",
+    "14": "ev",
+    "15": "nd",
+    "16": "ig"
+   },
+   "cells_with_lithology": 87098
+  },
+  "power": {
+   "merra2_time_axis": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+   ],
+   "syn1deg_time_axis": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+   ],
+   "global_mean_skin_temp_K": 288.3992934777013,
+   "annual_equals_mean_of_months_max_abs_diff_K": 0.14331531524658203
+  },
+  "ndvi": {
+   "ndvi_bin_width": 0.007499999999999951,
+   "ndvi_bins": 140
+  },
+  "terrain": {
+   "etopo_min_m": -10752.08203125,
+   "etopo_max_m": 8157.3564453125,
+   "tibet_plateau_cell_m": 4932.4091796875,
+   "dead_sea_shore_cell_m": 20.515522003173828,
+   "south_pole_plateau_cell_m": 2734.1201171875
+  }
+ },
+ "igbp_names": {
+  "1": "Evergreen needleleaf forest",
+  "2": "Evergreen broadleaf forest",
+  "3": "Deciduous needleleaf forest",
+  "4": "Deciduous broadleaf forest",
+  "5": "Mixed forest",
+  "6": "Closed shrubland",
+  "7": "Open shrubland",
+  "8": "Woody savanna",
+  "9": "Savanna",
+  "10": "Grassland",
+  "11": "Permanent wetland",
+  "12": "Cropland",
+  "13": "Urban and built-up",
+  "14": "Cropland / natural vegetation mosaic",
+  "15": "Permanent snow and ice",
+  "16": "Barren",
+  "17": "Water"
+ }
+}

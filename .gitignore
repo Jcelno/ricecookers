@@ -1,0 +1,19 @@
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+dist/
+logs/
+temporary screenshots/
+# downloaded source data (5.6 GB): re-created by `npm run pipeline`
+data/raw/
+# copied from node_modules by scripts/copy-assets.mjs
+public/cesium/
+public/maplibre/
+.DS_Store
+# design reference screenshots of third-party sites (not part of RADIUM)
+/*.png
+# local environment and editor state
+.env
+.env.*
+.claude/settings.local.json

@@ -1,0 +1,81 @@
+{
+ "id": "mars",
+ "body": "mars",
+ "type": "latlon",
+ "n_lat": 360,
+ "n_lon": 720,
+ "cell_deg": 0.5,
+ "cell_km": 29.64,
+ "radius_m": 3396000.0,
+ "validation": {
+  "terrain": {
+   "dem_min_m": -8206.0,
+   "dem_max_m": 21181.0,
+   "olympus_mons_summit_cell_m": 19554.21875,
+   "hellas_floor_cell_m": -6297.765625,
+   "median_mola_shot_coverage": 0.8359375
+  },
+  "grs": {
+   "weh_wt_range": [
+    1.6449999809265137,
+    7.3979997634887695
+   ],
+   "weh_wt_lat_coverage": [
+    -57.5,
+    57.5
+   ],
+   "fe_wt_range": [
+    10.631999969482422,
+    19.301000595092773
+   ],
+   "fe_wt_lat_coverage": [
+    -57.5,
+    57.5
+   ],
+   "si_wt_range": [
+    18.10700035095215,
+    22.113000869750977
+   ],
+   "si_wt_lat_coverage": [
+    -57.5,
+    57.5
+   ],
+   "k_wt_range": [
+    0.07100000232458115,
+    0.5609999895095825
+   ],
+   "k_wt_lat_coverage": [
+    -87.5,
+    87.5
+   ],
+   "cl_wt_range": [
+    0.2160000056028366,
+    0.796999990940094
+   ],
+   "cl_wt_lat_coverage": [
+    -57.5,
+    57.5
+   ],
+   "th_ppm_range": [
+    0.16300000250339508,
+    0.9459999799728394
+   ],
+   "th_ppm_lat_coverage": [
+    -87.5,
+    87.5
+   ]
+  },
+  "mcd": {
+   "status": "complete",
+   "pressure_vs_barometric_r": 0.9989222201636688,
+   "pressure_vs_barometric_median_ratio": 0.9353835707142517,
+   "global_mean_tsurf_K": 204.70798034976852,
+   "tmax_K": 309.0813903808594,
+   "tmin_K": 141.01119995117188,
+   "dust_tau_mean_range": [
+    0.08365038150825072,
+    0.7054578180472508
+   ]
+  }
+ }
+}
