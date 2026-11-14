@@ -86,8 +86,14 @@ function pinElement(p: Pin) {
   el.type = "button";
   el.title = `${p.name}: documented analog site`;
   el.setAttribute("aria-label", `${p.name}, documented analog site`);
-  el.style.cssText =
-    "width:14px;height:14px;padding:0;border-radius:2px;transform-origin:center;rotate:45deg;background:rgba(16,18,22,.55);border:1.5px solid #f6f2e9;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.6)";
+  // MapLibre places markers by writing `transform` on this element, so it must never be rotated itself:
+  // the CSS `rotate` property composes with that transform and swings the pin away from its location.
+  // The diamond is drawn by an inner element instead.
+  el.style.cssText = "width:20px;height:20px;padding:0;border:0;background:none;cursor:pointer;display:grid;place-items:center";
+  const d = document.createElement("span");
+  d.style.cssText =
+    "display:block;width:12px;height:12px;border-radius:2px;transform:rotate(45deg);background:rgba(16,18,22,.55);border:1.5px solid #f6f2e9;box-shadow:0 1px 4px rgba(0,0,0,.6);pointer-events:none";
+  el.appendChild(d);
   return el;
 }
 
@@ -150,6 +156,7 @@ export const EarthMap = forwardRef<GlobeHandle, Props>(function EarthMap(
     map.on("mouseout", () => cb.current.onCursor?.(null));
     map.on("load", () => {
       mapRef.current = map;
+      if (import.meta.env.DEV) (window as unknown as { __maplibre?: MlMap }).__maplibre = map; // for screenshot scripts
       setReady((n) => n + 1);
       cb.current.onStatus?.({ ready: true, error: null });
       report();

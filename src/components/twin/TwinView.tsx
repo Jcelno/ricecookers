@@ -5,8 +5,10 @@ import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/EarthMap";
 import { type GlobeHandle, GlobeView, type SiteMarker, type ViewState } from "@/components/map/GlobeView";
 import { GradeLegend } from "@/components/map/Stage";
 import { Tapes, type TapesHandle } from "@/components/map/Tapes";
+import { Photos } from "@/components/ui/Photos";
 import { Button, cx, GradeTile, IconButton, Meter, Notice, Section, Spinner, Switch } from "@/components/ui/primitives";
 import { overlay } from "@/lib/api";
+import { photoKey, photosFor } from "@/lib/photos";
 import { formatCoord, formatKm, formatMeasure, formatValue, GRADE_MEANING, pct } from "@/lib/format";
 import type { Candidate, CellInfo, CompareResult, DimDetail, DocumentedSite, Measure, Planet } from "@/lib/types";
 import { useStore } from "@/store";
@@ -46,6 +48,14 @@ function Origin() {
     return { lat: origin.lat, lon: origin.lon };
   }, [origin, cell, body]);
   const onPick = useCallback((lat: number, lon: number) => startTwin({ body: useStore.getState().body as Planet, lat, lon }), [startTwin]);
+  // Keep the chosen site in view: fly there whenever the origin changes (for example a polar site picked in
+  // Explore, which would otherwise sit out of sight behind the default near-side view).
+  const flights = useRef(0);
+  const originFocus = useMemo(() => {
+    if (!origin || origin.body !== body) return focus;
+    flights.current += 1;
+    return { body, lat: origin.lat, lon: origin.lon, spanKm: body === "moon" ? 2200 : 4200, nonce: 1e6 + flights.current };
+  }, [origin, body, focus]);
   const purposes = meta.purposes[body];
   const status = twin?.purposes ?? [];
 
@@ -65,7 +75,7 @@ function Origin() {
       </div>
 
       <div className="relative mx-4 aspect-square overflow-hidden rounded-md bg-void ring-1 ring-[var(--hair)]">
-        <GlobeView key={body} ref={handle} body={body} base={base} pins={pins} selection={sel} focus={focus} onPick={onPick} />
+        <GlobeView key={body} ref={handle} body={body} base={base} pins={pins} selection={sel} focus={originFocus} onPick={onPick} />
         <div className="surface-float absolute top-2 right-2 flex flex-col rounded-sm ring-1 ring-[var(--hair)]">
           <IconButton label="Zoom in" className="size-7" onClick={() => handle.current?.zoom(0.5)}><Plus size={14} /></IconButton>
           <IconButton label="Zoom out" className="size-7" onClick={() => handle.current?.zoom(2)}><Minus size={14} /></IconButton>
@@ -385,6 +395,13 @@ function Comparison({ c }: { c: CompareResult }) {
           )}
         </div>
       </section>
+
+      <Section title="Photographs of both places">
+        <div className="px-4 pt-0.5 pb-2 text-xs text-regolith-400">On {body === "moon" ? "the Moon" : "Mars"}, <span className="placename text-sm text-regolith-100">{c.planet.place.label}</span></div>
+        <Photos compact id={`twin-${photoKey(c.planet)}`} load={() => photosFor(c.planet)} />
+        <div className="hair-t px-4 pt-3 pb-2 text-xs text-regolith-400">On Earth, <span className="placename text-sm text-regolith-100">{c.earth.place.label}</span></div>
+        <Photos compact id={`twin-${photoKey(c.earth)}`} load={() => photosFor(c.earth)} />
+      </Section>
 
       <Section title="How it matches" count={`${m.dimensions.filter((d) => d.score !== null && d.weight > 0).length} scored`}>
         <ul>{m.dimensions.map((d) => <DimensionRow key={d.id} d={d} />)}</ul>

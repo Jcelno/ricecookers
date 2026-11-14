@@ -60,6 +60,11 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
   dust, habitability). RADIUM compares the site with all 341,042 land cells on Earth, lists the closest
   matches, marks which are documented analog sites and which are new leads, and opens a side-by-side
   comparison that states the strong matches, the weak ones, and the conditions Earth cannot reproduce.
+- **Photographs.** Every place shows real photographs: NASA science images of the nearest named feature or
+  landing site on the Moon and Mars (NASA Image and Video Library), and openly licensed photographs taken near
+  the place on Earth (Wikimedia Commons). Earth Twin shows both places together. Illustrations, artist's
+  concepts and anything tagged as AI-generated are filtered out, and every photo carries its author, licence
+  and a link to the original.
 - **Methodology and Data sources.** Both pages are generated from the running code and the dataset registry.
 
 ## How it is built
@@ -197,6 +202,8 @@ in the app's Data sources page and in `backend/registry.py`.
 | Blue Marble | NASA GIBS | Public domain |
 | Sentinel-2 cloudless 2016 | EOX IT Services, with Copernicus Sentinel data | CC BY 4.0 |
 | Borders and place names | OpenFreeMap, OpenMapTiles, OpenStreetMap contributors | OpenStreetMap data under ODbL 1.0 |
+| Moon and Mars photographs | NASA Image and Video Library | NASA images, not copyrighted; credited to the releasing team |
+| Earth photographs | Wikimedia Commons contributors | Each photo's own free licence (for example CC BY-SA), shown with the photo |
 
 **Software** (direct dependencies; each is open source)
 

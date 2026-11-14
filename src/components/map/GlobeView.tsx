@@ -12,6 +12,25 @@ import { GRADE_HEX, wrapLon } from "@/lib/format";
 import type { Grade, Pin, Planet, TileLayer } from "@/lib/types";
 import type { Focus } from "@/store";
 
+/** Hide pins that have rotated to the far side or to within a grazing angle of the rim, so a pin or its
+ *  label is never drawn half-clipped by the horizon (which reads as a pin floating off the globe). */
+const scratchN = new Cartesian3();
+const scratchV = new Cartesian3();
+function cullToHorizon(v: Viewer, ents: Entity[]) {
+  const cam = v.camera.positionWC;
+  const now = v.clock.currentTime;
+  let changed = false;
+  for (const e of ents) {
+    const pos = e.position?.getValue(now);
+    if (!pos) continue;
+    Cartesian3.normalize(pos, scratchN);
+    Cartesian3.normalize(Cartesian3.subtract(cam, pos, scratchV), scratchV);
+    const show = Cartesian3.dot(scratchN, scratchV) > 0.12; // about 7° above the local horizon
+    if (e.show !== show) { e.show = show; changed = true; }
+  }
+  if (changed) v.scene.requestRender();
+}
+
 // Planetocentric coordinates on a sphere, matching the LOLA and MOLA products
 // (Cesium's built-in Mars ellipsoid is flattened, which would shift latitudes).
 const ELLIPSOID: Record<Planet, Ellipsoid> = {
@@ -125,9 +144,9 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     ctl.maximumZoomDistance = ellipsoid.maximumRadius * 8;
     ctl.inertiaSpin = 0.86;
     ctl.inertiaZoom = 0.7;
-    if (!interactive) {
-      ctl.enableTilt = false;
-    }
+    // Top-down only: the graticule tapes, scale and cell outlines all assume the camera looks straight down.
+    ctl.enableTilt = false;
+    ctl.enableLook = false;
     v.camera.setView({ destination: Cartesian3.fromDegrees(HOME[body].lon, HOME[body].lat, ellipsoid.maximumRadius * (interactive ? 1.75 : 1.75), ellipsoid) });
     v.camera.percentageChanged = 0.002;
 
@@ -172,6 +191,9 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       }
       cb.current.onView?.({ lat: centre.lat, lon: centre.lon, degPerPx, heightKm: height / 1000 });
     };
+    const cull = () => cullToHorizon(v, [...pinEntities.current, ...markerEntities.current]);
+    const offCull = v.camera.changed.addEventListener(cull);
+    const offMoveEnd = v.camera.moveEnd.addEventListener(cull);
     const offChanged = v.camera.changed.addEventListener(report);
     const offTile = scene.globe.tileLoadProgressEvent.addEventListener((n: number) => n === 0 && scene.requestRender());
 
@@ -186,6 +208,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
 
     viewerRef.current = v;
     setViewer(v);
+    if (import.meta.env.DEV && interactive) (window as unknown as { __cesium?: Viewer }).__cesium = v; // for screenshot scripts
     cb.current.onStatus?.({ ready: true, error: null });
     setTimeout(report, 60);
 
@@ -193,6 +216,8 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       cancelAnimationFrame(raf);
       ro.disconnect();
       offChanged();
+      offCull();
+      offMoveEnd();
       offTile();
       scene.canvas.removeEventListener("mouseleave", leave);
       handler.destroy();
@@ -351,6 +376,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       lookup.current.set(ent.id, { lat: p.lat, lon: p.lon });
       return ent;
     });
+    cullToHorizon(viewer, pinEntities.current);
     viewer.scene.requestRender();
   }, [viewer, pins, body]);
 
@@ -377,6 +403,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       lookup.current.set(ent.id, { lat: m.lat, lon: m.lon });
       return ent;
     });
+    cullToHorizon(viewer, markerEntities.current);
     viewer.scene.requestRender();
   }, [viewer, markers, body]);
 

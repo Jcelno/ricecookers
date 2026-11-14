@@ -214,3 +214,15 @@ input[type="range"].slider:focus-visible { outline: 2px solid var(--world); outl
 .maplibregl-canvas { outline: none; }
 .maplibregl-canvas-container.maplibregl-interactive { cursor: crosshair; }
 .maplibregl-marker { will-change: transform; }
+
+/* Photo plates: real photographs shown like captioned field plates. Only transform/opacity animate. */
+.plate { position: relative; background: var(--color-basalt-800); box-shadow: 0 0 0 1px var(--hair), 0 6px 18px -8px rgb(2 4 10 / 0.7); }
+.plate::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgb(0 0 0 / 0.28), transparent 45%); opacity: 1; transition: opacity 180ms var(--ease-out); }
+.plate-img { display: block; transform: scale(1.001); transition: transform 420ms var(--ease-spring); }
+.plate:hover .plate-img { transform: scale(1.035); }
+.plate:hover::after { opacity: 0.4; }
+.plate:active .plate-img { transform: scale(1.015); }
+.plate:focus-visible { outline: 2px solid var(--world); outline-offset: 2px; }
+.plate-skeleton { background: var(--color-basalt-800); animation: plate-pulse 1.4s ease-in-out infinite; }
+@keyframes plate-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .plate-img, .plate::after { transition: none; } .plate-skeleton { animation: none; } }

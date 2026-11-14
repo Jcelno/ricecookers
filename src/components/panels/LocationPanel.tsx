@@ -1,7 +1,9 @@
 import { ArrowLeftRight, ExternalLink, Layers, LocateFixed, MapPin, X } from "lucide-react";
 import { useState } from "react";
 
+import { Photos } from "@/components/ui/Photos";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Meter, Notice, Section, Spinner } from "@/components/ui/primitives";
+import { featuredPhotos, photoKey, photosFor } from "@/lib/photos";
 import { formatKm, formatMeasure, formatValue, GRADE_MEANING, pct } from "@/lib/format";
 import type { Body, CellInfo, Evidence, Factor, Measure, Planet, Suitability } from "@/lib/types";
 import { useStore } from "@/store";
@@ -36,7 +38,10 @@ function Empty({ body }: { body: Body }) {
       <p className="mt-2 text-sm leading-relaxed text-regolith-300">
         Click anywhere on the {name}, or choose a pin. RADIUM shows what has been measured there, where each number comes from and how far to trust it.
       </p>
-      <div className="mt-5 text-xs font-medium text-regolith-400">Places worth a first look</div>
+      <div className="-mx-4 mt-4">
+        <Photos compact id={`featured-${body}`} load={() => featuredPhotos(body)} />
+      </div>
+      <div className="mt-1 text-xs font-medium text-regolith-400">Places worth a first look</div>
       <ul className="mt-1.5">
         {QUICK[body].map((q) => (
           <li key={q.name}>
@@ -272,6 +277,9 @@ export function LocationPanel() {
     <div className={cx("relative", status === "loading" && "opacity-70")} aria-busy={status === "loading"}>
       <Header cell={cell} />
       {cell.suitability && <SuitabilityBlock s={cell.suitability} />}
+      <Section title="Photographs">
+        <Photos id={photoKey(cell)} load={() => photosFor(cell)} />
+      </Section>
       <CellDetails cell={cell} />
     </div>
   );
