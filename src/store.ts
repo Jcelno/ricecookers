@@ -61,7 +61,7 @@ interface State {
 
   leftOpen: boolean;
   rightOpen: boolean;
-  sheet: null | "methodology" | "sources";
+  sheet: null | "methodology" | "sources" | "intro";
 
   init: () => Promise<void>;
   setBody: (b: Body) => void;

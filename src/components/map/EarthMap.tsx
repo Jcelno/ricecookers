@@ -84,7 +84,8 @@ function styleFor(b: Basemap): StyleSpecification {
 function pinElement(p: Pin) {
   const el = document.createElement("button");
   el.type = "button";
-  el.title = `${p.name}: documented analog site`;
+  const graded = p.grade !== undefined;
+  el.title = graded ? `${p.name}: documented analog site, ${p.grade ? `grade ${p.grade}` : "not graded"} for the selected site` : `${p.name}: documented analog site`;
   el.setAttribute("aria-label", `${p.name}, documented analog site`);
   // MapLibre places markers by writing `transform` on this element, so it must never be rotated itself:
   // the CSS `rotate` property composes with that transform and swings the pin away from its location.
@@ -92,7 +93,11 @@ function pinElement(p: Pin) {
   el.style.cssText = "width:20px;height:20px;padding:0;border:0;background:none;cursor:pointer;display:grid;place-items:center";
   const d = document.createElement("span");
   d.style.cssText =
-    "display:block;width:12px;height:12px;border-radius:2px;transform:rotate(45deg);background:rgba(16,18,22,.55);border:1.5px solid #f6f2e9;box-shadow:0 1px 4px rgba(0,0,0,.6);pointer-events:none";
+    `display:block;width:${graded ? 13 : 12}px;height:${graded ? 13 : 12}px;border-radius:2px;transform:rotate(45deg);` +
+    (graded
+      ? `background:${p.grade ? GRADE_HEX[p.grade] : "#94938a"};border:1.5px solid #101216;box-shadow:0 0 0 1.5px rgba(246,242,233,.85),0 1px 5px rgba(0,0,0,.7);`
+      : "background:rgba(16,18,22,.55);border:1.5px solid #f6f2e9;box-shadow:0 1px 4px rgba(0,0,0,.6);") +
+    "pointer-events:none";
   el.appendChild(d);
   return el;
 }

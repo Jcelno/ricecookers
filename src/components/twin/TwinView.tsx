@@ -471,6 +471,12 @@ export function TwinView() {
     () => (twin?.candidates ?? []).map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, text: String(c.rank), grade: c.grade, active: !!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13 })),
     [twin, picked],
   );
+  // Colour each documented analog site by its similarity grade to the chosen Moon or Mars site.
+  const gradedPins = useMemo(() => {
+    if (!twin) return earthPins;
+    const g = new Map(twin.documented.map((d) => [d.name, d.grade]));
+    return earthPins.map((p) => ({ ...p, grade: g.has(p.name) ? g.get(p.name)! : null }));
+  }, [twin, earthPins]);
   const sel = useMemo(() => {
     if (compare) return { lat: compare.earth.cell.lat, lon: compare.earth.cell.lon, outline: compare.earth.cell.outline };
     return picked ? { lat: picked.lat, lon: picked.lon } : null;
@@ -482,7 +488,7 @@ export function TwinView() {
     <>
       <Origin />
       <div className="relative h-full min-w-0 flex-1 overflow-hidden bg-void">
-        <EarthMap ref={handle} basemap={basemap} labels={earthLayers.labels} overlayUrl={url} opacity={0.8} dimBase={!!url} pins={earthPins} markers={markers} selection={sel} focus={focus} onPick={onPick} onView={onView} />
+        <EarthMap ref={handle} basemap={basemap} labels={earthLayers.labels} overlayUrl={url} opacity={0.8} dimBase={!!url} pins={gradedPins} markers={markers} selection={sel} focus={focus} onPick={onPick} onView={onView} />
         <Tapes ref={tapes} />
         <div className="surface-float absolute top-3 right-3 z-20 flex flex-col rounded-md ring-1 ring-[var(--hair)]">
           <IconButton label="Zoom in" onClick={() => handle.current?.zoom(0.5)}><Plus size={16} /></IconButton>
@@ -493,7 +499,7 @@ export function TwinView() {
           <div className="pointer-events-none absolute bottom-11 left-[72px] z-20">
             <div className="surface-float anim-rise pointer-events-auto w-[272px] rounded-md p-3 ring-1 ring-[var(--hair)]">
               <div className="text-sm leading-tight font-semibold text-regolith-50">Match to the selected {origin.body === "moon" ? "Moon" : "Mars"} site</div>
-              <div className="mt-0.5 mb-2 text-2xs leading-snug text-regolith-300">{showOverlay ? "Every land cell, graded." : "Map colouring is off."} Numbered markers are the best matches; diamonds are documented analog sites.</div>
+              <div className="mt-0.5 mb-2 text-2xs leading-snug text-regolith-300">{showOverlay ? "Every land cell, graded." : "Map colouring is off."} Numbered markers are the best matches. Diamonds are documented analog sites, coloured by their own grade.</div>
               <GradeLegend note="Clear cells are water or lack the data to compare." />
             </div>
           </div>

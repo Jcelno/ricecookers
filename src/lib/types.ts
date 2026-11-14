@@ -66,6 +66,8 @@ export interface Pin {
   id: string; name: string; kind: "landing" | "feature" | "analog"; lat: number; lon: number; note: string; source: string;
   link?: string; year?: number; country?: string; bodies?: Planet[]; theme?: string; feature_type?: string; diam_km?: number;
   distance_km?: number;
+  /** Earth Twin only: how closely this analog site matches the selected Moon or Mars site. */
+  grade?: Grade | null;
 }
 
 export interface CellInfo {

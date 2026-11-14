@@ -1,11 +1,28 @@
 // Real photographs of a place, from open archives. Nothing here is generated.
 //   Moon and Mars: NASA Image and Video Library (images-api.nasa.gov), searched by the name of the
 //                  nearest landing site or named feature. NASA imagery is not copyrighted.
-//   Earth:         Wikimedia Commons, first photographs geotagged within 10 km, then photographs that
-//                  name the surrounding region. Each keeps its own free licence and author credit.
-// Illustrations, artist's concepts, maps and anything categorised as AI-generated are filtered out.
+//   Earth:         Wikimedia Commons, only for documented analog sites: photographs geotagged within 10 km
+//                  of the site, then photographs that name it. Each keeps its own free licence and credit.
+// Only terrain and landscape are kept: people, buildings, museums, equipment, illustrations, maps and
+// anything categorised as AI-generated are filtered out.
 
-import type { Body, CellInfo, EarthPlace, PlanetPlace } from "./types";
+import { useStore } from "@/store";
+
+import type { Body, CellInfo, Pin, PlanetPlace } from "./types";
+
+const R_KM: Record<Body, number> = { moon: 1737.4, mars: 3389.5, earth: 6371.0 };
+function distKm(body: Body, la1: number, lo1: number, la2: number, lo2: number) {
+  const r = Math.PI / 180, a = Math.sin(((la2 - la1) * r) / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(((lo2 - lo1) * r) / 2) ** 2;
+  return 2 * R_KM[body] * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+/** RADIUM's own pins (landing sites, named features, analog sites) near a cell, nearest first. */
+function pinsNear(cell: CellInfo, maxKm: number): (Pin & { distance_km: number })[] {
+  const all = useStore.getState().pins[cell.body] ?? [];
+  return all
+    .map((p) => ({ ...p, distance_km: distKm(cell.body, cell.cell.lat, cell.cell.lon, p.lat, p.lon) }))
+    .filter((p) => p.distance_km <= maxKm)
+    .sort((a, b) => a.distance_km - b.distance_km);
+}
 
 export interface Photo {
   id: string;
@@ -26,15 +43,16 @@ export interface PhotoSet {
 
 const AI_OR_ART = /\b(ai[- ]generated|generative ai|stable diffusion|midjourney|dall[·\-‐ ]?e|text[- ]to[- ]image)\b/i;
 const NOT_A_PHOTO_NASA =
-  /illustrat|artist|concept|animation|render|simulat|infographic|graphic|poster|logo|diagram|chart|\bmap\b|mock-?up|replica|model of|full-scale|test bed|testbed|mission control|press conference|briefing|portrait|clean ?room|celebrat|team members|engineers|students|patch|emblem|sketch|painting|hardware|instrument|camera|spacecraft|assembl|engineering|wheel|parachute|heat shield|launch|cruise stage|full-size|prototype|annotat|labell?ed|figure|graph|sampling sites|sites on mars|sites through|map of|traverse|route|timeline|comparison|\\bplot\\b|spectr/i;
+  /illustrat|artist|concept|animation|render|simulat|infographic|graphic|poster|logo|diagram|chart|\bmap\b|mock-?up|replica|model of|full-scale|test bed|testbed|mission control|press conference|briefing|portrait|clean ?room|celebrat|team members|engineers|students|patch|emblem|sketch|painting|hardware|instrument|camera|spacecraft|assembl|engineering|wheel|parachute|heat shield|launch|cruise stage|full-size|prototype|annotat|labell?ed|figure|graph|sampling sites|sites on mars|sites through|map of|traverse|route|timeline|comparison|\bplot\b|spectr/i;
 const ART_IN_DESCRIPTION = /artist'?s? (concept|rendering|illustration|impression)|illustration|computer[- ]generated|animation|simulated view|rendering of/i;
 const NOT_A_PHOTO_COMMONS = /\b(map|locator|location|flag|logo|diagram|chart|coat of arms|emblem|seal|graph|plan|relief|topographic|satellite image of the world)\b/i;
 
-// Earth photos: the place itself first. Landscape words raise a photo; equipment, interiors and people drop it.
-const LANDSCAPE = /crater|valley|canyon|gorge|mountain|mount|peak|ridge|hill|plateau|mesa|butte|desert|dune|sand|salar|salt|playa|lava|volcan|caldera|basalt|rock|cliff|outcrop|terrain|landscape|panorama|view|vista|glacier|ice|snow|permafrost|lake|river|wadi|oasis|plain|steppe|tundra|coast|island|aerial|from space|iss\d|sts-\d/i;
-const NOT_THE_PLACE = /generator|shed|laser|medical|toilet|tent|interior|inside|kitchen|bedroom|office|lab(oratory)?\b|equipment|computer|screen|antenna|vehicle|truck|car\b|atv|helicopter|aircraft|plane\b|selfie|portrait|people|crew|group photo|team|meeting|sign\b|plaque|poster|museum|exhibit|hotel|restaurant|food|dish|statue|church|mosque|cathedral|logo/i;
-const landscapeFirst = (ps: Photo[]) =>
-  ps.filter((p) => !NOT_THE_PLACE.test(p.title)).map((p, i) => ({ p, k: (LANDSCAPE.test(p.title) ? 0 : 1) * 1000 + i })).sort((a, b) => a.k - b.k).map((x) => x.p);
+// Terrain and landscape only. A photo must name a landform, and must not show people, buildings or equipment.
+const LANDSCAPE =
+  /crater|valley|canyon|gorge|mountain|\bmount|peak|ridge|hill|plateau|mesa|butte|desert|dune|sand|salar|salt|playa|lava|volcan|caldera|basalt|rock|boulder|cliff|outcrop|terrain|landscape|panorama|view|vista|glacier|\bice\b|snow|permafrost|lake|river|wadi|oasis|plain|steppe|tundra|coast|shore|island|aerial|gypsum|spring|geyser|fumarole|impact|layer|delta|channel|floor|\brim\b|mound|scarp|slope|surface|horizon|polar|pole|highland|\bmare\b|regolith|soil|gravel|badland|formation|\berg\b|hamada|fjord|cerro|desierto|nunatak|moraine|basin|flats?\b|sediment|strata|terrace/i;
+const PEOPLE_OR_BUILDINGS =
+  /people|person|portrait|selfie|crew|astronaut|cosmonaut|scientist|researcher|\bteam|member|student|visitor|tourist|group|family|children|\bman\b|\bwoman\b|\bmen\b|\bwomen\b|\bboy|\bgirl|guide\b|museum|exhibit|gallery|building|house|\bhut\b|habitat|station\b|camp\b|hotel|hostel|restaurant|cafe|\bshop|market|church|mosque|temple|cathedral|statue|monument|memorial|\bsign\b|plaque|interior|inside|\broom\b|kitchen|generator|shed|\btent|equipment|instrument|vehicle|truck|\bcar\b|\bbus\b|\batv\b|helicopter|aircraft|airplane|airport|\bflag|salute|spacesuit|\bsuit\b|\beva\b|commander|conference|meeting|lecture|ceremony|festival|wedding/i;
+const isLandscape = (title: string, context = "") => LANDSCAPE.test(`${title} ${context}`) && !PEOPLE_OR_BUILDINGS.test(`${title} ${context}`);
 
 const cache = new Map<string, Promise<PhotoSet>>();
 const remember = (key: string, make: () => Promise<PhotoSet>) => {
@@ -63,13 +81,14 @@ async function nasaSearch(term: string, world: "Moon" | "Mars"): Promise<Photo[]
     const d = it.data[0];
     const href = it.links?.find((l) => l.render === "image")?.href;
     if (!d || !href) continue;
-    // Science imagery only: Planetary Photojournal releases (PIA…) and Apollo mission photographs (AS11-…).
-    // This keeps out outreach events, hardware on Earth and press photos that merely mention the site.
-    if (!/^(PIA\d{4,}|a?s\d{2}-\d+-\d+)/i.test(d.nasa_id)) continue;
+    // Planetary Photojournal releases (PIA…) only: orbital and surface views of the terrain. This keeps out
+    // outreach events, hardware, and crew photographs (Apollo surface frames often show astronauts and flags).
+    if (!/^PIA\d{4,}/i.test(d.nasa_id)) continue;
     if (out.some((o) => o.title === d.title)) continue;
     const text = `${d.title} ${d.description ?? ""} ${(d.keywords ?? []).join(" ")}`;
     if (!text.toLowerCase().includes(needle) || !worldWords.test(text)) continue;
     if (NOT_A_PHOTO_NASA.test(`${d.title} ${(d.keywords ?? []).join(" ")}`) || ART_IN_DESCRIPTION.test(d.description ?? "") || AI_OR_ART.test(text)) continue;
+    if (!LANDSCAPE.test(d.title) || PEOPLE_OR_BUILDINGS.test(`${d.title} ${(d.keywords ?? []).join(" ")}`)) continue;
     const credit = d.secondary_creator || d.photographer || `NASA${d.center ? ` ${d.center}` : ""}`;
     out.push({
       id: d.nasa_id,
@@ -99,13 +118,16 @@ async function nasaSearch(term: string, world: "Moon" | "Mars"): Promise<Photo[]
 }
 
 function planetTerms(place: PlanetPlace, cell: CellInfo): { term: string; why: string }[] {
-  // Landscape first: the named feature that contains the cell, then a landing site (rover and lander
-  // imagery of that ground), then the nearest named feature.
+  // The best-known name first: RADIUM's curated features and landing sites near the cell (Jezero, Gale,
+  // Perseverance, Apollo 15 …), then the IAU feature that contains the cell, then the nearest one.
   const terms: { term: string; why: string }[] = [];
-  if (place.within) terms.push({ term: place.within.name, why: `${place.within.name}, which contains this cell` });
-  for (const p of cell.nearby_pins ?? []) {
-    if (p.kind === "landing" && (p.distance_km ?? 1e9) < 300) terms.push({ term: p.name, why: `the ${p.name} landing site, ${Math.round(p.distance_km ?? 0)} km away` });
+  for (const p of pinsNear(cell, 120)) {
+    if (p.kind === "feature") terms.push({ term: p.name, why: `${p.name}, ${p.distance_km < 3 ? "at this cell" : `${Math.round(p.distance_km)} km away`}` });
   }
+  for (const p of pinsNear(cell, 120)) {
+    if (p.kind === "landing") terms.push({ term: p.name, why: `the ${p.name} landing site, ${Math.round(p.distance_km)} km away` });
+  }
+  if (place.within) terms.push({ term: place.within.name, why: `${place.within.name}, which contains this cell` });
   if (place.nearest && (place.nearest.distance_km ?? 1e9) < Math.max(250, place.nearest.diam_km)) {
     terms.push({ term: place.nearest.name, why: `${place.nearest.name}, the nearest named feature` });
   }
@@ -159,6 +181,7 @@ async function commons(params: Record<string, string>): Promise<Photo[]> {
     const desc = strip(m.ImageDescription?.value ?? "");
     const cats = m.Categories?.value ?? "";
     if (AI_OR_ART.test(`${cats} ${desc} ${p.title}`) || NOT_A_PHOTO_COMMONS.test(cleanTitle(p.title))) continue;
+    if (!isLandscape(cleanTitle(p.title), `${strip(m.ObjectName?.value ?? "")} ${cats} ${desc.slice(0, 400)}`)) continue;
     const license = m.LicenseShortName?.value;
     if (!license) continue;
     out.push({
@@ -174,34 +197,44 @@ async function commons(params: Record<string, string>): Promise<Photo[]> {
       archive: "Wikimedia Commons",
     });
   }
-  return landscapeFirst(out);
+  return out;
 }
 
-const ABBREV: [RegExp, string][] = [
-  [/\bMts\.?(?=\s|,|$)/g, "Mountains"], [/\bMt\.?(?=\s|,|$)/g, "Mount"], [/\bPen\.?(?=\s|,|$)/g, "Peninsula"],
-  [/\bDes\.?(?=\s|,|$)/g, "Desert"], [/\bPl\.?(?=\s|,|$)/g, "Plateau"], [/\bIs\.?(?=\s|,|$)/g, "Island"], [/\bL\.(?=\s|,|$)/g, "Lake"],
-];
-const expand = (s: string) => ABBREV.reduce((a, [re, to]) => a.replace(re, to), s).trim();
+export interface AnalogSite { name: string; lat: number; lon: number }
 
-export function earthPhotos(lat: number, lon: number, place: EarthPlace): Promise<PhotoSet> {
-  const area = place.region ? expand(place.region) : place.admin1 ? `${place.admin1}${place.country ? ` ${place.country}` : ""}` : place.country ?? "";
-  return remember(`e:${lat.toFixed(2)},${lon.toFixed(2)}:${area}`, async () => {
-    const near = await commons({ generator: "geosearch", ggscoord: `${lat}|${lon}`, ggsradius: "10000", ggsnamespace: "6", ggslimit: "40" });
-    if (near.length >= 3) return { photos: near.slice(0, 7), basis: "Photographs geotagged within 10 km of this cell's centre, from Wikimedia Commons." };
-    const named = area ? await commons({ generator: "search", gsrsearch: `"${area}" filetype:bitmap`, gsrnamespace: "6", gsrlimit: "40" }) : [];
-    const photos = [...near, ...named.filter((n) => !near.some((x) => x.id === n.id))].slice(0, 7);
-    if (!photos.length) return { photos, basis: "Wikimedia Commons has no openly licensed photographs taken near here or naming this area." };
+/** Landscape photographs of one documented analog site. */
+export function analogPhotos(site: AnalogSite): Promise<PhotoSet> {
+  return remember(`analog:${site.name}`, async () => {
+    const near = await commons({ generator: "geosearch", ggscoord: `${site.lat}|${site.lon}`, ggsradius: "10000", ggsnamespace: "6", ggslimit: "50" });
+    let photos = near;
+    if (photos.length < 4) {
+      const short = site.name.split(",")[0].trim();
+      const named = await commons({ generator: "search", gsrsearch: `"${short}" filetype:bitmap`, gsrnamespace: "6", gsrlimit: "50" });
+      photos = [...near, ...named.filter((n) => !near.some((x) => x.id === n.id))];
+    }
+    photos = photos.slice(0, 7);
     return {
       photos,
-      basis: near.length
-        ? `${near.length === 1 ? "One photograph is" : `${near.length} photographs are`} geotagged within 10 km; the rest are Wikimedia Commons photographs of ${area}, which may come from elsewhere in that area.`
-        : `Nothing on Wikimedia Commons is geotagged within 10 km, so these are photographs of ${area}. They may come from anywhere in that area.`,
+      basis: photos.length
+        ? `Landscape photographs of ${site.name}, a documented analog site, from Wikimedia Commons${near.length >= photos.length ? ", taken within 10 km of it" : ""}.`
+        : `Wikimedia Commons has no openly licensed landscape photographs of ${site.name}.`,
     };
   });
 }
 
 export function photosFor(cell: CellInfo): Promise<PhotoSet> {
-  return cell.body === "earth" ? earthPhotos(cell.cell.lat, cell.cell.lon, cell.place as EarthPlace) : planetPhotos(cell);
+  if (cell.body !== "earth") return planetPhotos(cell);
+  const site = pinsNear(cell, 150).find((p) => p.kind === "analog");
+  if (!site) {
+    return Promise.resolve({
+      photos: [],
+      basis: "Photographs are shown only for documented analog sites, and none lies within 150 km of this place.",
+    });
+  }
+  return analogPhotos(site).then((set) => ({
+    ...set,
+    basis: (site.distance_km ?? 0) > 5 ? `${set.basis} The site is ${Math.round(site.distance_km!)} km from this cell.` : set.basis,
+  }));
 }
 export const photoKey = (cell: CellInfo, body: Body = cell.body) => `${body}:${cell.cell.lat},${cell.cell.lon}`;
 
@@ -209,11 +242,10 @@ export const photoKey = (cell: CellInfo, body: Body = cell.body) => `${body}:${c
 export function featuredPhotos(body: Body): Promise<PhotoSet> {
   return remember(`featured:${body}`, async () => {
     if (body === "earth") {
-      const set = await earthPhotos(-24.08, -69.92, { label: "Atacama Desert", region: "Atacama Desert", admin1: null, country: "Chile" });
-      return { ...set, basis: "The Atacama Desert near Yungay, Chile, a documented Mars analog site. Photographs from Wikimedia Commons." };
+      return analogPhotos({ name: "Atacama Desert, Yungay", lat: -24.08, lon: -69.92 });
     }
     const [term, world, about] = body === "moon"
-      ? ["Apollo 17", "Moon" as const, "Apollo 17 photographs from the Taurus–Littrow valley, the last crewed landing site."]
+      ? ["Apollo 17", "Moon" as const, "Orbital views of the Apollo 17 landing site in the Taurus–Littrow valley."]
       : ["Jezero", "Mars" as const, "Jezero crater, where Perseverance is exploring an ancient river delta."];
     return { photos: (await nasaSearch(term, world)).slice(0, 4), basis: `${about} From NASA's image library.` };
   });

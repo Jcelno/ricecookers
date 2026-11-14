@@ -226,3 +226,13 @@ input[type="range"].slider:focus-visible { outline: 2px solid var(--world); outl
 .plate-skeleton { background: var(--color-basalt-800); animation: plate-pulse 1.4s ease-in-out infinite; }
 @keyframes plate-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .plate-img, .plate::after { transition: none; } .plate-skeleton { animation: none; } }
+
+/* First-visit guide: the visual side sits on a deep, lit stage. */
+.intro-stage {
+  background:
+    radial-gradient(120% 90% at 20% 0%, color-mix(in srgb, var(--world) 16%, transparent), transparent 60%),
+    radial-gradient(90% 80% at 100% 100%, rgb(86 200 245 / 0.07), transparent 60%),
+    var(--color-basalt-950);
+  border-right: 1px solid var(--hair);
+}
+@media (max-width: 767px) { .intro-stage { border-right: 0; border-bottom: 1px solid var(--hair); } }

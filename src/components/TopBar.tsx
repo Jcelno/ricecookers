@@ -1,4 +1,4 @@
-import { BookOpen, Database, Search as SearchIcon, X } from "lucide-react";
+import { BookOpen, CircleHelp, Database, Search as SearchIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
@@ -171,7 +171,11 @@ export function TopBar() {
 
       <div className="ml-auto flex items-center gap-1.5 max-sm:gap-0">
         <Search />
-        <Button onClick={() => setSheet("methodology")} title="How RADIUM measures, scores and grades">
+        <Button onClick={() => setSheet("intro")} title="A short guide to using RADIUM">
+          <CircleHelp size={15} />
+          <span className="hidden lg:inline">Guide</span>
+        </Button>
+        <Button className="max-sm:hidden" onClick={() => setSheet("methodology")} title="How RADIUM measures, scores and grades">
           <BookOpen size={15} />
           <span className="hidden lg:inline">Methodology</span>
         </Button>
