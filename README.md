@@ -29,11 +29,10 @@ npm run dev                                   # starts the data service (port 80
 `requirements.txt` holds only what the app needs to run. To run the tests or rebuild the data, also install
 the pipeline packages: `.venv/bin/pip install -r requirements-pipeline.txt`.
 
-**Deploying to Vercel.** Import the repository; `pyproject.toml` and `vercel.json` already configure it. The
-build installs `requirements.txt`, builds the web app into `public/` for Vercel's CDN, and runs
-`backend/app.py` as one Python function (about 380 MB, under Vercel's 500 MB limit). Leave the project's
-Framework Preset, Build Command and Output Directory on their defaults, because dashboard settings override
-`pyproject.toml`.
+**Deploying to Vercel.** Import the repository; `vercel.json` configures everything. Vercel builds the web app
+with Vite into `dist/` and serves it from its CDN, and runs the data service as one Python function
+(`api/index.py`, which loads `backend/app.py`, about 380 MB with its data, under the 500 MB limit). Every
+`/api/*` request is routed to that function.
 
 Open <http://localhost:3000>. `npm run dev` runs both processes; stop it with Ctrl-C.
 

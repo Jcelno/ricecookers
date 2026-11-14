@@ -1,9 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "PUPPETEER_SKIP_DOWNLOAD=1 npm ci",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" }
+  ],
   "functions": {
-    "backend/app.py": {
+    "api/index.py": {
       "maxDuration": 60,
-      "excludeFiles": "{node_modules/**,src/**,public/**,dist/**,pipeline/**,tests/**,docs/**,scripts/**,data/raw/**,logs/**,temporary screenshots/**,*.png,package-lock.json}"
+      "includeFiles": "{backend/**,data/processed/**}",
+      "excludeFiles": "{node_modules/**,src/**,public/**,dist/**,pipeline/**,tests/**,docs/**,scripts/**,logs/**,*.png,package-lock.json}"
     }
   }
 }
