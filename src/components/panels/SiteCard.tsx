@@ -9,6 +9,7 @@ import { OrbitalTile } from "@/components/panels/OrbitalTile";
 import { ProfileChart } from "@/components/panels/ProfileChart";
 import { TimelineChart } from "@/components/panels/TimelineChart";
 import { Photos } from "@/components/ui/Photos";
+import { DecisionCards } from "@/components/ui/Assessment";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Notice, Segmented, Spinner } from "@/components/ui/primitives";
 import { emitTour } from "@/lib/tour/events";
 import { api } from "@/lib/api";
@@ -257,6 +258,10 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
 
       {tab === "overview" && (
         <div className="anim-fade">
+          {cell.suitability && <section className="space-y-3 px-4 pt-4" aria-label="Mission decision support">
+            <div className="flex items-center gap-3"><GradeTile grade={cell.suitability.excluded ? null : cell.suitability.grade} size="lg" /><div className="min-w-0"><p className="text-xs font-medium text-regolith-100">{meta.missions.find(m => m.id === cell.suitability!.mission)?.label}</p><p className="text-xs text-regolith-400">{cell.suitability.excluded ? "Ruled out by a hard limit" : "Computed mission suitability"}</p></div></div>
+            <DecisionCards factors={cell.suitability.factors} />
+          </section>}
           {catalogSite && <section className="m-4 rounded-lg bg-basalt-800 p-3 ring-1 ring-[var(--hair)]"><SiteEvidence site={catalogSite} /></section>}
           <section className="px-4 pt-3">
             <div className={cx("rounded-md px-3 py-2.5 ring-1", a.tone === "good" ? "bg-[color-mix(in_srgb,var(--color-grade-b)_14%,transparent)] ring-[var(--color-grade-b)]/40" : a.tone === "warn" ? "bg-[color-mix(in_srgb,var(--color-grade-d)_14%,transparent)] ring-[var(--color-grade-d)]/40" : "bg-basalt-800 ring-[var(--hair)]")}>

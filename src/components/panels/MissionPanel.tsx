@@ -6,6 +6,7 @@ import { downloadCsv } from "@/lib/csv";
 import { GRADE_MEANING, pct, plural } from "@/lib/format";
 import type { Grade, Mission, SiteCard } from "@/lib/types";
 import { RegistrySelect } from "@/components/catalog/SiteCatalog";
+import { DecisionCards } from "@/components/ui/Assessment";
 import { shares, useStore } from "@/store";
 
 function MissionPicker({ missions, value, onChange }: { missions: Mission[]; value: string; onChange: (id: string) => void }) {
@@ -249,6 +250,7 @@ export function MissionPanel() {
                     />
                   </label>
                 </div>
+                <div className="px-4 pb-2.5"><DecisionCards factors={s.factors} compact /></div>
               </li>
             );
           })}
