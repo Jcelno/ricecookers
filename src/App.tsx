@@ -6,18 +6,20 @@ import { LayersPanel } from "@/components/panels/LayersPanel";
 import { LocationPanel } from "@/components/panels/LocationPanel";
 import { MissionPanel } from "@/components/panels/MissionPanel";
 import { TopBar } from "@/components/TopBar";
-import { TwinView } from "@/components/twin/TwinView";
 import { Button, cx, IconButton, Notice, Spinner } from "@/components/ui/primitives";
-import { CompareView } from "@/components/compare/CompareView";
-import { NearView } from "@/components/near/NearView";
+import { CompareTray } from "@/components/CompareTray";
 import { applyLink, startLinkSync } from "@/lib/deeplink";
 import { useStore } from "@/store";
 
+const TwinView = lazy(() => import("@/components/twin/TwinView").then((m) => ({ default: m.TwinView })));
+const NearView = lazy(() => import("@/components/near/NearView").then((m) => ({ default: m.NearView })));
+const CompareView = lazy(() => import("@/components/compare/CompareView").then((m) => ({ default: m.CompareView })));
 const Methodology = lazy(() => import("@/components/sheets/Methodology"));
 const Sources = lazy(() => import("@/components/sheets/Sources"));
 const Intro = lazy(() => import("@/components/sheets/Intro"));
 const BriefSheet = lazy(() => import("@/components/sheets/Brief"));
 const Scenarios = lazy(() => import("@/components/sheets/Scenarios"));
+const MissionReport = lazy(() => import("@/components/sheets/MissionReport"));
 const OfflineDemo = lazy(() => import("@/components/OfflineDemo"));
 
 function Side({ side, open, children, label }: { side: "left" | "right"; open: boolean; children: React.ReactNode; label: string }) {
@@ -98,12 +100,13 @@ export default function App() {
     <div className="flex h-full flex-col">
       <TopBar />
       <main className="relative flex min-h-0 flex-1">
+        <CompareTray />
         {mode === "twin" ? (
-          <TwinView />
+          <Suspense fallback={<div className="grid flex-1 place-items-center"><Spinner label="Opening Earth Analogs" /></div>}><TwinView /></Suspense>
         ) : mode === "near" ? (
-          <NearView />
+          <Suspense fallback={<div className="grid flex-1 place-items-center"><Spinner label="Opening Near Me" /></div>}><NearView /></Suspense>
         ) : mode === "compare" ? (
-          <CompareView />
+          <Suspense fallback={<div className="grid flex-1 place-items-center"><Spinner label="Opening Compare" /></div>}><CompareView /></Suspense>
         ) : (
           <>
             <Side side="left" open={leftOpen} label={mode === "mission" ? "Mission panel" : "Layers panel"}>
@@ -122,6 +125,7 @@ export default function App() {
         {sheet === "intro" && <Intro onClose={() => setSheet(null)} />}
         {sheet === "brief" && <BriefSheet onClose={() => setSheet(null)} />}
         {sheet === "scenarios" && <Scenarios onClose={() => setSheet(null)} />}
+        {sheet === "report" && <MissionReport onClose={() => setSheet(null)} />}
       </Suspense>
     </div>
   );

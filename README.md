@@ -42,7 +42,7 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Data service with auto-reload plus the Vite dev server on port 3000 |
-| `npm test` | 80 checks: science (`tests/test_science.py`) and API rules (`tests/test_api.py`) |
+| `npm test` | 90 checks: science (`tests/test_science.py`) and API rules (`tests/test_api.py`) |
 | `npm run build` | Type-check and build the web app into `dist/` |
 | `npm run pipeline` | Download the source data and rebuild every grid |
 | `node screenshot.mjs http://localhost:3000 label` | Save a screenshot to `temporary screenshots/` |
@@ -53,10 +53,12 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
   Terrain Camera, Viking MDIM 2.1) and a 2D map of Earth (Sentinel-2 cloudless, Blue Marble). Click anywhere
   to read the measurements for that analysis cell. Turn on data layers: elevation, slope, roughness,
   temperature, sunlight, hydrogen, permanent shadow, dust, precipitation, vegetation and more.
-- **Design a mission.** Pick lunar permanent base, Mars robotic landing or Mars human exploration. Move the
+- **Mission Planner.** A five-step guided workflow (destination, mission type, priorities, candidates, save or
+  export as CSV or a printable report). Pick lunar permanent base, Mars robotic landing or Mars human exploration. Move the
   priority sliders; every cell is regraded A to F, the globe is recoloured and the list of best sites is
   re-ranked, with a sentence explaining what changed. Hard limits can be switched on and off.
-- **Earth Twin.** Choose a Moon or Mars site and a purpose (rover mobility, ice and drilling, geology,
+- **Earth Analogs.** Lettered markers (A, B, C …) shared by the map and the list, adjustable matching weights,
+  use cases and a terrain thumbnail for each match. Choose a Moon or Mars site and a purpose (rover mobility, ice and drilling, geology,
   dust, habitability). RADIUM compares the site with all 341,042 land cells on Earth, lists the closest
   matches, marks which are documented analog sites and which are new leads, and opens a side-by-side
   comparison that states the strong matches, the weak ones, and the conditions Earth cannot reproduce.
@@ -76,6 +78,16 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
   how the top sites change, with each change explained by criterion.
 - **Analog atlas.** In Earth Analogs, colour documented sites by grade, environment type or study theme, filter
   by grade or category, and show or hide documented sites and model matches.
+- **Site Analysis Card.** Selecting a place opens an evidence-based assessment, a plain-language summary, metric
+  cards with sources and limits (K or °C), a real orbital tile of the cell, photographs, a regional terrain profile,
+  the cell's change through the lunar day or the year, its closest Earth twins and its mission grade, with actions to
+  find Earth twins, find similar places near you, compare, save or plan a mission.
+- **Map tools.** Swipe comparison between imagery and any data layer, centre on the selection, full screen, a
+  Simple/Advanced layer panel, and dashed outlines of the lunar 2.4 km polar grids.
+- **Compare workspace.** Up to four places from any world with Landing, Rover, Habitat and Science presets, bars,
+  "why this site / why not" statements drawn only from measured differences, CSV export, and the Earth-twin pair view.
+  The list follows you across views (compare tray) and is kept in share links.
+- **Saved.** Places and mission plans saved in this browser.
 - **Compare.** The chosen Moon or Mars site and Earth place side by side: maps, photographs, cell sizes, a
   purpose selector that recomputes live, a radar and bars of the normalised similarity dimensions with the
   measured values in their units, and separate lists of strengths, mismatches and what Earth cannot reproduce.
@@ -105,6 +117,13 @@ curl -s localhost:8000/api/analogs/nearby -H 'content-type: application/json' \
 curl -s localhost:8000/api/brief -H 'content-type: application/json' \
   -d '{"body": "mars", "lat": -4.59, "lon": 137.44, "purpose": "mobility",
        "earth_lat": 36.38, "earth_lon": -117.88, "setting": "field"}'
+
+# Temperature through the lunar day (Diviner, by local hour) at the Apollo 11 site
+curl -s 'localhost:8000/api/timeline?body=moon&lat=0.67&lon=23.47'
+
+# Earth Twin with your own weights (0–100 per dimension of the purpose)
+curl -s localhost:8000/api/twin -H 'content-type: application/json' \
+  -d '{"body": "mars", "lat": -4.59, "lon": 137.44, "purpose": "general", "weights": {"terrain": 80, "geology": 20}}'
 
 # Regional elevation profile (cell means) through Gale crater, north to south
 curl -s 'localhost:8000/api/profile?body=mars&lat=-4.59&lon=137.44&axis=ns'

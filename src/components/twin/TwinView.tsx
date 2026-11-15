@@ -1,7 +1,7 @@
 import { ArrowLeft, Columns2, Download, FileText, Home, Minus, Navigation, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/EarthMap";
+import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/LazyEarthMap";
 import { type GlobeHandle, GlobeView, type SiteMarker, type ViewState } from "@/components/map/GlobeView";
 import { GradeLegend } from "@/components/map/Stage";
 import { Tapes, type TapesHandle } from "@/components/map/Tapes";
@@ -10,6 +10,8 @@ import { Button, cx, GradeTile, IconButton, Meter, Notice, Section, Segmented, S
 import { overlay } from "@/lib/api";
 import { badgeFor, categoriesFor, pinCategories } from "@/lib/atlas";
 import { downloadCsv } from "@/lib/csv";
+import { earthTile } from "@/components/panels/OrbitalTile";
+import { letterFor } from "@/lib/labels";
 import { photoKey, photosFor } from "@/lib/photos";
 import { formatCoord, formatKm, GRADE_HEX, formatMeasure, formatValue, GRADE_MEANING, pct } from "@/lib/format";
 import type { Candidate, CellInfo, CompareResult, DimDetail, DocumentedSite, Measure, Planet } from "@/lib/types";
@@ -147,6 +149,7 @@ function Origin() {
               </ul>
             </Section>
           )}
+          {twin && <WeightSliders key={`${twin.planet.body}-${purpose}`} dims={twin.dimensions} />}
         </>
       )}
     </aside>
@@ -155,10 +158,13 @@ function Origin() {
 
 /* --------------------------------------------------------------- right column */
 function CandidateRow({ c, active, onClick }: { c: Candidate; active: boolean; onClick: () => void }) {
+  const tpl = useStore((s) => s.meta?.layers.earth.tiles[0]?.url);
+  const thumb = tpl ? earthTile(tpl, c.lat, c.lon, 8) : null;
+  const useful = c.fitness.filter((f) => f.grade === "A" || f.grade === "B").map((f) => f.label.toLowerCase());
   return (
     <li className="border-t border-[var(--hair)]">
-      <button type="button" aria-current={active} onClick={onClick} className="row-ctl grid w-full grid-cols-[18px_32px_1fr] items-start gap-x-2.5 px-4 py-2.5 text-left">
-        <span className="tnum mt-1.5 text-right text-xs text-regolith-400">{c.rank}</span>
+      <button type="button" aria-current={active} onClick={onClick} className={cx("row-ctl grid w-full grid-cols-[24px_32px_1fr_52px] items-start gap-x-2.5 px-4 py-2.5 text-left", active && "bg-basalt-800")}>
+        <span className="mt-1 grid size-6 place-items-center rounded-full border-2 text-[11px] font-bold text-regolith-50" style={{ background: "#08111f", borderColor: c.grade ? GRADE_HEX[c.grade] : "#7b8fa1" }} aria-label={`Marker ${letterFor(c.rank - 1)}`}>{letterFor(c.rank - 1)}</span>
         <GradeTile grade={c.grade} />
         <span className="min-w-0">
           <span className="placename block text-md leading-tight text-regolith-50 [overflow-wrap:anywhere]">{c.place.label}</span>
@@ -170,6 +176,7 @@ function CandidateRow({ c, active, onClick }: { c: Candidate; active: boolean; o
               <span className="rounded-xs px-1.5 py-px text-2xs text-world ring-1 ring-[var(--world)]" title="No site in RADIUM's reference list of documented analogs lies within 150 km. That does not mean the area has never been studied.">Not in reference list</span>
             )}
           </span>
+          {useful.length > 0 && <span className="mt-1 block text-2xs leading-snug text-regolith-300">Useful for {useful.join(", ")}.</span>}
           <span className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-1">
             {c.dimensions.filter((d) => d.weight > 0).map((d) => (
               <span key={d.id} className="inline-flex items-center gap-1 text-2xs text-regolith-400">
@@ -179,6 +186,11 @@ function CandidateRow({ c, active, onClick }: { c: Candidate; active: boolean; o
             ))}
           </span>
         </span>
+        {thumb && (
+          <span className="relative mt-0.5 block size-[52px] overflow-hidden rounded-sm ring-1 ring-[var(--hair)]" title="Sentinel-2 cloudless tile around this place (EOX, CC BY 4.0)">
+            <img src={thumb.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="block size-full object-cover" />
+          </span>
+        )}
       </button>
     </li>
   );
@@ -205,6 +217,7 @@ function DocumentedRow({ d, onClick }: { d: DocumentedSite; onClick: () => void 
 
 function Results() {
   const twin = useStore((s) => s.twin);
+  const picked = useStore((s) => s.picked);
   const status = useStore((s) => s.twinStatus);
   const error = useStore((s) => s.twinError);
   const origin = useStore((s) => s.twinOrigin);
@@ -255,7 +268,7 @@ function Results() {
       </div>
       {tab === "best" ? (
         <>
-          <ol className="mt-2">{twin.candidates.map((c) => <CandidateRow key={c.id} c={c} active={false} onClick={() => void pickEarth(c.lat, c.lon, true)} />)}</ol>
+          <ol className="mt-2">{twin.candidates.map((c) => <CandidateRow key={c.id} c={c} active={!!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13} onClick={() => void pickEarth(c.lat, c.lon, true)} />)}</ol>
           <p className="hair-t px-4 py-3 text-2xs leading-relaxed text-regolith-500">
             Ranked by data alone. The list of documented analog sites is used only to label results and never changes a grade. Click anywhere on the map to grade a place of your own.
           </p>
@@ -407,6 +420,7 @@ function Comparison({ c }: { c: CompareResult }) {
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Button size="sm" variant="solid" onClick={() => useStore.getState().openBrief({ lat: c.earth.cell.lat, lon: c.earth.cell.lon })}><FileText size={13} /> Create a test brief</Button>
           <Button size="sm" variant="outline" onClick={() => useStore.getState().setMode("compare")}><Columns2 size={13} /> Full side-by-side view</Button>
+          <Button size="sm" variant="outline" onClick={() => { const st = useStore.getState(); st.addCompare({ body: c.planet.body, lat: c.planet.cell.lat, lon: c.planet.cell.lon, label: c.planet.place.label }); st.addCompare({ body: "earth", lat: c.earth.cell.lat, lon: c.earth.cell.lon, label: c.earth.place.label }); }}>Add both to Compare</Button>
           <Button size="sm" variant="outline" onClick={() => useStore.getState().setMode("near")}><Navigation size={13} /> Find nearer analogs</Button>
         </div>
       </section>
@@ -486,11 +500,12 @@ export function TwinView() {
   const tapes = useRef<TapesHandle>(null);
 
   const basemap = meta.layers.earth.tiles.find((b) => b.id === earthLayers.base) ?? meta.layers.earth.tiles[0];
-  const url = origin && showOverlay ? overlay.twin(origin.body, origin.lat, origin.lon, purpose) : null;
+  const twinWeights = useStore((s) => s.twinWeights);
+  const url = origin && showOverlay ? overlay.twin(origin.body, origin.lat, origin.lon, purpose, twinWeights) : null;
   const markers: SiteMarker[] = useMemo(
     () => (showModelled ? twin?.candidates ?? [] : [])
       .filter((c) => gradeFilter.includes(c.grade ?? "none"))
-      .map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, text: String(c.rank), grade: c.grade, active: !!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13 })),
+      .map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, text: letterFor(c.rank - 1), grade: c.grade, active: !!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13 })),
     [twin, picked, showModelled, gradeFilter],
   );
   // Atlas: documented sites become text badges coloured by grade, environment or study theme, then filtered.
@@ -524,7 +539,8 @@ export function TwinView() {
     <>
       <Origin />
       <div className="relative h-full min-w-0 flex-1 overflow-hidden bg-void">
-        <EarthMap ref={handle} basemap={basemap} labels={earthLayers.labels} overlayUrl={url} opacity={0.8} dimBase={!!url} pins={gradedPins} markers={markers} selection={sel} focus={focus} onPick={onPick} onView={onView} />
+        <EarthMap ref={handle} basemap={basemap} labels={earthLayers.labels} overlayUrl={url} opacity={0.8} dimBase={!!url} pins={gradedPins} markers={markers} selection={sel} focus={focus} onPick={onPick} onView={onView}
+          onMarker={(id) => { const c = twin?.candidates.find((x) => x.id === id); if (c) void pickEarth(c.lat, c.lon, true); }} />
         <Tapes ref={tapes} />
         <div className="surface-float absolute top-3 right-3 z-20 flex flex-col rounded-md ring-1 ring-[var(--hair)]">
           <IconButton label="Zoom in" onClick={() => handle.current?.zoom(0.5)}><Plus size={16} /></IconButton>
@@ -578,7 +594,7 @@ function AtlasPanel({ twin, shownDocs, shownModel, context, body }: { twin: Retu
             <div className="mt-2"><Segmented size="sm" label="Colour documented sites by" value={s.colorBy} onChange={(v) => s.setAtlas({ colorBy: v, catFilter: null })}
               options={[{ value: "grade", label: "Grade" }, { value: "environment", label: "Environment" }, { value: "application", label: "Study theme" }]} /></div>
             <p className="mt-1.5 text-2xs leading-snug text-regolith-400">
-              {s.colorBy === "grade" ? `Squares are documented sites, circles the numbered model matches, both graded for ${context || `${body === "moon" ? "Moon" : "Mars"} similarity`}. RADIUM's own A–F scale, not a NASA rating.`
+              {s.colorBy === "grade" ? `Lettered circles are the model's best matches (A is best; ring colour is the grade). Squares are documented sites and show their own grade letter. Both are graded for ${context || `${body === "moon" ? "Moon" : "Mars"} similarity`} on RADIUM's own A–F scale, not a NASA rating.`
                 : s.colorBy === "environment" ? "Environment of each documented site, from its published study theme. Model matches keep their grade colour: their environment type is not catalogued."
                   : "What each documented site has been studied for, from the reference list. A study theme, not a measurement."}
             </p>
@@ -612,5 +628,48 @@ function AtlasPanel({ twin, shownDocs, shownModel, context, body }: { twin: Retu
         )}
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------ custom weights */
+/** Re-weight the comparison dimensions of the current purpose. Missing dimensions stay unscored; results update live. */
+function WeightSliders({ dims }: { dims: { id: string; label: string; weight: number; available: boolean }[] }) {
+  const custom = useStore((s) => s.twinWeights);
+  const setW = useStore((s) => s.setTwinWeights);
+  const meta = useStore((s) => s.meta)!;
+  const purpose = useStore((s) => s.purpose);
+  const body = useStore((s) => s.twinOrigin?.body ?? "mars");
+  // Defaults always come from the purpose's documented weights, not from the (possibly customised) last result.
+  const base = useMemo(() => {
+    const pw = meta.purposes[body].find((p) => p.id === purpose)?.weights ?? {};
+    return Object.fromEntries(dims.map((d) => [d.id, Math.round((pw[d.id] ?? 0) * 100)]));
+  }, [meta, body, purpose, dims]);
+  const [w, setLocal] = useState<Record<string, number>>(custom ?? base);
+  const timer = useRef(0);
+  const total = Object.values(w).reduce((a, b) => a + b, 0) || 1;
+  const change = (id: string, v: number) => {
+    const next = { ...w, [id]: v };
+    setLocal(next);
+    window.clearTimeout(timer.current);
+    if (Object.values(next).some((x) => x > 0)) timer.current = window.setTimeout(() => setW(next), 300);
+  };
+  return (
+    <Section title="Adjust matching weights" defaultOpen={false} count={custom ? "custom" : "purpose defaults"}>
+      <div className="px-4 pb-3">
+        <p className="mb-2 text-2xs leading-snug text-regolith-400">Say what matters for your test: a rover engineer might weight terrain, a geologist rock type. Shares are rescaled to 100%. Dimensions without data at this site stay unscored whatever their weight.</p>
+        <ul className="space-y-1">
+          {dims.map((d) => (
+            <li key={d.id} className={d.available ? "" : "opacity-50"}>
+              <div className="flex items-baseline justify-between text-xs"><label htmlFor={`tw-${d.id}`} className="text-regolith-200">{d.label}</label><span className="tnum text-regolith-400">{Math.round(((w[d.id] ?? 0) / total) * 100)}%</span></div>
+              <input id={`tw-${d.id}`} type="range" min={0} max={100} value={w[d.id] ?? 0} onChange={(e) => change(d.id, Number(e.target.value))} className="slider" aria-label={`${d.label} weight`} />
+            </li>
+          ))}
+        </ul>
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-2xs text-regolith-500">{custom ? "Using your weights: grades below are for this weighting." : "Using the purpose's documented weights."}</span>
+          <Button size="sm" disabled={!custom} onClick={() => { setLocal(base); setW(null); }}><RotateCcw size={12} /> Defaults</Button>
+        </div>
+      </div>
+    </Section>
   );
 }

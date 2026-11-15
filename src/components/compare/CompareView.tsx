@@ -1,7 +1,8 @@
 import { ArrowLeft, BookOpen, FileText, Navigation } from "lucide-react";
-import { useMemo } from "react";
+import { SitesCompare } from "@/components/compare/SitesCompare";
+import { useMemo, useState } from "react";
 
-import { EarthMap } from "@/components/map/EarthMap";
+import { EarthMap } from "@/components/map/LazyEarthMap";
 import { GlobeView } from "@/components/map/GlobeView";
 import { Photos } from "@/components/ui/Photos";
 import { Button, cx, GradeTile, Notice, Spinner } from "@/components/ui/primitives";
@@ -88,7 +89,7 @@ function Side({ cell, title, world }: { cell: CellInfo; title: string; world: "m
   );
 }
 
-export function CompareView() {
+function PairView() {
   const meta = useStore((s) => s.meta)!;
   const c = useStore((s) => s.compare);
   const status = useStore((s) => s.compareStatus);
@@ -101,7 +102,7 @@ export function CompareView() {
     return (
       <div className="scroll grid h-full w-full place-items-center p-6">
         <div className="max-w-md text-center">
-          <h2 className="font-serif text-[1.8rem] leading-tight font-medium tracking-[-0.03em] text-regolith-50">Nothing to compare yet</h2>
+          <h2 className="font-serif text-[1.8rem] leading-tight font-medium tracking-[-0.03em] text-regolith-50">No Earth twin pair yet</h2>
           <p className="mt-2 text-sm leading-relaxed text-regolith-300">Choose a Moon or Mars site in Earth Analogs and open one of its Earth matches. The pair then appears here side by side.</p>
           <Button variant="solid" className="mt-4" onClick={() => setMode("twin")}>Go to Earth Analogs</Button>
         </div>
@@ -207,6 +208,22 @@ export function CompareView() {
         </div>
       </div>
       {status === "loading" && <div className="fixed right-4 bottom-4 z-30"><Spinner label="Recomputing for this purpose" /></div>}
+    </div>
+  );
+}
+
+/** Compare: any saved or selected places side by side, plus the Moon/Mars-vs-Earth twin pair when one is open. */
+export function CompareView() {
+  const list = useStore((s) => s.compareList);
+  const pair = useStore((s) => !!s.compare);
+  const [tab, setTab] = useState<"sites" | "pair">(list.length === 0 && pair ? "pair" : "sites");
+  return (
+    <div className="flex h-full w-full flex-col">
+      <div role="tablist" aria-label="Comparison type" className="hair-b flex shrink-0 gap-1 px-4 py-2">
+        <button type="button" role="tab" aria-selected={tab === "sites"} onClick={() => setTab("sites")} className="ctl h-8 rounded-sm px-3 text-sm font-medium text-regolith-200">Sites ({list.length})</button>
+        <button type="button" role="tab" aria-selected={tab === "pair"} onClick={() => setTab("pair")} className="ctl h-8 rounded-sm px-3 text-sm font-medium text-regolith-200">Earth twin pair{pair ? "" : " (none)"}</button>
+      </div>
+      <div className="min-h-0 flex-1">{tab === "sites" ? <SitesCompare /> : <PairView />}</div>
     </div>
   );
 }

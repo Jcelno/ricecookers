@@ -6,6 +6,19 @@ import type { Body, CellInfo, CompareResult, Grade, Meta, NearbyResult, Pin, Pla
 export type Mode = "explore" | "mission" | "twin" | "near" | "compare";
 export type ColorBy = "grade" | "environment" | "application";
 export type Units = "km" | "mi";
+/** A place on any world, as carried between views (Compare tray, saved list, mission destination). */
+export interface SiteRef { body: Body; lat: number; lon: number; label: string }
+export interface SavedMission { id: string; name: string; mission: string; weights: Record<string, number>; limits: string[]; site: SiteRef | null; created: string }
+interface SavedState { sites: SiteRef[]; missions: SavedMission[] }
+const SAVED_KEY = "radium.saved.v1";
+const loadSaved = (): SavedState => {
+  try { const v = JSON.parse(localStorage.getItem(SAVED_KEY) ?? "null"); if (v && Array.isArray(v.sites) && Array.isArray(v.missions)) return v; } catch { /* storage blocked */ }
+  return { sites: [], missions: [] };
+};
+const storeSaved = (v: SavedState) => { try { localStorage.setItem(SAVED_KEY, JSON.stringify(v)); } catch { /* storage blocked: kept for this tab only */ } };
+const sameSite = (a: SiteRef, b: SiteRef) => a.body === b.body && Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(a.lon - b.lon) < 1e-4;
+export const COMPARE_MAX = 4;
+
 export interface BriefRequest { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number }
 
 // Miles by default only where they are the everyday unit; anyone can switch.
@@ -86,11 +99,17 @@ interface State {
   nearActive: string | null;
 
   brief: BriefRequest | null;
+  compareList: SiteRef[];
+  saved: SavedState;
+  tempUnit: "K" | "C";
+  twinWeights: Record<string, number> | null;
+  /** Layer panel detail: plain-language (false) or full technical (true). */
+  advanced: boolean;
   scenarioB: { mission: string; weights: Record<string, number>; limits: string[] } | null;
 
   leftOpen: boolean;
   rightOpen: boolean;
-  sheet: null | "methodology" | "sources" | "intro" | "brief" | "scenarios";
+  sheet: null | "methodology" | "sources" | "intro" | "brief" | "scenarios" | "report";
 
   init: () => Promise<void>;
   setBody: (b: Body) => void;
@@ -118,6 +137,13 @@ interface State {
   setNear: (patch: Partial<Pick<State, "nearLoc" | "nearRadius" | "nearMode" | "nearDocOnly" | "units" | "nearActive">>) => void;
   runNearby: () => Promise<void>;
   setTarget: (o: { body: Planet; lat: number; lon: number } | null) => void;
+  addCompare: (s: SiteRef) => void;
+  removeCompare: (i: number) => void;
+  clearCompare: () => void;
+  saveSite: (s: SiteRef) => void;
+  saveMission: (name: string) => void;
+  removeSaved: (kind: "sites" | "missions", i: number) => void;
+  setTwinWeights: (w: Record<string, number> | null) => void;
   openBrief: (earth: { lat: number; lon: number }) => void;
 
   setPanel: (side: "left" | "right", open: boolean) => void;
@@ -189,10 +215,16 @@ export const useStore = create<State>((set, get) => ({
   nearActive: null,
 
   brief: null,
+  compareList: [],
+  saved: loadSaved(),
+  tempUnit: "K",
+  twinWeights: null,
+  advanced: false,
   scenarioB: null,
 
   // On narrow screens panels float over the map, so they start closed.
-  leftOpen: typeof window === "undefined" || window.innerWidth >= 1100,
+  // The map is the centrepiece: the layer panel starts collapsed below 1400 px (one click opens it).
+  leftOpen: typeof window === "undefined" || window.innerWidth >= 1400,
   // The right panel opens at the start on every screen size: on phones it is a bottom sheet over the map,
   // so first-time visitors see what RADIUM is for. It can be closed.
   rightOpen: true,
@@ -367,7 +399,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setPurpose: (purpose) => {
-    set({ purpose, compare: null });
+    set({ purpose, compare: null, twinWeights: null });
     if (get().mode === "near" && get().nearLoc) void get().runNearby();
     void get().runTwin().then(() => {
       const p = get().picked;
@@ -382,7 +414,7 @@ export const useStore = create<State>((set, get) => ({
     twinAbort = new AbortController();
     set({ twinStatus: "loading", twinError: null });
     try {
-      const twin = await api.twin({ ...s.twinOrigin, purpose: s.purpose, n: 10 }, twinAbort.signal);
+      const twin = await api.twin({ ...s.twinOrigin, purpose: s.purpose, n: 10, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, twinAbort.signal);
       set({ twin, twinStatus: "ready" });
     } catch (e) {
       if (aborted(e)) return;
@@ -398,7 +430,7 @@ export const useStore = create<State>((set, get) => ({
     set({ picked: { lat, lon }, compareStatus: "loading", compareError: null, rightOpen: true });
     if (fly) get().flyTo("earth", lat, lon, 1400);
     try {
-      const compare = await api.compare({ ...s.twinOrigin, purpose: s.purpose, earth_lat: lat, earth_lon: lon }, compareAbort.signal);
+      const compare = await api.compare({ ...s.twinOrigin, purpose: s.purpose, earth_lat: lat, earth_lon: lon, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, compareAbort.signal);
       set({ compare, compareStatus: "ready" });
     } catch (e) {
       if (aborted(e)) return;
@@ -438,7 +470,7 @@ export const useStore = create<State>((set, get) => ({
     try {
       const nearResult = await api.nearby({
         lat: s.nearLoc.lat, lon: s.nearLoc.lon, radius_km: s.nearRadius, mode: s.nearMode, documented_only: s.nearDocOnly, limit: 20,
-        ...(target ? { body: target.body, target_lat: target.lat, target_lon: target.lon, purpose: s.purpose } : {}),
+        ...(target ? { body: target.body, target_lat: target.lat, target_lon: target.lon, purpose: s.purpose, ...(s.twinWeights ? { weights: s.twinWeights } : {}) } : {}),
       }, nearAbort.signal);
       set({ nearResult, nearStatus: "ready", nearActive: null });
     } catch (e) {
@@ -453,6 +485,39 @@ export const useStore = create<State>((set, get) => ({
     const purpose = purposes.some((p) => p.id === s.purpose) ? s.purpose : "general";
     set({ twinOrigin: o, purpose, twin: null, picked: null, compare: null, ...(o ? {} : { nearMode: "nearest" as const }) });
     if (s.nearLoc) void get().runNearby();
+  },
+
+  addCompare: (site) => set((s) => {
+    if (s.compareList.some((x) => sameSite(x, site))) return {};
+    return { compareList: [...s.compareList, site].slice(-COMPARE_MAX) };
+  }),
+  removeCompare: (i) => set((s) => ({ compareList: s.compareList.filter((_, k) => k !== i) })),
+  clearCompare: () => set({ compareList: [] }),
+  saveSite: (site) => {
+    const s = get();
+    if (s.saved.sites.some((x) => sameSite(x, site))) return;
+    const saved = { ...s.saved, sites: [site, ...s.saved.sites].slice(0, 50) };
+    storeSaved(saved);
+    set({ saved });
+  },
+  saveMission: (name) => {
+    const s = get();
+    const sel = s.cell && s.cell.body !== "earth" ? { body: s.cell.body, lat: s.cell.cell.lat, lon: s.cell.cell.lon, label: s.cell.place.label } : null;
+    const m: SavedMission = { id: `${Date.now()}`, name, mission: s.missionId, weights: { ...s.rawWeights[s.missionId] }, limits: [...(s.limitsOn[s.missionId] ?? [])], site: sel, created: new Date().toISOString().slice(0, 16).replace("T", " ") };
+    const saved = { ...s.saved, missions: [m, ...s.saved.missions].slice(0, 30) };
+    storeSaved(saved);
+    set({ saved });
+  },
+  removeSaved: (kind, i) => {
+    const s = get();
+    const saved = { ...s.saved, [kind]: (s.saved[kind] as unknown[]).filter((_, k) => k !== i) } as SavedState;
+    storeSaved(saved);
+    set({ saved });
+  },
+  setTwinWeights: (w) => {
+    set({ twinWeights: w });
+    void get().runTwin().then(() => { const p = get().picked; if (p) void get().pickEarth(p.lat, p.lon); });
+    if (get().mode === "near" && get().nearLoc) void get().runNearby();
   },
 
   openBrief: (earth) => {

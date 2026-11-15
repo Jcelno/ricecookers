@@ -24,15 +24,42 @@ function label(v: number, step: number, pos: string, neg: string) {
   return `${a.toFixed(dec)}°${v > 0 ? pos : neg}`;
 }
 
-export const Tapes = forwardRef<TapesHandle, { inset?: { left: number; right: number } }>(function Tapes({ inset }, ref) {
+export const Tapes = forwardRef<TapesHandle, { inset?: { left: number; right: number }; globe?: boolean }>(function Tapes({ inset, globe = false }, ref) {
   const lonC = useRef<HTMLCanvasElement>(null);
   const latC = useRef<HTMLCanvasElement>(null);
   const last = useRef<ViewState | null>(null);
+  const globeRef = useRef(globe);
+  globeRef.current = globe;
 
   const draw = (v: ViewState) => {
     last.current = v;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const font = '500 11px "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif';
+
+    // Near a pole meridians converge, so straight latitude/longitude scales would mislabel the view. Hide them.
+    const latSpan = ((latC.current?.clientHeight ?? 600) / 2) * v.degPerPx;
+    // Only on the 3D globes: the Earth map is Mercator, where meridians stay parallel and the scales stay valid.
+    if (globeRef.current && Math.abs(v.lat) + latSpan > 88.5) {
+      for (const c of [lonC.current, latC.current]) {
+        if (!c) continue;
+        const g = c.getContext("2d")!;
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.clearRect(0, 0, c.width, c.height);
+      }
+      const c = lonC.current;
+      if (c) {
+        const w = c.clientWidth, h = c.clientHeight;
+        if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+        const g = c.getContext("2d")!;
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.font = font;
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        g.fillStyle = `${INK}0.7)`;
+        g.fillText(`${v.lat >= 0 ? "North" : "South"} polar view: scales hidden because meridians converge. The pointer readout stays exact.`, w / 2, h / 2);
+      }
+      return;
+    }
 
     // ---- longitude tape (bottom) ----
     const c1 = lonC.current;

@@ -1,9 +1,10 @@
-import { ArrowLeftRight, Download, FileText, Home, LocateFixed, MapPin, Minus, Plus, X } from "lucide-react";
+import { ArrowLeftRight, Bookmark, Columns2, Download, ExternalLink, FileText, Home, LocateFixed, MapPin, Minus, Plus, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/EarthMap";
+import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/LazyEarthMap";
 import type { GlobeHandle, SiteMarker, ViewState } from "@/components/map/GlobeView";
 import { Tapes, type TapesHandle } from "@/components/map/Tapes";
+import { letterFor } from "@/lib/labels";
 import { Button, cx, GradeTile, IconButton, Notice, Segmented, Spinner, Switch } from "@/components/ui/primitives";
 import { GRADE_HEX, GRADE_MEANING } from "@/lib/format";
 import { api } from "@/lib/api";
@@ -263,7 +264,7 @@ function Scatter({ items, active, onPick, units }: { items: Item[]; active: stri
           );
         })}
       </svg>
-      <figcaption className="mt-1 text-2xs leading-snug text-regolith-500">Up is a closer match, left is nearer. Diamonds are documented sites, circles modelled regions. A decision aid only: distance never changes a grade.</figcaption>
+      <figcaption className="mt-1 text-2xs leading-snug text-regolith-500">Up is a closer match, left is nearer. Select a point to select that lettered result. Diamonds are documented sites, circles modelled regions. A decision aid only: distance never changes a grade.</figcaption>
     </figure>
   );
 }
@@ -275,9 +276,9 @@ function ResultRow({ it, active, units, hasTarget }: { it: Item; active: boolean
   const tags = it.kind === "documented" ? it.tags.environment.filter((t) => t.id !== "other").map((t) => t.label) : [];
   const open = () => { setNear({ nearActive: it.key }); flyTo("earth", it.lat, it.lon, 900); };
   return (
-    <li className={cx("border-t border-[var(--hair)] first:border-t-0", active && "bg-basalt-800/70")}>
+    <li id={`near-${it.key}`} className={cx("border-t border-[var(--hair)] first:border-t-0", active && "bg-basalt-800/70")}>
       <button type="button" onClick={open} aria-expanded={active} className="row-ctl grid w-full grid-cols-[22px_28px_1fr_auto] items-center gap-x-2.5 px-4 py-2.5 text-left">
-        <span className="tnum text-xs text-regolith-400">{it.n}</span>
+        <span className="grid size-6 place-items-center rounded-full border-2 text-[11px] font-bold text-regolith-50" style={{ background: "#08111f", borderColor: sim?.grade ? GRADE_HEX[sim.grade] : "#7b8fa1" }} aria-label={`Marker ${letterFor(it.n - 1)}`}>{letterFor(it.n - 1)}</span>
         {hasTarget ? <GradeTile grade={sim?.grade ?? null} size="sm" title={sim?.grade ? `${GRADE_MEANING[sim.grade]} match` : "Not graded: too little comparable data"} />
           : <span className="grid size-6 place-items-center"><span className="block size-2.5 rotate-45 rounded-[2px] border-[1.5px] border-regolith-100" /></span>}
         <span className="min-w-0">
@@ -298,6 +299,11 @@ function ResultRow({ it, active, units, hasTarget }: { it: Item; active: boolean
           )}
           {hasTarget && sim?.score === null && <p className="mt-1 text-regolith-400">Not graded: too little comparable data at this place.</p>}
           <div className="mt-2 flex flex-wrap gap-1.5">
+            <Button size="sm" variant="outline" onClick={() => useStore.getState().addCompare({ body: "earth", lat: it.lat, lon: it.lon, label: itemName(it) })}><Columns2 size={13} /> Add to Compare</Button>
+            <Button size="sm" variant="outline" onClick={() => useStore.getState().saveSite({ body: "earth", lat: it.lat, lon: it.lon, label: itemName(it) })}><Bookmark size={13} /> Save</Button>
+            <a className="ctl inline-flex h-7 items-center gap-1 rounded-sm px-2 text-xs text-regolith-200 ring-1 ring-[var(--hair-strong)]" href={`https://www.openstreetmap.org/?mlat=${it.lat.toFixed(4)}&mlon=${it.lon.toFixed(4)}#map=9/${it.lat.toFixed(4)}/${it.lon.toFixed(4)}`} target="_blank" rel="noreferrer" title="Opens OpenStreetMap in a new tab. Roads and access are not checked by RADIUM.">
+              <ExternalLink size={12} /> Open map
+            </a>
             {target && (
               <>
                 <Button size="sm" variant="solid" onClick={() => { startTwin(target); void pickEarth(it.lat, it.lon, true); }}><ArrowLeftRight size={13} /> Compare</Button>
@@ -391,7 +397,7 @@ export function NearView() {
     const docs = r.documented.map((d) => ({ key: `d:${d.name}`, ...d }));
     const regs = r.regions.map((g) => ({ key: `r:${g.lat},${g.lon}`, ...g }));
     const all = r.query.mode === "best" ? [...docs, ...regs].sort((a, b) => (b.similarity?.score ?? -1) - (a.similarity?.score ?? -1) || a.distance_km - b.distance_km) : docs;
-    return all.map((it, k) => ({ id: it.key, lat: it.lat, lon: it.lon, text: String(k + 1), grade: it.similarity?.grade ?? null, active: active === it.key }));
+    return all.map((it, k) => ({ id: it.key, lat: it.lat, lon: it.lon, text: letterFor(k), grade: it.similarity?.grade ?? null, active: active === it.key }));
   }, [r, active]);
   const onPick = useCallback((lat: number, lon: number) => {
     setNear({ nearLoc: { lat: +lat.toFixed(4), lon: +lon.toFixed(4), source: "map" } });
@@ -406,6 +412,7 @@ export function NearView() {
       </aside>
       <div className="relative h-full min-w-0 flex-1 overflow-hidden bg-void">
         <EarthMap ref={handle} basemap={basemap} labels={earthLayers.labels} overlayUrl={null} pins={[]} markers={markers}
+          onMarker={(id) => { const m = markers.find((x) => x.id === id); setNear({ nearActive: id }); if (m) useStore.getState().flyTo("earth", m.lat, m.lon, 900); document.getElementById(`near-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }}
           selection={nearLoc ? { lat: nearLoc.lat, lon: nearLoc.lon } : null} focus={focus} onPick={onPick} onView={onView} />
         <Tapes ref={tapes} />
         <div className="surface-float absolute top-3 right-3 z-20 flex flex-col rounded-md ring-1 ring-[var(--hair)]">
@@ -416,7 +423,7 @@ export function NearView() {
         <div className="pointer-events-none absolute bottom-11 left-[72px] z-20 max-sm:left-3">
           <div className="surface-float pointer-events-auto w-[248px] rounded-md p-3 text-2xs leading-snug text-regolith-300 ring-1 ring-[var(--hair)]">
             <div className="text-sm font-semibold text-regolith-50">Near Me</div>
-            <p className="mt-0.5">The white dot is your starting point; click the map to move it. Numbers follow the list{r?.target ? ", coloured by similarity grade (grey: not graded)" : ""}.</p>
+            <p className="mt-0.5">The white dot is your starting point; click the map to move it. Letters follow the list; ring colour is the grade{r?.target ? ", coloured by similarity grade (grey: not graded)" : ""}.</p>
           </div>
         </div>
         <div className="pointer-events-none absolute right-3 bottom-9 z-20 max-w-[54%] text-right text-[10px] leading-tight text-regolith-400 [text-shadow:0_1px_2px_#000]">{basemap.attribution}. {LABEL_ATTRIBUTION}.</div>

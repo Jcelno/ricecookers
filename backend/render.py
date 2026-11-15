@@ -86,7 +86,27 @@ def grade_rgba(score: np.ndarray, excluded: np.ndarray | None = None) -> np.ndar
     return out
 
 
+def bleed(rgba: np.ndarray) -> np.ndarray:
+    """Copy the nearest visible colour into fully transparent pixels (alpha stays 0).
+
+    GPUs blend neighbouring texels when a map overlay is drawn smaller than its native size. If transparent
+    pixels are black, that blend darkens every data edge, which is what drew dark jagged borders around the
+    lunar polar grids. Values and coverage are unchanged: only the colour of invisible pixels changes."""
+    if rgba.ndim != 3 or rgba.shape[2] != 4:
+        return rgba
+    clear = rgba[..., 3] == 0
+    if not clear.any() or clear.all():
+        return rgba
+    from scipy import ndimage
+    idx = ndimage.distance_transform_edt(clear, return_distances=False, return_indices=True)
+    out = rgba.copy()
+    out[..., :3] = rgba[idx[0], idx[1], :3]
+    out[..., 3] = rgba[..., 3]
+    return out
+
+
 def png(rgba: np.ndarray) -> bytes:
+    rgba = bleed(rgba)
     buf = io.BytesIO()
     Image.fromarray(rgba, "RGBA").save(buf, format="PNG", optimize=False, compress_level=3)
     return buf.getvalue()
@@ -111,10 +131,13 @@ CAP_EDGE_LAT = 75.5
 CAP_DLAT, CAP_DLON = 0.05, 0.1
 
 
-def polar_cap(values: np.ndarray, half_m: float, cell_m: float, south: bool) -> np.ndarray:
+def polar_cap(values: np.ndarray, half_m: float, cell_m: float, south: bool, outside: np.ndarray | None = None) -> np.ndarray:
     """Sample a polar-stereographic grid (n × n, any trailing channel shape) onto
-    a latitude/longitude cap image (pole → 75.5°), nearest neighbour. Pixels
-    outside the polar square come back as zeros (transparent)."""
+    a latitude/longitude cap image (pole → 75.5°), nearest neighbour.
+
+    Pixels outside the polar square are transparent, or, when `outside` is given (a global equirectangular
+    image with rows north→south), take the global value there. The cap then meets the global image along the
+    75.5° parallel, a cell edge of the 0.5° grid, with no gap and no double-drawn band."""
     n_rows = int(round((90.0 - CAP_EDGE_LAT) / CAP_DLAT))
     n_cols = int(round(360.0 / CAP_DLON))
     if south:
@@ -127,7 +150,23 @@ def polar_cap(values: np.ndarray, half_m: float, cell_m: float, south: bool) -> 
     j = np.clip(np.floor((x + half_m) / cell_m).astype(int), 0, values.shape[1] - 1)
     i = np.clip(np.floor((half_m - y) / cell_m).astype(int), 0, values.shape[0] - 1)
     out = values[i, j]
-    out[~inside] = 0
+    if outside is None:
+        out[~inside] = 0
+    else:
+        n_lat, n_lon = outside.shape[:2]
+        gi = np.clip(np.floor((90.0 - lat[:, None]) / (180.0 / n_lat)).astype(int), 0, n_lat - 1)
+        gj = np.clip(np.floor((lon[None, :] + 180.0) / (360.0 / n_lon)).astype(int), 0, n_lon - 1)
+        gi, gj = np.broadcast_arrays(gi, gj)
+        out[~inside] = outside[gi[~inside], gj[~inside]]
+    return out
+
+
+def blank_caps(img: np.ndarray) -> np.ndarray:
+    """Clear the rows of a global equirectangular image that the polar cap images draw (|lat| > 75.5°)."""
+    n = img.shape[0]
+    lat = 90.0 - (180.0 / n) * (np.arange(n) + 0.5)
+    out = img.copy()
+    out[np.abs(lat) > CAP_EDGE_LAT] = 0
     return out
 
 

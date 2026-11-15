@@ -2,8 +2,8 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import {
   Cartesian2, Cartesian3, Cartographic, Color, DistanceDisplayCondition, Ellipsoid, EllipsoidTerrainProvider, type Entity,
-  GeographicProjection, GeographicTilingScheme, Globe, HorizontalOrigin, ImageryLayer, LabelStyle, Math as CMath, NearFarScalar,
-  Rectangle, ScreenSpaceEventHandler, ScreenSpaceEventType, SingleTileImageryProvider, SkyBox, TextureMagnificationFilter,
+  GeographicProjection, GeographicTilingScheme, Globe, HorizontalOrigin, ImageryLayer, LabelStyle, Math as CMath, NearFarScalar, PolylineDashMaterialProperty,
+  Rectangle, ScreenSpaceEventHandler, ScreenSpaceEventType, SingleTileImageryProvider, SkyBox, SplitDirection, TextureMagnificationFilter,
   TextureMinificationFilter, UrlTemplateImageryProvider, VerticalOrigin, Viewer,
 } from "cesium";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -61,6 +61,10 @@ interface Props {
   onCursor?: (c: { lat: number; lon: number } | null) => void;
   onView?: (v: ViewState) => void;
   onStatus?: (s: { ready: boolean; error: string | null }) => void;
+  /** Swipe comparison: data overlays draw only right of this fraction of the width (null = everywhere). */
+  split?: number | null;
+  /** Dataset coverage outlines as lon/lat rings, drawn dashed. */
+  coverage?: [number, number][][];
 }
 
 function markerImage(text: string, grade: Grade | null, active: boolean) {
@@ -84,7 +88,7 @@ function markerImage(text: string, grade: Grade | null, active: boolean) {
 }
 
 export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
-  { body, base, tileOverlay, images = [], opacity = 0.85, dimBase = false, pins = [], markers = [], selection, focus, interactive = true, onPick, onCursor, onView, onStatus },
+  { body, base, tileOverlay, images = [], opacity = 0.85, dimBase = false, pins = [], markers = [], selection, focus, interactive = true, onPick, onCursor, onView, onStatus, split = null, coverage },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -136,7 +140,10 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     scene.globe.baseColor = Color.fromCssColorString("#0c0d10");
     scene.globe.showGroundAtmosphere = false;
     scene.globe.enableLighting = false;
-    scene.globe.maximumScreenSpaceError = 1.5;
+    // 2 px of allowed error: visually indistinguishable at these mosaic resolutions, and noticeably fewer tile
+    // requests per view (measured in scripts/dev-perf.mjs). A larger cache avoids refetching when panning back.
+    scene.globe.maximumScreenSpaceError = 2;
+    scene.globe.tileCacheSize = 300;
     scene.fog.enabled = false;
     if (scene.sun) scene.sun.show = false;
     if (scene.moon) scene.moon.show = false;
@@ -293,6 +300,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     }
     if (tileOverlay) {
       const layer = new ImageryLayer(tiles(tileOverlay), { alpha: opacity });
+      layer.splitDirection = splitRef.current === null ? SplitDirection.NONE : SplitDirection.RIGHT;
       viewer.imageryLayers.add(layer, 1);
       tileRef.current = layer;
     }
@@ -302,18 +310,26 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
 
   // ------------------------------------------------- RADIUM grid image overlays
   const imageKey = images.map((i) => i.key).join("|");
+  const wantRef = useRef(new Set<string>());
   useEffect(() => {
     if (!viewer) return;
     let cancelled = false;
     const want = new Map(images.map((i) => [i.key, i]));
-    for (const [key, layer] of imgRef.current) {
-      if (!want.has(key)) {
-        viewer.imageryLayers.remove(layer, true);
-        imgRef.current.delete(key);
+    wantRef.current = new Set(want.keys());
+    // Old images stay on screen until their replacements have loaded, so changing weights or layers never flashes
+    // an empty globe. Anything no longer wanted is removed once something new is drawn (or at once if nothing is).
+    const prune = () => {
+      for (const [key, layer] of imgRef.current) {
+        if (!wantRef.current.has(key)) {
+          viewer.imageryLayers.remove(layer, true);
+          imgRef.current.delete(key);
+        }
       }
-    }
-    for (const img of images) {
-      if (imgRef.current.has(img.key)) continue;
+    };
+    const pending = images.filter((img) => !imgRef.current.has(img.key));
+    if (pending.length === 0 || images.length === 0) prune();
+    let left = pending.length;
+    for (const img of pending) {
       SingleTileImageryProvider.fromUrl(img.url, { rectangle: Rectangle.fromDegrees(...img.rect) })
         .then((provider) => {
           if (cancelled || viewer.isDestroyed() || imgRef.current.has(img.key)) return;
@@ -322,11 +338,16 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
             magnificationFilter: TextureMagnificationFilter.NEAREST,
             minificationFilter: TextureMinificationFilter.LINEAR,
           });
+          layer.splitDirection = splitRef.current === null ? SplitDirection.NONE : SplitDirection.RIGHT;
           viewer.imageryLayers.add(layer);
           imgRef.current.set(img.key, layer);
-          viewer.scene.requestRender();
         })
-        .catch((e) => console.warn("overlay failed to load", img.url, e));
+        .catch((e) => console.warn("overlay failed to load", img.url, e))
+        .finally(() => {
+          left -= 1;
+          if (!cancelled && !viewer.isDestroyed() && left === 0) prune();
+          if (!viewer.isDestroyed()) viewer.scene.requestRender();
+        });
     }
     viewer.scene.requestRender();
     return () => {
@@ -334,6 +355,37 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewer, imageKey]);
+
+  // ------------------------------------------------------ swipe comparison
+  const splitRef = useRef<number | null>(split);
+  splitRef.current = split;
+  useEffect(() => {
+    if (!viewer) return;
+    const dir = split === null ? SplitDirection.NONE : SplitDirection.RIGHT;
+    if (tileRef.current) tileRef.current.splitDirection = dir;
+    for (const l of imgRef.current.values()) l.splitDirection = dir;
+    if (split !== null) viewer.scene.splitPosition = split;
+    viewer.scene.requestRender();
+  }, [viewer, split]);
+
+  // ------------------------------------------------------ coverage outlines
+  const covRef = useRef<Entity[]>([]);
+  const covKey = coverage ? coverage.length : 0;
+  useEffect(() => {
+    if (!viewer) return;
+    for (const e of covRef.current) viewer.entities.remove(e);
+    covRef.current = (coverage ?? []).map((ring) =>
+      viewer.entities.add({
+        polyline: {
+          positions: Cartesian3.fromDegreesArrayHeights(ring.flatMap(([lo, la]) => [lo, la, ELLIPSOID[body].maximumRadius * 0.0003]), ELLIPSOID[body]),
+          width: 1.6,
+          material: new PolylineDashMaterialProperty({ color: Color.fromCssColorString("#eef4f8").withAlpha(0.85), dashLength: 10 }),
+        },
+      }),
+    );
+    viewer.scene.requestRender();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewer, covKey, body]);
 
   useEffect(() => {
     if (!viewer) return;
@@ -442,7 +494,12 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       selEntities.current.push(
         viewer.entities.add({
           position: Cartesian3.fromDegrees(selection.lon, selection.lat, lift * 2, E),
-          point: { pixelSize: 6, color: Color.fromCssColorString("#f6f2e9"), outlineColor: Color.fromCssColorString("#0b0c0e"), outlineWidth: 2 },
+          point: { pixelSize: 7, color: Color.fromCssColorString("#f6f2e9"), outlineColor: Color.fromCssColorString("#0b0c0e"), outlineWidth: 2 },
+        }),
+        // A ring around the selected place so it stands out at any zoom.
+        viewer.entities.add({
+          position: Cartesian3.fromDegrees(selection.lon, selection.lat, lift * 2, E),
+          point: { pixelSize: 22, color: Color.TRANSPARENT, outlineColor: Color.fromCssColorString("#f6f2e9").withAlpha(0.95), outlineWidth: 2.5 },
         }),
       );
     }

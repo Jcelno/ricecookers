@@ -106,6 +106,7 @@ class Store:
             # ice-stable ground within about 10 km of each polar cell (9 × 9 cells = 21.6 km)
             p.a["ice_nearby"] = ndimage.uniform_filter(np.nan_to_num(p.a["ice_1m_frac"], nan=0.0), size=9, mode="nearest").astype(np.float32)
         moon.valid = ~in_polar                       # polar squares are served by the polar grids
+        moon.in_polar = in_polar                     # kept for drawing: global values sit under the polar images
 
         earth = self.g["earth"]
         # Data-quality rule: MODIS land cover labels some bright salt flats

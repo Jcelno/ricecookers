@@ -308,22 +308,23 @@ class Twin:
             score = np.where(cov >= MIN_COVERAGE, num / (cov * total), np.nan)
         return score, cov
 
-    def score_all(self, g: Grid, i: int, j: int, purpose: str):
+    def score_all(self, g: Grid, i: int, j: int, purpose: str, weights: dict | None = None):
+        """weights: optional user override of the purpose's dimension weights (same dimension ids, any scale)."""
         p = self.profile(g, i, j)
         dims = self.dimensions(p)
-        w = PURPOSES[g.body][purpose]["w"]
+        w = weights or PURPOSES[g.body][purpose]["w"]
         score, cov = self.combine(dims, w)
         if score is not None:
             score = np.where(self.valid, score, np.nan)
         return p, dims, score, cov
 
     # ----------------------------------------------------------- explanation
-    def explain(self, p: dict, dims: dict, ei: int, ej: int, purpose: str):
+    def explain(self, p: dict, dims: dict, ei: int, ej: int, purpose: str, weights: dict | None = None):
         """Everything needed to justify one Earth cell as an analog of profile p."""
         e = self.e
         ev = lambda n: e.value(n, ei, ej)  # noqa: E731
         body = p["body"]
-        w = PURPOSES[body][purpose]["w"]
+        w = weights or PURPOSES[body][purpose]["w"]
         total_w = sum(w.values())
         rows = []
         for d, meta in DIMENSIONS.items():
@@ -455,3 +456,29 @@ class Twin:
             prev = edge
         return {"cells": int(v.size), "grades": out,
                 "best": float(v.max()) if v.size else None, "median": float(np.median(v)) if v.size else None}
+
+
+def custom_weights(body: str, purpose: str, raw: dict | None):
+    """Validate a user's dimension weights for one purpose. Returns None to use the purpose's defaults.
+
+    Only the purpose's own dimensions can be weighted (others are not meaningful for it); values are 0–100 and at
+    least one must be positive. The fitness-by-purpose table always keeps the documented purpose weights."""
+    if not raw:
+        return None
+    base = PURPOSES[body][purpose]["w"]
+    out = {}
+    for d in base:
+        v = raw.get(d, None)
+        if v is None:
+            out[d] = base[d] * 100
+            continue
+        v = float(v)
+        if not (0.0 <= v <= 100.0):
+            raise ValueError(f"weight for {d} must be between 0 and 100")
+        out[d] = v
+    extra = set(raw) - set(base)
+    if extra:
+        raise ValueError(f"unknown dimensions for this purpose: {sorted(extra)}")
+    if sum(out.values()) <= 0:
+        raise ValueError("at least one weight must be above zero")
+    return out

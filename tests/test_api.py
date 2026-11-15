@@ -184,3 +184,80 @@ def test_documented_sites_carry_tags_and_citations():
     for p in PINS["earth"]:
         assert p["source"] and p["tags"]["environment"] and p["tags"]["applications"]
     assert sum("doi:" in p["source"] for p in PINS["earth"]) >= 20
+
+
+# ------------------------------------------------------ custom twin weights
+def test_custom_weights_equal_to_defaults_reproduce_default_results():
+    from backend.similarity import PURPOSES
+    w = {d: v * 100 for d, v in PURPOSES["mars"]["mobility"]["w"].items()}
+    base = {"body": "mars", "lat": -4.59, "lon": 137.44, "purpose": "mobility", "n": 5}
+    a = client.post("/api/twin", json=base).json()
+    b = client.post("/api/twin", json={**base, "weights": w}).json()
+    assert [c["score"] for c in a["candidates"]] == pytest.approx([c["score"] for c in b["candidates"]])
+
+
+def test_custom_weights_change_the_ranking_and_are_reported():
+    base = {"body": "mars", "lat": -4.59, "lon": 137.44, "purpose": "general", "n": 5}
+    a = client.post("/api/twin", json=base).json()
+    b = client.post("/api/twin", json={**base, "weights": {"terrain": 100, "geology": 0, "ice": 0, "environment": 0, "thermal": 0, "dust": 0}}).json()
+    assert b["custom_weights"] is True and a["custom_weights"] is False
+    assert [c["id"] for c in a["candidates"]] != [c["id"] for c in b["candidates"]]
+    # with terrain alone, the match score is the terrain dimension score
+    for c in b["candidates"]:
+        t = next(d for d in c["dimensions"] if d["id"] == "terrain")
+        assert c["score"] == pytest.approx(t["score"])
+
+
+@pytest.mark.parametrize("w", [{"terrain": 150}, {"terrain": -1}, {"gravity": 50}, {"terrain": 0, "geology": 0, "ice": 0, "environment": 0, "thermal": 0, "dust": 0}])
+def test_bad_custom_weights_are_rejected(w):
+    r = client.post("/api/twin", json={"body": "mars", "lat": -4.59, "lon": 137.44, "purpose": "general", "weights": w})
+    assert r.status_code == 422
+
+
+# ------------------------------------------------------ map overlay regressions
+def _png(params):
+    import io
+    import numpy as np
+    from PIL import Image
+    r = client.get("/api/overlay/var.png", params=params)
+    assert r.status_code == 200
+    return np.array(Image.open(io.BytesIO(r.content)))
+
+
+def test_overlay_transparent_pixels_are_not_black():
+    # Black under alpha 0 made GPUs draw dark fringes around the lunar polar squares.
+    for params in ({"body": "moon", "var": "elev_mean", "region": "north"}, {"body": "moon", "var": "elev_mean", "region": "global"},
+                   {"body": "mars", "var": "slope_med", "region": "global"}):
+        a = _png(params)
+        clear = a[..., 3] == 0
+        if clear.any():
+            assert (a[clear][:, :3].sum(axis=1) > 0).mean() > 0.99
+
+
+def test_global_and_polar_images_meet_at_the_cap_edge_without_gap_or_overlap():
+    import numpy as np
+    from backend.render import CAP_EDGE_LAT
+    g = _png({"body": "moon", "var": "elev_mean", "region": "global"})
+    lat = 90 - (180 / g.shape[0]) * (np.arange(g.shape[0]) + 0.5)
+    assert (g[np.abs(lat) > CAP_EDGE_LAT, :, 3] == 0).all()           # global image stops at the cap edge
+    cap = _png({"body": "moon", "var": "elev_mean", "region": "north"})
+    assert (cap[..., 3] > 0).mean() > 0.97                              # the cap covers the whole cap (polar + global values)
+
+
+def test_polar_and_global_elevation_share_one_colour_scale():
+    meta = client.get("/api/meta").json()
+    elev = next(l for l in meta["layers"]["moon"]["grid"] if l["id"] == "elev_mean")
+    assert elev["has_polar"] and elev["polar_legend"] is None
+
+
+# --------------------------------------------------------------- timeline
+def test_timeline_keeps_unobserved_hours_missing():
+    r = client.get("/api/timeline", params={"body": "moon", "lat": 0.67, "lon": 23.47}).json()
+    s = r["series"][0]
+    assert len(s["values"]) == 24 and s["unit"] == "K"
+    assert s["observed"] == sum(v is not None for v in s["values"])
+    noon = s["values"][12]
+    assert noon is not None and 350 < noon < 420                        # Diviner noon near the equator
+    m = client.get("/api/timeline", params={"body": "mars", "lat": -4.59, "lon": 137.44}).json()
+    assert [len(x["values"]) for x in m["series"]] == [12, 12]
+    assert client.get("/api/timeline", params={"body": "venus", "lat": 0, "lon": 0}).status_code == 400

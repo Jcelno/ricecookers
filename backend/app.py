@@ -21,7 +21,7 @@ from . import briefs, catalog, reference, registry, render
 from .geo import RADIUS_KM, fmt_latlon, gc_km, pick_distinct
 from .naming import Earth as EarthNames
 from .naming import Planetary
-from .similarity import (A_HIGHLAND, A_MARE, A_MARS, AFFINITY_NOTES, DIMENSIONS, MIN_COVERAGE as SIM_MIN_COVERAGE,
+from .similarity import (custom_weights, A_HIGHLAND, A_MARE, A_MARS, AFFINITY_NOTES, DIMENSIONS, MIN_COVERAGE as SIM_MIN_COVERAGE,
                          PURPOSES, SEPARATION_KM, Twin, purpose_applicable)
 from .store import DATA, Store
 from .suitability import (CRITERIA, GRADE_EDGES, GRADE_MEANING, LIMITS, MIN_COVERAGE, MISSIONS, RANK_SEPARATION_KM,
@@ -105,7 +105,7 @@ def grid_layers(body: str):
             "unit": m["unit"], "fmt": m.get("fmt"), "evidence": m["evidence"], "source": m["source"], "res": m["res"],
             "caveat": m.get("caveat"), "legend": {"stops": render.legend_stops(lay["cmap"]), "min": lay["vmin"], "max": lay["vmax"], "log": lay["log"]},
             "has_polar": polar,
-            "polar_legend": ({"stops": render.legend_stops(catalog.VARS["moon_sp"][vid]["layer"]["cmap"]),
+            "polar_legend": None if polar else ({"stops": render.legend_stops(catalog.VARS["moon_sp"][vid]["layer"]["cmap"]),
                               "min": catalog.VARS["moon_sp"][vid]["layer"]["vmin"], "max": catalog.VARS["moon_sp"][vid]["layer"]["vmax"],
                               "log": catalog.VARS["moon_sp"][vid]["layer"]["log"]} if polar else None),
         })
@@ -164,7 +164,7 @@ def _meta():
             "mars": {"tiles": TREK["mars"], "grid": grid_layers("mars")},
             "earth": {"tiles": EARTH_BASEMAPS, "grid": grid_layers("earth")},
         },
-        "cap": {"edge_lat": render.CAP_EDGE_LAT},
+        "cap": {"edge_lat": render.CAP_EDGE_LAT, "boxes": _polar_boxes()},
         "sources_index": {s["id"]: {"name": s["name"], "url": s["url"], "agency": s["agency"]} for s in registry.SOURCES},
     })
 
@@ -378,6 +378,7 @@ class TwinRequest(BaseModel):
     lon: float
     purpose: str = "general"
     n: int = 10
+    weights: Optional[dict] = None   # user override of the purpose's dimension weights (0–100 each)
 
 
 class CompareRequest(TwinRequest):
@@ -395,12 +396,19 @@ def nearest_documented(lat, lon, body):
     return best
 
 
+def req_weights(req):
+    try:
+        return custom_weights(req.body, req.purpose, getattr(req, "weights", None))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 def twin_setup(req: TwinRequest):
     need_body(req.body, planetary=True)
     if req.purpose not in PURPOSES[req.body]:
         raise HTTPException(400, f"purpose must be one of {list(PURPOSES[req.body])}")
     g, i, j = store.locate(req.body, req.lat, req.lon)
-    p, dims, score, cov = twin.score_all(g, i, j, req.purpose)
+    p, dims, score, cov = twin.score_all(g, i, j, req.purpose, req_weights(req))
     return g, i, j, p, dims, score, cov
 
 
@@ -425,7 +433,7 @@ def twin_search(req: TwinRequest):
     cands = []
     for ei, ej in twin.top(score, n):
         lat, lon = e.centre(ei, ej)
-        ex = twin.explain(p, dims, ei, ej, req.purpose)
+        ex = twin.explain(p, dims, ei, ej, req.purpose, req_weights(req))
         doc = nearest_documented(lat, lon, req.body)
         cands.append({
             "id": f"earth:{ei}:{ej}", "lat": lat, "lon": lon, "coords": fmt_latlon(lat, lon), "place": enames.place(lat, lon),
@@ -441,7 +449,7 @@ def twin_search(req: TwinRequest):
     for site in PINS["earth"]:
         ei, ej = e.index(site["lat"], site["lon"])
         v = float(score[ei, ej])
-        ex = twin.explain(p, dims, ei, ej, req.purpose)
+        ex = twin.explain(p, dims, ei, ej, req.purpose, req_weights(req))
         documented.append({"name": site["name"], "country": site["country"], "lat": site["lat"], "lon": site["lon"],
                            "theme": site["theme"], "source": site["source"], "for_this_body": req.body in site["bodies"],
                            "score": ex["score"], "grade": ex["grade"], "strong": ex["strong"], "weak": ex["weak"],
@@ -449,7 +457,7 @@ def twin_search(req: TwinRequest):
     documented.sort(key=lambda d: -(d["score"] if d["score"] is not None else -1))
 
     applicable, purpose_note = purpose_applicable(req.purpose, p)
-    w = PURPOSES[req.body][req.purpose]["w"]
+    w = req_weights(req) or PURPOSES[req.body][req.purpose]["w"]
     tw = sum(w.values())
     dim_status = [{"id": d, "label": DIMENSIONS[d]["label"], "weight": wd / tw, "available": dims.get(d) is not None}
                   for d, wd in w.items()]
@@ -457,6 +465,7 @@ def twin_search(req: TwinRequest):
         "planet": {"body": req.body, "grid": g.id, "lat": plat, "lon": plon, "coords": fmt_latlon(plat, plon),
                    "place": pnames[req.body].context(plat, plon), "profile": p, "cell_km": g.size_km(i)},
         "purpose": req.purpose, "purpose_applicable": applicable, "purpose_note": purpose_note,
+        "custom_weights": req_weights(req) is not None,
         "purposes": [{"id": pid, "applicable": purpose_applicable(pid, p)[0], "note": purpose_applicable(pid, p)[1]}
                      for pid in PURPOSES[req.body]],
         "dimensions": dim_status,
@@ -472,7 +481,7 @@ def twin_compare(req: CompareRequest):
     e = store.g["earth"]
     ei, ej = e.index(req.earth_lat, req.earth_lon)
     elat, elon = e.centre(ei, ej)
-    ex = twin.explain(p, dims, ei, ej, req.purpose)
+    ex = twin.explain(p, dims, ei, ej, req.purpose, req_weights(req))
     plat, plon = g.centre(i, j)
     pd = store.describe(g, i, j)
     ed = store.describe(e, ei, ej)
@@ -505,6 +514,7 @@ class NearbyRequest(BaseModel):
     purpose: str = "general"
     documented_only: bool = False
     limit: int = 20
+    weights: Optional[dict] = None
 
 
 @lru_cache(maxsize=1)
@@ -516,9 +526,9 @@ def _earth_centres():
 
 
 @lru_cache(maxsize=16)
-def _twin_score(gid: str, i: int, j: int, purpose: str):
-    """Earth Twin score for every Earth cell (the same array /api/twin ranks), cached per target and purpose."""
-    p, dims, score, cov = twin.score_all(store.g[gid], i, j, purpose)
+def _twin_score(gid: str, i: int, j: int, purpose: str, wkey: str = ""):
+    """Earth Twin score for every Earth cell (the same array /api/twin ranks), cached per target, purpose and weights."""
+    p, dims, score, cov = twin.score_all(store.g[gid], i, j, purpose, json.loads(wkey) if wkey else None)
     return p, dims, score
 
 
@@ -555,10 +565,12 @@ def analogs_nearby(req: NearbyRequest):
     lat = req.lat
     e = store.g["earth"]
     p = dims = score = None
+    cw = None
     tinfo = None
     if target is not None:
         g, i, j = target
-        p, dims, score = _twin_score(g.id, i, j, req.purpose)
+        cw = req_weights(req)
+        p, dims, score = _twin_score(g.id, i, j, req.purpose, json.dumps(cw, sort_keys=True) if cw else "")
         tlat, tlon = g.centre(i, j)
         tinfo = {"body": req.body, "lat": tlat, "lon": tlon, "coords": fmt_latlon(tlat, tlon),
                  "label": pnames[req.body].context(tlat, tlon)["label"], "purpose": req.purpose,
@@ -570,7 +582,7 @@ def analogs_nearby(req: NearbyRequest):
         if score is None:
             return None
         ei, ej = e.index(slat, slon)
-        ex = twin.explain(p, dims, ei, ej, req.purpose)
+        ex = twin.explain(p, dims, ei, ej, req.purpose, cw)
         return {"score": ex["score"], "grade": ex["grade"], "coverage": ex["coverage"], "strong": ex["strong"], "weak": ex["weak"]}
 
     # Documented sites: straight-line (great-circle) distance on Earth's surface.
@@ -641,7 +653,7 @@ def research_brief(req: BriefRequest):
     e = store.g["earth"]
     ei, ej = e.index(req.earth_lat, req.earth_lon)
     elat, elon = e.centre(ei, ej)
-    ex = twin.explain(p, dims, ei, ej, req.purpose)
+    ex = twin.explain(p, dims, ei, ej, req.purpose, req_weights(req))
     plat, plon = g.centre(i, j)
     doc = nearest_documented(elat, elon, req.body)
     earth_label = enames.place(elat, elon)["label"]
@@ -692,10 +704,84 @@ def terrain_profile(body: str, lat: float, lon: float, axis: str = "ns", half: i
 
 
 # =============================================================================
+# Time series for one cell: Moon by local hour, Mars by season, Earth by month
+# =============================================================================
+TIMELINE = {
+    "moon": [("moon_t_hour", "Surface temperature", "K", "observed", "diviner_gcp",
+              "Diviner bolometric temperature, mean of the observed quarter-hour bins in each local hour. Hours without an observation are left empty, never filled.")],
+    "mars": [("mars_t_season", "Surface temperature, seasonal mean", "K", "modelled", "mcd",
+              "Mars Climate Database v6.2 day-and-night mean for each 30° of solar longitude (a typical year without global dust storms)."),
+             ("mars_flux_season", "Sunlight at the surface, seasonal mean", "W/m²", "modelled", "mcd",
+              "Mars Climate Database v6.2 incident solar flux at the surface, day-and-night mean per season.")],
+    "earth": [("earth_t_month", "Skin temperature, monthly mean", "K", "modelled", "power_merra2",
+               "NASA POWER (MERRA-2 reanalysis) monthly climatology of surface skin temperature, 2001–2020.")],
+}
+AXIS = {"moon": ("Local solar time (hour)", [f"{h:02d}:30" for h in range(24)]),
+        "mars": ("Season, solar longitude Ls", [f"Ls {ls}°" for ls in range(15, 360, 30)]),
+        "earth": ("Month", ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])}
+
+
+@lru_cache(maxsize=8)
+def _series(name: str):
+    path = DATA / "timeline" / f"{name}.npz"
+    if not path.exists():
+        return None
+    with np.load(path) as z:
+        return z["a"]
+
+
+@app.get("/api/timeline")
+def timeline(body: str, lat: float, lon: float):
+    need_body(body)
+    if not (math.isfinite(lat) and math.isfinite(lon)) or abs(lat) > 90:
+        raise HTTPException(422, "latitude must be between -90 and 90")
+    lon = ((lon + 180.0) % 360.0) - 180.0
+    out = []
+    for name, label, unit, evidence, source, note in TIMELINE[body]:
+        a = _series(name)
+        if a is None:
+            continue
+        n_t, n_lat, n_lon = a.shape
+        i = min(n_lat - 1, max(0, int((90.0 - lat) / (180.0 / n_lat))))
+        j = min(n_lon - 1, max(0, int((lon + 180.0) / (360.0 / n_lon))))
+        vals = [None if not np.isfinite(v) else round(float(v), 1) for v in a[:, i, j]]
+        if body == "earth" and not bool(store.g["earth"].valid[min(i, store.g["earth"].n_lat - 1), min(j, store.g["earth"].n_lon - 1)]):
+            vals = [None] * n_t                              # open water: not analysed
+        out.append({"id": name, "label": label, "unit": unit, "evidence": evidence, "source": source, "note": note,
+                    "values": vals, "observed": sum(v is not None for v in vals)})
+    axis, ticks = AXIS[body]
+    return clean({"body": body, "lat": lat, "lon": lon, "axis": axis, "ticks": ticks, "series": out})
+
+
+# =============================================================================
 # Map overlays (PNG)
 # =============================================================================
 def png_response(data: bytes):
     return Response(content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=600"})
+
+
+def _polar_boxes():
+    """Outline of each lunar 2.4 km polar grid (a square in polar-stereographic metres) as lon/lat rings."""
+    from .geo import polar_latlon
+    out = {}
+    for key, gid in (("south", "moon_sp"), ("north", "moon_np")):
+        g = store.g[gid]
+        h = g.half_m
+        t = np.linspace(-h, h, 41)
+        xs = np.concatenate([t, np.full(41, h), t[::-1], np.full(41, -h)])
+        ys = np.concatenate([np.full(41, h), t[::-1], np.full(41, -h), t])
+        la, lo = polar_latlon(xs, ys, g.south)
+        out[key] = [[round(float(a), 4), round(float(b), 4)] for a, b in zip(lo, la)]
+    return out
+
+
+def _polar_var(var: str) -> bool:
+    return var in catalog.VARS["moon_sp"] and "layer" in catalog.VARS["moon_sp"][var]
+
+
+def _global_layer(var: str):
+    v = catalog.VARS["moon"].get(var)
+    return v["layer"] if v and "layer" in v else None
 
 
 @lru_cache(maxsize=96)
@@ -710,9 +796,18 @@ def _var_png(body: str, var: str, region: str) -> bytes:
         if var not in g.vars or "layer" not in g.vars[var]:
             return render.png(np.zeros((2, 4, 4), np.uint8))
         m = g.vars[var]["layer"]
-        a = np.where(g.valid, g.a[var], np.nan)
-        return render.png(render.colorize(a, m["cmap"], m["vmin"], m["vmax"], m["log"]))
+        rgba = render.colorize(np.where(g.valid, g.a[var], np.nan), m["cmap"], m["vmin"], m["vmax"], m["log"])
+        if body == "moon" and _polar_var(var):
+            rgba = render.blank_caps(rgba)        # the polar cap images draw everything poleward of 75.5°
+        return render.png(rgba)
     g = store.g["moon_sp" if region == "south" else "moon_np"]
+    gl = _global_layer(var)
+    if gl is not None:
+        # One colour scale on both grids, and global values fill the cap outside the 2.4 km square.
+        mg = store.g["moon"]
+        rgba = render.colorize(g.a[var], gl["cmap"], gl["vmin"], gl["vmax"], gl["log"])
+        outside = render.colorize(np.where(mg.valid, mg.a[var], np.nan), gl["cmap"], gl["vmin"], gl["vmax"], gl["log"])
+        return render.png(render.polar_cap(rgba, g.half_m, g.cell_m, g.south, outside=outside))
     m = g.vars[var]["layer"]
     rgba = render.colorize(g.a[var], m["cmap"], m["vmin"], m["vmax"], m["log"])
     return render.png(render.polar_cap(rgba, g.half_m, g.cell_m, g.south))
@@ -740,10 +835,13 @@ def _suit_png(mission: str, wkey: str, lkey: str, region: str) -> bytes:
     gid = body if region == "global" else ("moon_sp" if region == "south" else "moon_np")
     g = store.g[gid]
     score, cov, excluded = engine.evaluate(gid, mission, weights, limits)
-    score = np.where(g.valid, score, np.nan)
-    rgba = render.grade_rgba(score, excluded)
-    if region != "global":
-        rgba = render.polar_cap(rgba, g.half_m, g.cell_m, g.south)
+    rgba = render.grade_rgba(np.where(g.valid, score, np.nan), excluded)
+    if body == "moon" and region == "global":
+        rgba = render.blank_caps(rgba)            # the cap images draw everything poleward of 75.5°
+    elif region != "global":
+        gs, gc, ge = engine.evaluate("moon", mission, weights, limits)
+        outside = render.grade_rgba(np.where(store.g["moon"].valid, gs, np.nan), ge)
+        rgba = render.polar_cap(rgba, g.half_m, g.cell_m, g.south, outside=outside)
     return render.png(rgba)
 
 
@@ -760,21 +858,25 @@ def overlay_suit(mission: str, w: Optional[str] = None, limits: Optional[str] = 
 
 
 @lru_cache(maxsize=32)
-def _twin_png(body: str, gid: str, i: int, j: int, purpose: str) -> bytes:
+def _twin_png(body: str, gid: str, i: int, j: int, purpose: str, wkey: str = "") -> bytes:
     g = store.g[gid]
-    p, dims, score, cov = twin.score_all(g, i, j, purpose)
+    p, dims, score, cov = twin.score_all(g, i, j, purpose, json.loads(wkey) if wkey else None)
     if score is None:
         return render.png(np.zeros((2, 2, 4), np.uint8))
     return render.png(render.to_mercator(render.grade_rgba(score)))
 
 
 @app.get("/api/overlay/twin.png")
-def overlay_twin(body: str, lat: float, lon: float, purpose: str = "general"):
+def overlay_twin(body: str, lat: float, lon: float, purpose: str = "general", w: Optional[str] = None):
     need_body(body, planetary=True)
     if purpose not in PURPOSES[body]:
         raise HTTPException(400, "unknown purpose")
+    try:
+        cw = custom_weights(body, purpose, json.loads(w) if w else None)
+    except (ValueError, json.JSONDecodeError) as e:
+        raise HTTPException(422, str(e))
     g, i, j = store.locate(body, lat, lon)
-    return png_response(_twin_png(body, g.id, i, j, purpose))
+    return png_response(_twin_png(body, g.id, i, j, purpose, json.dumps(cw, sort_keys=True) if cw else ""))
 
 
 @app.get("/api/health")

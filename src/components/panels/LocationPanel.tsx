@@ -1,11 +1,11 @@
 import { ArrowLeftRight, ExternalLink, Layers, LocateFixed, MapPin, Navigation, X } from "lucide-react";
 import { useState } from "react";
 
-import { ProfileChart } from "@/components/panels/ProfileChart";
+import { SiteCard } from "@/components/panels/SiteCard";
 import { Photos } from "@/components/ui/Photos";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Meter, Notice, Section, Spinner } from "@/components/ui/primitives";
 import { featuredPhotos, photoKey, photosFor } from "@/lib/photos";
-import { formatKm, formatMeasure, formatValue, GRADE_MEANING, pct } from "@/lib/format";
+import { formatKm, formatMeasure, formatValue, GRADE_MEANING, inUnit, pct } from "@/lib/format";
 import type { Body, CellInfo, Evidence, Factor, Measure, Planet, Suitability } from "@/lib/types";
 import { useStore } from "@/store";
 
@@ -64,6 +64,20 @@ function Empty({ body }: { body: Body }) {
             <span className="block text-sm font-medium text-regolith-50">Try a worked example</span>
             <span className="block text-xs leading-snug text-regolith-400">Gale crater on Mars, rover mobility: see its closest Earth match, why it matches and where it fails. Computed live.</span>
           </button>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {[
+              { t: "Lunar south pole", d: "Sunlit ridges and cold traps", go: () => { const st = useStore.getState(); st.setBody("moon"); void st.select("moon", -89.45, -137.31, { fly: true, spanKm: 300 }); } },
+              { t: "Explore Mars", d: "Jezero crater's delta", go: () => { const st = useStore.getState(); st.setBody("mars"); void st.select("mars", 18.44, 77.45, { fly: true, spanKm: 700 }); } },
+              { t: "Find Earth analogs", d: "For a Moon or Mars site", go: () => useStore.getState().startTwin({ body: "mars", lat: 18.44, lon: 77.45 }) },
+              { t: "Compare two places", d: "Shackleton ridge and Mons Mouton", go: () => { const st = useStore.getState(); st.addCompare({ body: "moon", lat: -89.45, lon: -137.31, label: "Ridge beside Shackleton" }); st.addCompare({ body: "moon", lat: -84.6, lon: 31.0, label: "Mons Mouton" }); st.setMode("compare"); } },
+              { t: "Plan a mission", d: "Guided, five steps", go: () => useStore.getState().setMode("mission") },
+            ].map((j) => (
+              <button key={j.t} type="button" onClick={j.go} className="row-ctl rounded-md px-2.5 py-2 text-left ring-1 ring-[var(--hair)]">
+                <span className="block text-sm font-medium text-regolith-50">{j.t}</span>
+                <span className="block text-2xs leading-snug text-regolith-400">{j.d}</span>
+              </button>
+            ))}
+          </div>
           <p className="mt-3 border-t border-[var(--hair)] pt-3 text-xs leading-relaxed text-regolith-400">Or click anywhere on the {name}. RADIUM shows what has been measured there, where each number comes from and how far to trust it.</p>
         </>
       ) : (
@@ -96,8 +110,10 @@ function Empty({ body }: { body: Body }) {
   );
 }
 
-function MeasureRow({ m, body }: { m: Measure; body: Body }) {
+function MeasureRow({ m: raw, body }: { m: Measure; body: Body }) {
   const [open, setOpen] = useState(false);
+  const temp = useStore((s) => s.tempUnit);
+  const m = inUnit(raw, temp);
   const meta = useStore((s) => s.meta)!;
   const setLayer = useStore((s) => s.setLayer);
   const mode = useStore((s) => s.mode);
@@ -186,7 +202,7 @@ function FactorRow({ f }: { f: Factor }) {
   );
 }
 
-function SuitabilityBlock({ s }: { s: Suitability }) {
+export function SuitabilityBlock({ s }: { s: Suitability }) {
   const meta = useStore((st) => st.meta)!;
   const mission = meta.missions.find((m) => m.id === s.mission);
   return (
@@ -311,15 +327,7 @@ export function LocationPanel() {
   if (!cell || cell.body !== body) return status === "loading" ? <div className="p-5"><Spinner label="Reading the grids for this place" /></div> : <Empty body={body} />;
   return (
     <div className={cx("relative", status === "loading" && "opacity-70")} aria-busy={status === "loading"}>
-      <Header cell={cell} />
-      {cell.suitability && <SuitabilityBlock s={cell.suitability} />}
-      <Section title="Photographs">
-        <Photos id={photoKey(cell)} load={() => photosFor(cell)} />
-      </Section>
-      <Section title="Regional terrain profile" defaultOpen={false}>
-        <ProfileChart body={cell.body} lat={cell.cell.lat} lon={cell.cell.lon} />
-      </Section>
-      <CellDetails cell={cell} />
+      <SiteCard cell={cell} />
     </div>
   );
 }

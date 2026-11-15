@@ -37,6 +37,17 @@ export function applyLink(hash: string) {
   const mode = MODES.includes(q.get("m") as Mode) ? (q.get("m") as Mode) : "explore";
   const body = BODIES.includes(q.get("b") as Body) ? (q.get("b") as Body) : st.body;
 
+  // Places queued for comparison: "body,lat,lon,label;…" (validated; at most four).
+  const cl = q.get("cl");
+  if (cl) {
+    const list = cl.split(";").map((part) => {
+      const [b, la, lo, ...rest] = part.split(",");
+      const pos = latlon(`${la},${lo}`);
+      return BODIES.includes(b as Body) && pos ? { body: b as Body, ...pos, label: rest.join(",").slice(0, 80) || `${b} ${la}, ${lo}` } : null;
+    }).filter((x): x is NonNullable<typeof x> => !!x).slice(0, 4);
+    if (list.length) useStore.setState({ compareList: list });
+  }
+
   const c = q.get("c") as ColorBy;
   if (COLORS.includes(c)) st.setAtlas({ colorBy: c });
 
@@ -75,6 +86,8 @@ export function applyLink(hash: string) {
     st.startTwin(target);
     if (earth) void useStore.getState().pickEarth(earth.lat, earth.lon, true);
     if (mode === "compare") useStore.getState().setMode("compare");
+  } else if (mode === "compare") {
+    st.setMode("compare");
   } else if (mode === "near") {
     const nr = Number(q.get("nr"));
     useStore.setState({
@@ -132,6 +145,7 @@ export function currentLink(): string {
     q.set("nm", s.nearMode);
     if (s.nearDocOnly) q.set("nd", "1");
   }
+  if (s.compareList.length) q.set("cl", s.compareList.map((x) => `${x.body},${r4(x.lat)},${r4(x.lon)},${x.label.replace(/[;]/g, " ")}`).join(";"));
   if (s.sheet && s.sheet !== "intro") q.set("sh", s.sheet);
   return `${location.origin}${location.pathname}#${q.toString()}`;
 }

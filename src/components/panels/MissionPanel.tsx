@@ -1,7 +1,8 @@
-import { ArrowDown, ArrowUp, Columns2, RotateCcw, Sparkle } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, Check, Columns2, Download, Printer, RotateCcw, Sparkle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { Button, cx, GradeTile, Notice, Section, Spinner, Switch } from "@/components/ui/primitives";
+import { Button, cx, GradeTile, Notice, Section, Segmented, Spinner, Switch } from "@/components/ui/primitives";
+import { downloadCsv } from "@/lib/csv";
 import { GRADE_MEANING, pct, plural } from "@/lib/format";
 import type { Grade, Mission, SiteCard } from "@/lib/types";
 import { shares, useStore } from "@/store";
@@ -26,6 +27,8 @@ function MissionPicker({ missions, value, onChange }: { missions: Mission[]; val
     </div>
   );
 }
+
+const STEPS = ["Destination", "Mission", "Priorities", "Candidates", "Save"];
 
 function Movement({ s }: { s: SiteCard }) {
   if (s.prev_rank === undefined) return null;
@@ -56,6 +59,11 @@ export function MissionPanel() {
   const share = shares(raw);
   const timer = useRef<number | undefined>(undefined);
   const [compare, setCompare] = useState<string[]>([]);
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+  const saved = useStore((s) => s.saved);
+  const compareList = useStore((s) => s.compareList);
 
   useEffect(() => setCompare([]), [missionId]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -75,19 +83,73 @@ export function MissionPanel() {
   const eligible = stats ? stats.graded - stats.excluded : 0;
   const good = stats ? stats.grades.A + stats.grades.B : 0;
   const chosen = sites.filter((s) => compare.includes(s.id));
+  const destination = cell && cell.body === mission.body ? cell : null;
+  const pickable = [...compareList, ...saved.sites].filter((p, k, a) => p.body === mission.body && a.findIndex((q) => q.lat === p.lat && q.lon === p.lon) === k).slice(0, 6);
+  useEffect(() => { setName(`${mission.label}${destination ? `, ${destination.place.label}` : ""}`); setSavedNote(null); }, [missionId, destination?.cell.lat]); // eslint-disable-line react-hooks/exhaustive-deps
+  const exportCsv = () => downloadCsv(`radium-${missionId}-candidates.csv`,
+    ["rank", "place", "lat", "lon", "suitability_score", "grade", "coverage", ...mission.criteria.map((c) => `${c.id}_grade`), ...mission.criteria.map((c) => `${c.id}_weight_share`)],
+    sites.map((x) => [x.rank, x.place, x.lat, x.lon, x.score, x.grade, x.coverage, ...mission.criteria.map((c) => x.factors.find((f) => f.id === c.id)?.grade ?? null), ...mission.criteria.map((c) => share[c.id] ?? 0)]),
+    [`RADIUM preliminary candidates for ${mission.label}. Hard limits on: ${limitsOn.join(", ") || "none"}.`, "Suitability is RADIUM's own 0-1 scale from public data at 2-30 km resolution; not a landing or construction certification."]);
 
   return (
     <div>
-      <header className="px-4 pt-4 pb-3">
+      <header className="px-4 pt-4 pb-2">
         <h2 className="text-md font-semibold text-regolith-50">Mission Planner</h2>
-        <p className="mt-1 mb-2.5 text-xs leading-relaxed text-regolith-400">Choose a mission, then say what matters most. Every cell on the globe is regraded as you move a slider. Grades here are site suitability for the mission, not Earth analog similarity.</p>
-        <MissionPicker missions={meta.missions} value={missionId} onChange={setMission} />
-        <Button size="sm" variant="outline" className="mt-2.5 w-full justify-center" onClick={() => useStore.getState().setSheet("scenarios")} title="Set two versions of these priorities and limits side by side">
-          <Columns2 size={13} /> Compare two scenarios
-        </Button>
+        <p className="mt-1 text-xs leading-relaxed text-regolith-400">Five steps from a destination to a saved, exportable plan. Grades here are site suitability for the mission, not Earth analog similarity, and not a certification.</p>
+        <ol className="mt-3 grid grid-cols-5 gap-1" aria-label="Steps">
+          {STEPS.map((t, k) => (
+            <li key={t}>
+              <button type="button" onClick={() => setStep(k)} aria-current={step === k ? "step" : undefined}
+                className={cx("ctl flex w-full flex-col items-center gap-1 rounded-sm px-0.5 py-1 text-[10px] leading-tight", step === k ? "text-regolith-50" : "text-regolith-400")}>
+                <span className={cx("grid size-5 place-items-center rounded-full text-[10px] font-bold ring-1", step === k ? "bg-world text-world-ink ring-transparent" : k < step ? "ring-[var(--world)] text-world" : "ring-[var(--hair-strong)]")}>{k < step ? <Check size={11} /> : k + 1}</span>
+                {t}
+              </button>
+            </li>
+          ))}
+        </ol>
       </header>
 
-      <Section title="Priorities" aside={
+      {step === 0 && (
+        <Section title="1. Choose a destination">
+          <div className="px-4 pb-3">
+            <Segmented label="World" value={mission.body} onChange={(b) => { const m = meta.missions.find((x) => x.body === b); if (m) setMission(m.id); }} options={[{ value: "moon", label: "Moon" }, { value: "mars", label: "Mars" }]} />
+            <div className="mt-3 rounded-md bg-basalt-800 px-3 py-2.5 text-sm">
+              {destination ? (
+                <>
+                  <div className="text-2xs text-regolith-400">Selected site</div>
+                  <div className="placename text-md text-regolith-50">{destination.place.label}</div>
+                  <div className="tnum text-2xs text-regolith-400">{destination.coords}</div>
+                  {destination.suitability && <div className="mt-1.5 flex items-center gap-2 text-xs text-regolith-200"><GradeTile grade={destination.suitability.excluded ? null : destination.suitability.grade} size="sm" />{destination.suitability.excluded ? "Ruled out by a hard limit" : destination.suitability.grade ? `${GRADE_MEANING[destination.suitability.grade]} for ${mission.label.toLowerCase()}` : "Not enough data to grade"}</div>}
+                </>
+              ) : <p className="text-xs leading-snug text-regolith-300">Click the globe to choose a site, or pick one below. You can also plan without a site: step 4 lists the best candidates.</p>}
+            </div>
+            {pickable.length > 0 && (
+              <>
+                <div className="mt-3 text-2xs text-regolith-400">From Compare and your saved places</div>
+                <ul className="mt-1">{pickable.map((p) => (
+                  <li key={`${p.lat}${p.lon}`}><button type="button" className="row-ctl -mx-2 block w-[calc(100%+16px)] rounded-sm px-2 py-1.5 text-left" onClick={() => void select(p.body, p.lat, p.lon, { fly: true, spanKm: 500 })}>
+                    <span className="placename block truncate text-md text-regolith-50">{p.label}</span><span className="tnum text-2xs text-regolith-400">{p.lat.toFixed(2)}, {p.lon.toFixed(2)}</span>
+                  </button></li>
+                ))}</ul>
+              </>
+            )}
+            <Button size="sm" variant="solid" className="mt-3" onClick={() => setStep(1)}>Next: mission type</Button>
+          </div>
+        </Section>
+      )}
+
+      {step === 1 && (
+        <Section title="2. Choose a mission type">
+          <div className="px-4 pb-3">
+            <MissionPicker missions={meta.missions.filter((m) => m.body === mission.body)} value={missionId} onChange={setMission} />
+            <p className="mt-2 text-2xs leading-snug text-regolith-500">RADIUM has {meta.missions.length} mission models: a permanent lunar base, a robotic Mars landing and a crewed Mars mission. For a rover campaign or science outpost, start from the closest model and adjust the priorities in the next step.</p>
+            <Button size="sm" variant="solid" className="mt-3" onClick={() => setStep(2)}>Next: priorities</Button>
+          </div>
+        </Section>
+      )}
+
+      {step === 2 && (<>
+      <Section title="3. Set priorities" aside={
         <button type="button" disabled={isDefault} onClick={resetWeights} className="ctl mr-3 inline-flex h-6 items-center gap-1 rounded-sm px-2 text-xs text-regolith-300" title="Return sliders and limits to this mission's defaults">
           <RotateCcw size={11} /> Reset
         </button>
@@ -98,7 +160,7 @@ export function MissionPanel() {
             return (
               <li key={c.id} className="py-0.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <label htmlFor={`w-${c.id}`} className="text-sm text-regolith-100" title={c.question}>{c.label}</label>
+                  <label htmlFor={`w-${c.id}`} className="text-sm text-regolith-100" title={c.rule}>{c.label}</label>
                   <span className="tnum text-xs text-regolith-300" title="Share of the overall grade after all sliders are rescaled to 100%">{pct(share[c.id] ?? 0)}</span>
                 </div>
                 <input
@@ -107,6 +169,7 @@ export function MissionPanel() {
                   onChange={(e) => onSlide(c.id, Number(e.target.value))}
                   aria-valuetext={`${pct(share[c.id] ?? 0)} of the grade`}
                 />
+                <p className="text-2xs leading-snug text-regolith-500">{c.question}</p>
               </li>
             );
           })}
@@ -122,8 +185,11 @@ export function MissionPanel() {
           <p className="px-2 pt-1 text-2xs leading-snug text-regolith-500">Limits rule a cell out whatever its grade. They are screening values chosen by RADIUM, not agency requirements.</p>
         </div>
       </Section>
+      <div className="px-4 pb-3"><Button size="sm" variant="solid" onClick={() => setStep(3)}>Next: candidate sites</Button></div>
+      </>)}
 
-      <Section title="Best sites" aside={status === "loading" ? <span className="mr-4"><Spinner /></span> : undefined}>
+      {step === 3 && (
+      <Section title="4. Compare candidate sites" aside={status === "loading" ? <span className="mr-4"><Spinner /></span> : undefined}>
         <div className="px-2 pb-1">
           <Switch checked={showSuitability} onChange={(v) => useStore.setState({ showSuitability: v })} label="Colour the globe by grade" />
         </div>
@@ -210,10 +276,31 @@ export function MissionPanel() {
             </table>
           </div>
         )}
-        <p className="hair-t px-4 py-3 text-2xs leading-relaxed text-regolith-500">
-          Grades are RADIUM's exploratory assessment from public data at 2 to 30 km resolution. They are a way to compare options, not a landing-site certification.
+        <div className="flex flex-wrap gap-1.5 px-4 pt-2">
+          <Button size="sm" variant="outline" disabled={!chosen.length} onClick={() => { const st = useStore.getState(); chosen.forEach((x) => st.addCompare({ body: mission.body, lat: x.lat, lon: x.lon, label: x.place })); st.setMode("compare"); }}><Columns2 size={13} /> Open ticked sites in Compare</Button>
+          <Button size="sm" variant="outline" onClick={() => useStore.getState().setSheet("scenarios")}><Columns2 size={13} /> Compare two scenarios</Button>
+        </div>
+        <p className="hair-t mt-3 px-4 py-3 text-2xs leading-relaxed text-regolith-500">
+          Grades are RADIUM's exploratory assessment from public data at 2 to 30 km resolution. They are a way to compare options, not a landing-site certification. Tick sites to compare them; select one for its full analysis.
         </p>
+        <div className="px-4 pb-3"><Button size="sm" variant="solid" onClick={() => setStep(4)}>Next: save or export</Button></div>
       </Section>
+      )}
+
+      {step === 4 && (
+        <Section title="5. Save or export">
+          <div className="px-4 pb-4">
+            <p className="text-xs leading-snug text-regolith-300">Keep this plan in this browser, download the candidate list, or print a preliminary report with the criteria, candidates, sources and limits.</p>
+            <label className="mt-3 block text-2xs text-regolith-400">Plan name<input value={name} onChange={(e) => setName(e.target.value)} className="field mt-0.5" /></label>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Button size="sm" variant="solid" onClick={() => { useStore.getState().saveMission(name.trim() || mission.label); setSavedNote("Saved. Find it under Saved in the top bar."); }}><Bookmark size={13} /> Save plan</Button>
+              <Button size="sm" variant="outline" disabled={!sites.length} onClick={exportCsv}><Download size={13} /> Candidates CSV</Button>
+              <Button size="sm" variant="outline" onClick={() => useStore.getState().setSheet("report")}><Printer size={13} /> Printable report</Button>
+            </div>
+            {savedNote && <p className="mt-2 text-2xs text-grade-b" role="status">{savedNote}</p>}
+          </div>
+        </Section>
+      )}
     </div>
   );
 }

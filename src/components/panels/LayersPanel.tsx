@@ -1,4 +1,4 @@
-import { cx, EvidenceGlyph, Section, Switch } from "@/components/ui/primitives";
+import { cx, EvidenceGlyph, Section, Segmented, Switch } from "@/components/ui/primitives";
 import type { Basemap, Evidence, GridLayer, TileLayer } from "@/lib/types";
 import { type Overlay, useStore } from "@/store";
 
@@ -7,6 +7,12 @@ const GROUP_LABEL: Record<string, string> = {
   atmos: "Atmosphere and dust", geology: "Composition and geology", surface: "Surface cover",
   elevation: "Terrain", slope: "Terrain", roughness: "Terrain", temperature: "Surface temperature", dust: "Atmosphere and dust",
 };
+// Simple mode speaks in terms of what the user is deciding, Advanced keeps the scientific category names.
+const SIMPLE_NAME: Record<string, string> = {
+  Terrain: "Terrain & safety", "Surface temperature": "Temperature", "Sunlight and energy": "Sunlight & power", Communication: "Communications",
+  "Water and ice": "Water & resources", "Atmosphere and dust": "Atmosphere & dust", "Composition and geology": "Composition & geology", "Surface cover": "Surface cover",
+};
+const firstSentence = (t: string) => (t.match(/^.*?[.!?](\s|$)/)?.[0] ?? t).trim();
 const GROUP_ORDER = ["Terrain", "Surface temperature", "Sunlight and energy", "Communication", "Water and ice", "Atmosphere and dust", "Composition and geology", "Surface cover"];
 
 function Radio({ on, onClick, title, sub, evidence }: { on: boolean; onClick: () => void; title: string; sub?: string; evidence?: Evidence }) {
@@ -31,6 +37,7 @@ export function LayersPanel() {
   const body = useStore((s) => s.body);
   const st = useStore((s) => s.layers[s.body]);
   const setLayer = useStore((s) => s.setLayer);
+  const advanced = useStore((s) => s.advanced);
 
   const tiles = body === "earth" ? [] : (meta.layers[body].tiles as TileLayer[]);
   const basemaps = body === "earth" ? (meta.layers.earth.tiles as Basemap[]) : [];
@@ -45,11 +52,11 @@ export function LayersPanel() {
     groups.get(k)!.grid.push(g);
   }
   for (const t of rendered) {
-    const k = GROUP_LABEL[t.group] ?? t.group;
+    const k = advanced ? (GROUP_LABEL[t.group] ?? t.group) : "Scientific datasets";
     if (!groups.has(k)) groups.set(k, { grid: [], tiles: [] });
     groups.get(k)!.tiles.push(t);
   }
-  const ordered = [...groups.entries()].sort((a, b) => GROUP_ORDER.indexOf(a[0]) - GROUP_ORDER.indexOf(b[0]));
+  const ordered = [...groups.entries()].sort((a, b) => (GROUP_ORDER.indexOf(a[0]) + 1 || 99) - (GROUP_ORDER.indexOf(b[0]) + 1 || 99));
   const isOn = (o: Overlay, kind: "grid" | "tiles", id: string) => o?.kind === kind && o.id === id;
   const pick = (kind: "grid" | "tiles", id: string) => setLayer(body, { overlay: isOn(st.overlay, kind, id) ? null : { kind, id } });
   const activeGroup = (items: { grid: GridLayer[]; tiles: TileLayer[] }) => items.grid.some((g) => isOn(st.overlay, "grid", g.id)) || items.tiles.some((t) => isOn(st.overlay, "tiles", t.id));
@@ -57,11 +64,17 @@ export function LayersPanel() {
   return (
     <div>
       <header className="px-4 pt-4 pb-3">
-        <h2 className="text-md font-semibold text-regolith-50">Map layers</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-md font-semibold text-regolith-50">Map layers</h2>
+          <Segmented size="sm" label="Detail level" value={advanced ? "adv" : "simple"} onChange={(v) => useStore.setState({ advanced: v === "adv" })}
+            options={[{ value: "simple", label: "Simple", title: "Plain-language names and explanations" }, { value: "adv", label: "Advanced", title: "Scientific names, resolutions and every NASA map" }]} />
+        </div>
         <p className="mt-1 text-xs leading-relaxed text-regolith-400">
           {body === "earth"
             ? "Satellite view underneath, one data layer on top. Data layers are drawn from the same grids RADIUM analyses."
-            : "Orbital imagery underneath, one data layer on top. Layers marked RADIUM grid are the values used in the analysis; NASA rendered maps are pictures for context."}
+            : advanced
+              ? "Orbital imagery underneath, one data layer on top. Layers marked RADIUM grid are the values used in the analysis; NASA rendered maps are pictures for context."
+              : "Pick what to see on the globe. Each layer shows one measurement; switch to Advanced for resolutions and sources."}
         </p>
       </header>
 
@@ -92,13 +105,14 @@ export function LayersPanel() {
         )}
         <div role="radiogroup" aria-label="Data layer">
           {ordered.map(([name, items]) => (
-            <LayerGroup key={`${body}-${name}`} name={name} open={activeGroup(items) || name === "Terrain"}>
+            <LayerGroup key={`${body}-${name}`} name={advanced ? name : (SIMPLE_NAME[name] ?? name)} open={activeGroup(items) || name === "Terrain"}>
               {items.grid.map((g) => (
-                <Radio key={g.id} on={isOn(st.overlay, "grid", g.id)} onClick={() => pick("grid", g.id)} title={g.title} evidence={g.evidence}
-                  sub={`RADIUM grid, ${g.res}`} />
+                <Radio key={g.id} on={isOn(st.overlay, "grid", g.id)} onClick={() => pick("grid", g.id)} title={g.title} evidence={advanced ? g.evidence : undefined}
+                  sub={advanced ? `RADIUM grid, ${g.res}${g.polar_only ? ". Polar squares only" : ""}` : `${firstSentence(g.description)}${g.polar_only ? " Near the poles only." : ""}`} />
               ))}
               {items.tiles.map((t) => (
-                <Radio key={t.id} on={isOn(st.overlay, "tiles", t.id)} onClick={() => pick("tiles", t.id)} title={t.title} sub="NASA rendered map" />
+                <Radio key={t.id} on={isOn(st.overlay, "tiles", t.id)} onClick={() => pick("tiles", t.id)} title={t.title}
+                  sub={advanced ? `NASA rendered map, ${t.provider}` : "A NASA map picture for context; RADIUM reads no values from it."} />
               ))}
             </LayerGroup>
           ))}

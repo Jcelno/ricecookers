@@ -124,7 +124,7 @@ const STEPS: Step[] = [
     title: "Design a mission",
     body: (
       <>
-        <p>Open “Design a mission” and choose a lunar base, a robotic Mars landing or a crewed Mars mission. Move the sliders to say what matters most, such as sunlight, water ice or safe landing.</p>
+        <p>Open Mission Planner and choose a lunar base, a robotic Mars landing or a crewed Mars mission. Move the sliders to say what matters most, such as sunlight, water ice or safe landing.</p>
         <p>Every place is regraded from A to F as you go, the globe recolours, and the best sites are listed and numbered.</p>
       </>
     ),
@@ -134,7 +134,7 @@ const STEPS: Step[] = [
     title: "Find a site's Earth twins",
     body: (
       <>
-        <p>Open “Earth Twin”, pick a Moon or Mars site and say what the analog is for, such as rover testing or drilling for ice. RADIUM compares it with every land area on Earth.</p>
+        <p>Open Earth Analogs, pick a Moon or Mars site and say what the analog is for, such as rover testing or drilling for ice. RADIUM compares it with every land area on Earth.</p>
         <p>Open a match to see what is alike, what is not, and where Earth simply cannot copy the Moon or Mars, such as gravity and air pressure.</p>
       </>
     ),

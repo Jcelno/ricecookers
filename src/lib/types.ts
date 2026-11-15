@@ -37,7 +37,7 @@ export interface Meta {
     mars: { tiles: TileLayer[]; grid: GridLayer[] };
     earth: { tiles: Basemap[]; grid: GridLayer[] };
   };
-  cap: { edge_lat: number };
+  cap: { edge_lat: number; boxes?: { south: [number, number][]; north: [number, number][] } };
   sources_index: Record<string, { name: string; url: string; agency: string }>;
 }
 
@@ -178,4 +178,9 @@ export interface Probe { id: string; lat: number; lon: number; score: number | n
 export interface Profile {
   body: Body; axis: "ns" | "ew"; centre: { lat: number; lon: number; coords: string }; cell_km: [number, number];
   points: { offset_km: number; lat: number; lon: number; elev_m: number | null; slope_deg: number | null }[]; source: string; note: string;
+}
+
+export interface Timeline {
+  body: Body; lat: number; lon: number; axis: string; ticks: string[];
+  series: { id: string; label: string; unit: string; evidence: Evidence; source: string; note: string; values: (number | null)[]; observed: number }[];
 }

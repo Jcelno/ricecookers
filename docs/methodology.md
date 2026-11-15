@@ -170,6 +170,27 @@ data service is unreachable and labels it as a saved example.
 22 journal and book citations were checked against Crossref on 2026-11-14 (authors, year, journal, volume and
 pages) and carry their DOI; programme-only entries (for example HI-SEAS, AMASE, Desert RATS) cite the programme.
 
+**Lunar polar overlays.** Within 305 km of each pole the 2.4 km polar grids replace the 15 km global grid. Map
+images are drawn so the two never overlap or leave gaps: the global image stops at 75.5°, and the polar cap image
+covers everything poleward of it, with polar values inside the square and global values around it, on the global
+layer's colour scale. Transparent pixels carry the nearest visible colour (alpha stays zero) so texture filtering
+cannot draw dark fringes. The squares are outlined on the map; a polar-only layer says so when the selected place
+lies outside them. Scores are unaffected.
+
+**Time series** (`GET /api/timeline`, `pipeline/build_timeline.py`). Moon: Diviner bolometric temperature by local
+hour, the mean of observed quarter-hour bins only (unobserved hours stay empty). Mars: Mars Climate Database
+seasonal means of surface temperature and solar flux (12 seasons). Earth: NASA POWER monthly skin temperature.
+
+**Custom similarity weights.** Earth Analogs, compare, briefs, Near Me and the twin overlay accept user weights for
+the purpose's own dimensions (0–100 each, at least one positive). Sending the documented weights reproduces the
+default results exactly (tested). The fitness-by-purpose table always uses the documented weights.
+
+**Site assessment.** The label in the Site Analysis Card follows fixed rules: "Limited data" when fewer than half
+of the headline measurements exist; "Potential terrain concerns" when typical or steep-ground slope exceeds the
+level at which the suitability terrain criterion gives no credit (Moon 12°/20°, Mars and Earth 6°/15°), unless at
+least 30% of a polar cell is gentle at 480 m; "Promising" only when the cell grades A or B for a mission with no
+hard limit failed; otherwise "Additional analysis required".
+
 **Share links.** The address hash records the view (mode, world, target, purpose, chosen Earth cell, mission
 weights and limits, scenario B, atlas colouring and Near Me settings). Values read from a link are validated
 (latitude −90..90, longitude −180..180, weights 0..100, known ids only) and anything else is ignored.

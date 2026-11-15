@@ -16,12 +16,13 @@ const CORNERS: [[number, number], [number, number], [number, number], [number, n
 // Borders and place names: OpenFreeMap vector tiles (OpenStreetMap data, OpenMapTiles schema).
 // Keyless and CORS-enabled; styled here so lettering matches the rest of the interface.
 const OFM = "https://tiles.openfreemap.org";
-export const LABEL_ATTRIBUTION = "Borders and place names © OpenStreetMap contributors, OpenMapTiles, served by OpenFreeMap";
+export { LABEL_ATTRIBUTION } from "@/lib/attribution";
+import { LABEL_ATTRIBUTION } from "@/lib/attribution";
 const LABEL_LAYERS = ["boundary", "label-water", "label-country", "label-state", "label-city"];
 const NAME = ["coalesce", ["get", "name:en"], ["get", "name"]] as unknown as string;
 const HALO = { "text-halo-color": "rgba(6,8,12,0.85)", "text-halo-width": 1.3 };
 
-interface Props {
+export interface EarthMapProps {
   basemap: Basemap | undefined;
   labels: boolean;
   overlayUrl?: string | null;
@@ -32,6 +33,8 @@ interface Props {
   selection?: { lat: number; lon: number; outline?: [number, number][] } | null;
   focus?: Focus | null;
   onPick?: (lat: number, lon: number) => void;
+  /** Clicking a numbered/lettered site marker. Falls back to onPick when not given. */
+  onMarker?: (id: string) => void;
   onCursor?: (c: { lat: number; lon: number } | null) => void;
   onView?: (v: ViewState) => void;
   onStatus?: (s: { ready: boolean; error: string | null }) => void;
@@ -109,17 +112,22 @@ function pinElement(p: Pin) {
 }
 
 function markerElement(m: SiteMarker) {
+  // Letter = which result (matches the list); ring colour = similarity grade. Two cues, never one letter for both.
   const el = document.createElement("button");
   el.type = "button";
   el.textContent = m.text;
-  el.setAttribute("aria-label", `Match ${m.text}`);
-  const s = m.active ? 30 : 24;
-  el.style.cssText = `width:${s}px;height:${s}px;border-radius:50%;padding:0;font:600 12px "IBM Plex Sans",sans-serif;color:#101216;cursor:pointer;background:${m.grade ? GRADE_HEX[m.grade] : "#94938a"};border:${m.active ? "3px solid #f6f2e9" : "2px solid #101216"};box-shadow:0 2px 8px rgba(0,0,0,.65)`;
+  el.title = `${m.text}${m.grade ? `: grade ${m.grade}` : ": not graded"}`;
+  el.setAttribute("aria-label", `Result ${m.text}${m.grade ? `, similarity grade ${m.grade}` : ", not graded"}`);
+  const s = m.active ? 32 : 26;
+  const ring = m.grade ? GRADE_HEX[m.grade] : "#7b8fa1";
+  el.style.cssText =
+    `width:${s}px;height:${s}px;border-radius:50%;padding:0;font:700 ${m.text.length > 1 ? 10 : 12}px "IBM Plex Sans",sans-serif;color:#eef4f8;cursor:pointer;` +
+    `background:#08111f;border:3px solid ${ring};box-shadow:${m.active ? "0 0 0 2px #eef4f8," : ""}0 2px 8px rgba(0,0,0,.7)`;
   return el;
 }
 
-export const EarthMap = forwardRef<GlobeHandle, Props>(function EarthMap(
-  { basemap, labels, overlayUrl, opacity = 0.85, dimBase = false, pins = [], markers = [], selection, focus, onPick, onCursor, onView, onStatus },
+export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap(
+  { basemap, labels, overlayUrl, opacity = 0.85, dimBase = false, pins = [], markers = [], selection, focus, onPick, onMarker, onCursor, onView, onStatus },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -127,8 +135,8 @@ export const EarthMap = forwardRef<GlobeHandle, Props>(function EarthMap(
   const [ready, setReady] = useState(0);
   const pinMarkers = useRef<Marker[]>([]);
   const siteMarkers = useRef<Marker[]>([]);
-  const cb = useRef({ onPick, onCursor, onView, onStatus });
-  cb.current = { onPick, onCursor, onView, onStatus };
+  const cb = useRef({ onPick, onMarker, onCursor, onView, onStatus });
+  cb.current = { onPick, onMarker, onCursor, onView, onStatus };
   const lastFocus = useRef(0);
   const baseId = basemap?.id;
 
@@ -254,7 +262,8 @@ export const EarthMap = forwardRef<GlobeHandle, Props>(function EarthMap(
       el.style.zIndex = s.active ? "3" : "2";
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        cb.current.onPick?.(s.lat, s.lon);
+        if (cb.current.onMarker) cb.current.onMarker(s.id);
+        else cb.current.onPick?.(s.lat, s.lon);
       });
       return new Marker({ element: el }).setLngLat([s.lon, s.lat]).addTo(map);
     });

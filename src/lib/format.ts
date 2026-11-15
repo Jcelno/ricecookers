@@ -58,3 +58,9 @@ export function clamp(x: number, lo: number, hi: number) {
 export function wrapLon(lon: number) {
   return ((((lon + 180) % 360) + 360) % 360) - 180;
 }
+
+/** Temperatures are stored in kelvin; show them in °C when asked. Differences (sigma, ranges) are the same in both. */
+export function inUnit<T extends { value: number | null; unit: string }>(m: T, temp: "K" | "C"): T {
+  if (m.unit !== "K" || temp === "K" || m.value === null) return m;
+  return { ...m, value: m.value - 273.15, unit: "°C" };
+}

@@ -12,12 +12,13 @@ from __future__ import annotations
 import sys
 import time
 
-from . import (build_earth, build_layers, build_mars, build_moon, build_moon_polar, build_names, fetch, fetch_earth,
+from . import (build_earth, build_timeline, build_layers, build_mars, build_moon, build_moon_polar, build_names, fetch, fetch_earth,
                fetch_mcd)
 
 FETCH = [("plain data files", fetch.main), ("NASA POWER and GIBS", fetch_earth.main), ("Mars Climate Database", fetch_mcd.main)]
 BUILD = [("Moon, global grid", build_moon.main), ("Moon, polar grids", build_moon_polar.main), ("Mars grid", build_mars.main),
-         ("Earth grid", build_earth.main), ("place names", build_names.main), ("map tile layers", build_layers.main)]
+         ("Earth grid", build_earth.main), ("place names", build_names.main), ("map tile layers", build_layers.main),
+         ("time series", build_timeline.main)]
 
 
 def main() -> int:

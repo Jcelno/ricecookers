@@ -75,8 +75,8 @@
   --world-ink: #101216;
   --hair: rgb(150 190 220 / 0.14);
   --hair-strong: rgb(150 190 220 / 0.26);
-  --panel-w: 372px;
-  --rail-w: 316px;
+  --panel-w: 360px;
+  --rail-w: 288px;
   --top-h: 52px;
   color-scheme: dark;
 }

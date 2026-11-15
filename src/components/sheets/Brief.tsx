@@ -122,7 +122,8 @@ export default function BriefSheet({ onClose }: { onClose: () => void }) {
     if (!req) return;
     const ac = new AbortController();
     setErr(null);
-    api.brief({ ...req, setting }, ac.signal).then(setBrief, (e) => { if (e?.name !== "AbortError") setErr(e.message); });
+    const w = useStore.getState().twinWeights;
+    api.brief({ ...req, setting, ...(w ? { weights: w } : {}) }, ac.signal).then(setBrief, (e) => { if (e?.name !== "AbortError") setErr(e.message); });
     return () => ac.abort();
   }, [req, setting]);
 

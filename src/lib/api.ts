@@ -1,4 +1,4 @@
-import type { Body, Brief, Profile, CellInfo, CompareResult, Meta, NearbyResult, Pin, Planet, RankResult, SearchHit, Source, TwinResult } from "./types";
+import type { Body, Brief, Profile, Timeline, CellInfo, CompareResult, Meta, NearbyResult, Pin, Planet, RankResult, SearchHit, Source, TwinResult } from "./types";
 
 export class ApiError extends Error {
   constructor(message: string, public status?: number) {
@@ -50,16 +50,17 @@ export const api = {
     b: { mission: string; weights?: Record<string, number>; limits?: string[]; prev_weights?: Record<string, number>; prev_limits?: string[]; n?: number; probe?: { lat: number; lon: number }[] },
     signal?: AbortSignal,
   ) => post<RankResult>("/api/rank", b, signal),
-  twin: (b: { body: Planet; lat: number; lon: number; purpose: string; n?: number }, signal?: AbortSignal) => post<TwinResult>("/api/twin", b, signal),
-  compare: (b: { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number }, signal?: AbortSignal) =>
+  twin: (b: { body: Planet; lat: number; lon: number; purpose: string; n?: number; weights?: Record<string, number> }, signal?: AbortSignal) => post<TwinResult>("/api/twin", b, signal),
+  compare: (b: { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number; weights?: Record<string, number> }, signal?: AbortSignal) =>
     post<CompareResult>("/api/twin/compare", b, signal),
+  timeline: (body: Body, lat: number, lon: number, signal?: AbortSignal) => request<Timeline>(`/api/timeline?${qs({ body, lat, lon })}`, { signal }),
   profile: (body: Body, lat: number, lon: number, axis: "ns" | "ew", signal?: AbortSignal) =>
     request<Profile>(`/api/profile?${qs({ body, lat, lon, axis })}`, { signal }),
   nearby: (
-    b: { lat: number; lon: number; radius_km: number; mode: "nearest" | "best"; body?: Planet; target_lat?: number; target_lon?: number; purpose?: string; documented_only?: boolean; limit?: number },
+    b: { lat: number; lon: number; radius_km: number; mode: "nearest" | "best"; body?: Planet; target_lat?: number; target_lon?: number; purpose?: string; documented_only?: boolean; limit?: number; weights?: Record<string, number> },
     signal?: AbortSignal,
   ) => post<NearbyResult>("/api/analogs/nearby", b, signal),
-  brief: (b: { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number; setting?: string }, signal?: AbortSignal) =>
+  brief: (b: { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number; setting?: string; weights?: Record<string, number> }, signal?: AbortSignal) =>
     post<Brief>("/api/brief", b, signal),
 };
 
@@ -68,5 +69,6 @@ export const overlay = {
   variable: (body: Body, id: string, region: "global" | "south" | "north" = "global") => `/api/overlay/var.png?${qs({ body, var: id, region })}`,
   suitability: (mission: string, weights: Record<string, number> | undefined, limits: string[] | undefined, region: "global" | "south" | "north" = "global") =>
     `/api/overlay/suitability.png?${qs({ mission, w: weights ? JSON.stringify(weights) : undefined, limits: limits ? limits.join(",") : undefined, region })}`,
-  twin: (body: Planet, lat: number, lon: number, purpose: string) => `/api/overlay/twin.png?${qs({ body, lat: lat.toFixed(4), lon: lon.toFixed(4), purpose })}`,
+  twin: (body: Planet, lat: number, lon: number, purpose: string, weights?: Record<string, number> | null) =>
+    `/api/overlay/twin.png?${qs({ body, lat: lat.toFixed(4), lon: lon.toFixed(4), purpose, w: weights ? JSON.stringify(weights) : undefined })}`,
 };
