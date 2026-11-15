@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import briefs, catalog, reference, registry, render, sites
 from .geo import RADIUS_KM, fmt_latlon, gc_km, pick_distinct
@@ -206,6 +206,16 @@ def methodology():
         },
         "similarity": {
             "min_coverage": SIM_MIN_COVERAGE, "separation_km": SEPARATION_KM, "dimensions": DIMENSIONS,
+            "reverse": {
+                "endpoint": "/api/twin/reverse", "evidence": "computed",
+                "method": "Evaluate the existing pairwise Earth Twin model over every valid planetary grid cell against one fixed Earth land cell; no interpolation.",
+                "coverage_threshold": SIM_MIN_COVERAGE, "weights": "Default research-purpose weights for each world; no new overall score.",
+                "separation_km": {body: RANK_SEPARATION_KM[body] for body in ("moon", "mars")},
+                "catalog": "Research sites are listed separately from screened grid-cell matches, using their actual analysis cells.",
+                "curated_count": "Number of assessed, verified Earth analogs for that world scoring below the Earth cell for the explicitly named best-matched planetary target.",
+                "limits": "Reverses search direction, not a generic symmetric metric. Gravity, pressure and radiation remain excluded and disclosed.",
+                "analog_envelope": "Not assessed: no calibrated Earth analog-suitability envelope or interpolation of curated qualitative grades is introduced.",
+            },
             "purposes": {b: {pid: {"label": p["label"], "weights": p["w"]} for pid, p in ps.items()} for b, ps in PURPOSES.items()},
             "affinity": {"classes": lith, "mare": A_MARE, "highland": A_HIGHLAND, "mars": A_MARS, "notes": AFFINITY_NOTES},
         },
@@ -529,6 +539,28 @@ def twin_compare(req: CompareRequest):
         "purpose": req.purpose, "match": ex, "documented": nearest_documented(elat, elon, req.body),
         "rank_among": rank_among, "why": why_text(ex) if ex["score"] is not None else None,
     })
+
+
+class ReverseTwinRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    lat: float
+    lon: float
+    purpose: str = "general"
+    n: int = Field(default=5, ge=1, le=10)
+    body: Optional[str] = None
+
+
+@app.post("/api/twin/reverse")
+def reverse_twin(req: ReverseTwinRequest):
+    need_coordinates(req.lat, req.lon)
+    bodies = [req.body] if req.body else ["moon", "mars"]
+    if any(body not in PURPOSES for body in bodies):
+        raise HTTPException(422, "body must be moon or mars, or omitted to search both")
+    if not any(req.purpose in PURPOSES[body] for body in bodies):
+        raise HTTPException(422, "Unknown research purpose for the requested worlds")
+    from .reverse import search  # Optional code and arrays load only when requested.
+    return clean(search(store, twin, PINS, pnames, enames, lat=req.lat, lon=(req.lon + 180) % 360 - 180,
+                        purpose=req.purpose, n=req.n, bodies=bodies))
 
 
 # =============================================================================
