@@ -66,8 +66,11 @@ export interface Pin {
   id: string; name: string; kind: "landing" | "feature" | "analog"; lat: number; lon: number; note: string; source: string;
   link?: string; year?: number; country?: string; bodies?: Planet[]; theme?: string; feature_type?: string; diam_km?: number;
   distance_km?: number;
+  tags?: SiteTags;
   /** Earth Twin only: how closely this analog site matches the selected Moon or Mars site. */
   grade?: Grade | null;
+  /** Earth Analogs atlas: a text badge (grade letter or category code) drawn instead of the plain diamond. */
+  badge?: { text: string; color: string; ink: string; title: string };
 }
 
 export interface CellInfo {
@@ -88,6 +91,7 @@ export interface RankResult {
   mission: string; weights: Record<string, number>; sites: SiteCard[]; limits: string[];
   stats: { cells: number; graded: number; excluded: number; grades: Record<Grade, number> };
   change: { summary: string | null; weights_before: Record<string, number>; entered: number; left: number } | null;
+  probes?: Probe[];
 }
 
 export interface DimScore { id: string; label: string; score: number | null; grade: Grade | null; weight: number }
@@ -134,3 +138,39 @@ export interface Source {
   license: string; limitations: string; processing: string; evidence: string;
 }
 export interface SearchHit { name: string; type: string; lat: number; lon: number; diam_km?: number }
+
+/* ------------------------------------------------------------- Near Me */
+export interface Tag { id: string; label: string }
+export interface SiteTags { environment: Tag[]; applications: Tag[] }
+export interface Similarity { score: number | null; grade: Grade | null; coverage: number; strong: string[]; weak: string[] }
+export interface NearbyDocumented {
+  kind: "documented"; name: string; country: string; lat: number; lon: number; coords: string; distance_km: number;
+  theme: string; tags: SiteTags; source: string; bodies: Planet[]; similarity: Similarity | null;
+}
+export interface NearbyRegion {
+  kind: "modelled_region"; lat: number; lon: number; coords: string; place: string; distance_km: number; cell_km: [number, number];
+  similarity: Similarity; documented_nearby: Candidate["documented"];
+}
+export interface NearbyResult {
+  query: { lat: number; lon: number; radius_km: number; mode: "nearest" | "best"; documented_only: boolean; limit: number };
+  target: { body: Planet; lat: number; lon: number; coords: string; label: string; purpose: string; purpose_label: string; score_context: string; comparable: boolean } | null;
+  documented: NearbyDocumented[]; documented_in_radius: number; regions: NearbyRegion[]; catalogue_size: number; notes: string[];
+}
+
+/* ------------------------------------------------------- Research brief */
+export interface BriefSource { id: string; name: string; url: string; agency: string; resolution?: string; evidence?: string }
+export interface BriefDim { id: string; label: string; grade: Grade | null; score: number | null; weight: number; pairs: Pair[]; note: string | null; sources: BriefSource[] }
+export interface Brief {
+  kind: "proposal"; disclaimer: string; title: string; goal: string; question: string; usable: boolean; usable_note: string | null;
+  target: { body: Planet; label: string; coords: string; cell_km: [number, number] };
+  earth: { label: string; coords: string; cell_km: [number, number]; documented: Candidate["documented"] };
+  purpose: { id: string; label: string };
+  match: { score: number | null; grade: Grade | null; meaning: string | null; coverage: number };
+  why_useful: BriefDim[]; mismatches: BriefDim[]; not_assessed: { id: string; label: string; text: string }[];
+  cannot_reproduce: { label: string; planet: string; earth: string; text: string }[];
+  protocol: { setting: string; instrument_class: string; controlled: string[]; measured: string[]; data_to_collect: string[]; comparison: string; informative_outcome: string; laboratory_needs: string };
+  preparation: string[]; unknowns: Record<string, string>;
+  meta: { generated_utc: string; radium_version: string; build: string; settings: Record<string, string | number> };
+}
+
+export interface Probe { id: string; lat: number; lon: number; score: number | null; grade: Grade | null; coverage: number; excluded: boolean; failed_limits: string[]; rank: number | null }

@@ -8,7 +8,7 @@ import type { Photo, PhotoSet } from "@/lib/photos";
 type State = { status: "loading" } | { status: "ready"; set: PhotoSet } | { status: "error"; message: string };
 
 /** Loads a set of real photographs and shows them as captioned plates. `load` must be stable for a given `id`. */
-export function Photos({ id, load, compact = false }: { id: string; load: () => Promise<PhotoSet>; compact?: boolean }) {
+export function Photos({ id, load, compact = false, hideEmpty = false }: { id: string; load: () => Promise<PhotoSet>; compact?: boolean; hideEmpty?: boolean }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [open, setOpen] = useState<number | null>(null);
   const [broken, setBroken] = useState<ReadonlySet<string>>(new Set());
@@ -38,11 +38,13 @@ export function Photos({ id, load, compact = false }: { id: string; load: () => 
     );
   }
   if (state.status === "error") {
+    if (hideEmpty) return null;
     return <p className="px-4 pb-4 text-xs leading-snug text-regolith-400">Photographs could not be loaded ({state.message}). The archive may be busy; reopen this place to try again.</p>;
   }
   const { basis } = state.set;
   const photos = state.set.photos.filter((p) => !broken.has(p.id)); // a file that fails to load is dropped, not shown broken
   if (!photos.length) {
+    if (hideEmpty) return null;
     return <p className="px-4 pb-4 text-xs leading-snug text-regolith-400">{state.set.photos.length ? "The photographs found for this place could not be loaded." : basis}</p>;
   }
   const [lead, ...rest] = photos;

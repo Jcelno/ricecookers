@@ -1,9 +1,17 @@
 import { create } from "zustand";
 
 import { api, ApiError } from "@/lib/api";
-import type { Body, CellInfo, CompareResult, Meta, Pin, Planet, RankResult, TwinResult } from "@/lib/types";
+import type { Body, CellInfo, CompareResult, Grade, Meta, NearbyResult, Pin, Planet, RankResult, TwinResult } from "@/lib/types";
 
-export type Mode = "explore" | "mission" | "twin";
+export type Mode = "explore" | "mission" | "twin" | "near";
+export type ColorBy = "grade" | "environment" | "application";
+export type Units = "km" | "mi";
+export interface BriefRequest { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number }
+
+// Miles by default only where they are the everyday unit; anyone can switch.
+const defaultUnits = (): Units => {
+  try { return /^(en-US|en-LR|my)/.test(navigator.language) ? "mi" : "km"; } catch { return "km"; }
+};
 export type Status = "idle" | "loading" | "ready" | "error";
 export type Overlay = { kind: "tiles" | "grid"; id: string } | null;
 
@@ -59,9 +67,30 @@ interface State {
   compareStatus: Status;
   compareError: string | null;
 
+  // Earth Analogs atlas
+  colorBy: ColorBy;
+  gradeFilter: (Grade | "none")[];
+  showDocumented: boolean;
+  showModelled: boolean;
+  catFilter: string[] | null;
+
+  // Near Me. The location stays in this browser tab: it is sent only with a Near Me request and never put in share links.
+  nearLoc: { lat: number; lon: number; source: "device" | "manual" | "map" } | null;
+  nearRadius: number;
+  nearMode: "nearest" | "best";
+  nearDocOnly: boolean;
+  units: Units;
+  nearResult: NearbyResult | null;
+  nearStatus: Status;
+  nearError: string | null;
+  nearActive: string | null;
+
+  brief: BriefRequest | null;
+  scenarioB: { mission: string; weights: Record<string, number>; limits: string[] } | null;
+
   leftOpen: boolean;
   rightOpen: boolean;
-  sheet: null | "methodology" | "sources" | "intro";
+  sheet: null | "methodology" | "sources" | "intro" | "brief" | "scenarios";
 
   init: () => Promise<void>;
   setBody: (b: Body) => void;
@@ -85,14 +114,23 @@ interface State {
   pickEarth: (lat: number, lon: number, fly?: boolean) => Promise<void>;
   clearPick: () => void;
 
+  setAtlas: (patch: Partial<Pick<State, "colorBy" | "gradeFilter" | "showDocumented" | "showModelled" | "catFilter">>) => void;
+  setNear: (patch: Partial<Pick<State, "nearLoc" | "nearRadius" | "nearMode" | "nearDocOnly" | "units" | "nearActive">>) => void;
+  runNearby: () => Promise<void>;
+  setTarget: (o: { body: Planet; lat: number; lon: number } | null) => void;
+  openBrief: (earth: { lat: number; lon: number }) => void;
+
   setPanel: (side: "left" | "right", open: boolean) => void;
   setSheet: (s: State["sheet"]) => void;
 }
+
+export const ALL_GRADES: (Grade | "none")[] = ["A", "B", "C", "D", "F", "none"];
 
 let cellAbort: AbortController | null = null;
 let rankAbort: AbortController | null = null;
 let twinAbort: AbortController | null = null;
 let compareAbort: AbortController | null = null;
+let nearAbort: AbortController | null = null;
 let nonce = 0;
 
 const message = (e: unknown) => (e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Something went wrong.");
@@ -134,6 +172,25 @@ export const useStore = create<State>((set, get) => ({
   compareStatus: "idle",
   compareError: null,
 
+  colorBy: "grade",
+  gradeFilter: [...ALL_GRADES],
+  showDocumented: true,
+  showModelled: true,
+  catFilter: null,
+
+  nearLoc: null,
+  nearRadius: 1500,
+  nearMode: "nearest",
+  nearDocOnly: false,
+  units: defaultUnits(),
+  nearResult: null,
+  nearStatus: "idle",
+  nearError: null,
+  nearActive: null,
+
+  brief: null,
+  scenarioB: null,
+
   // On narrow screens panels float over the map, so they start closed.
   leftOpen: typeof window === "undefined" || window.innerWidth >= 1100,
   rightOpen: typeof window === "undefined" || window.innerWidth >= 760,
@@ -161,7 +218,7 @@ export const useStore = create<State>((set, get) => ({
     if (s.body === b && s.mode !== "twin") return;
     let mode = s.mode;
     let missionId = s.missionId;
-    if (mode === "twin") mode = "explore";
+    if (mode === "twin" || mode === "near") mode = "explore";
     if (mode === "mission") {
       if (b === "earth") mode = "explore";
       else if (s.meta) {
@@ -190,6 +247,12 @@ export const useStore = create<State>((set, get) => ({
     }
     if (m === "twin") {
       get().startTwin();
+      return;
+    }
+    if (m === "near") {
+      document.documentElement.dataset.world = "earth";
+      set({ mode: m, rightOpen: true, leftOpen: typeof window === "undefined" || window.innerWidth >= 760 });
+      if (get().nearLoc) void get().runNearby();
       return;
     }
     document.documentElement.dataset.world = s.body;
@@ -298,6 +361,7 @@ export const useStore = create<State>((set, get) => ({
 
   setPurpose: (purpose) => {
     set({ purpose, compare: null });
+    if (get().mode === "near" && get().nearLoc) void get().runNearby();
     void get().runTwin().then(() => {
       const p = get().picked;
       if (p) void get().pickEarth(p.lat, p.lon);
@@ -338,6 +402,56 @@ export const useStore = create<State>((set, get) => ({
   clearPick: () => {
     compareAbort?.abort();
     set({ picked: null, compare: null, compareStatus: "idle", compareError: null });
+  },
+
+  setAtlas: (patch) => set(patch),
+
+  setNear: (patch) => {
+    // Switching units snaps the radius to the nearest round value in the new unit.
+    if (patch.units && patch.units !== get().units && patch.nearRadius === undefined && get().nearRadius < 20000) {
+      const opts = patch.units === "mi" ? [150, 300, 600, 1000, 2000, 4000].map((m) => Math.round(m * 1.609344)) : [250, 500, 1000, 1500, 3000, 6000];
+      patch = { ...patch, nearRadius: opts.reduce((a, b) => (Math.abs(b - get().nearRadius) < Math.abs(a - get().nearRadius) ? b : a)) };
+    }
+    set(patch);
+    const keys = Object.keys(patch);
+    if (keys.some((k) => k !== "nearActive") && get().nearLoc) void get().runNearby();
+  },
+
+  runNearby: async () => {
+    const s = get();
+    if (!s.nearLoc) return;
+    const target = s.twinOrigin;
+    if (s.nearMode === "best" && !target) {
+      set({ nearStatus: "error", nearError: "Choose a Moon or Mars target to rank by similarity, or rank by distance instead.", nearResult: null });
+      return;
+    }
+    nearAbort?.abort();
+    nearAbort = new AbortController();
+    set({ nearStatus: "loading", nearError: null });
+    try {
+      const nearResult = await api.nearby({
+        lat: s.nearLoc.lat, lon: s.nearLoc.lon, radius_km: s.nearRadius, mode: s.nearMode, documented_only: s.nearDocOnly, limit: 20,
+        ...(target ? { body: target.body, target_lat: target.lat, target_lon: target.lon, purpose: s.purpose } : {}),
+      }, nearAbort.signal);
+      set({ nearResult, nearStatus: "ready", nearActive: null });
+    } catch (e) {
+      if (aborted(e)) return;
+      set({ nearStatus: "error", nearError: message(e), nearResult: null });
+    }
+  },
+
+  setTarget: (o) => {
+    const s = get();
+    const purposes = o ? s.meta?.purposes[o.body] ?? [] : [];
+    const purpose = purposes.some((p) => p.id === s.purpose) ? s.purpose : "general";
+    set({ twinOrigin: o, purpose, twin: null, picked: null, compare: null, ...(o ? {} : { nearMode: "nearest" as const }) });
+    if (s.nearLoc) void get().runNearby();
+  },
+
+  openBrief: (earth) => {
+    const s = get();
+    if (!s.twinOrigin) return;
+    set({ brief: { ...s.twinOrigin, purpose: s.purpose, earth_lat: earth.lat, earth_lon: earth.lon }, sheet: "brief" });
   },
 
   setPanel: (side, open) => set(side === "left" ? { leftOpen: open } : { rightOpen: open }),

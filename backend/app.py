@@ -17,8 +17,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from . import catalog, reference, registry, render
-from .geo import RADIUS_KM, fmt_latlon, gc_km
+from . import briefs, catalog, reference, registry, render
+from .geo import RADIUS_KM, fmt_latlon, gc_km, pick_distinct
 from .naming import Earth as EarthNames
 from .naming import Planetary
 from .similarity import (A_HIGHLAND, A_MARE, A_MARS, AFFINITY_NOTES, DIMENSIONS, MIN_COVERAGE as SIM_MIN_COVERAGE,
@@ -271,6 +271,8 @@ class RankRequest(BaseModel):
     prev_weights: Optional[dict] = None
     prev_limits: Optional[list] = None
     n: int = 12
+    # Scenario comparison: grade these places under this request's weights and limits too.
+    probe: Optional[list] = None
 
 
 def site_card(g, i, j, mission, weights, limits):
@@ -348,7 +350,22 @@ def rank(req: RankRequest):
                 summary += " The top sites and their order did not change."
         change = {"summary": summary, "weights_before": pw, "entered": len(new), "left": len(gone)}
 
-    return clean({"mission": req.mission, "weights": w, "sites": sites, "stats": stats, "change": change,
+    probes = []
+    for q in (req.probe or [])[:40]:
+        try:
+            plat, plon = float(q["lat"]), float(q["lon"])
+        except (KeyError, TypeError, ValueError):
+            raise HTTPException(422, "each probe needs numeric lat and lon")
+        if not (math.isfinite(plat) and math.isfinite(plon)) or abs(plat) > 90:
+            raise HTTPException(422, "probe latitude must be within -90..90")
+        g, i, j = store.locate(MISSIONS[req.mission]["body"], plat, plon)
+        c = engine.cell(g, i, j, req.mission, req.weights, req.limits)
+        rid = f"{g.id}:{i}:{j}"
+        probes.append({"id": rid, "lat": plat, "lon": plon, "score": c["score"], "grade": c["grade"], "coverage": c["coverage"],
+                       "excluded": bool(c.get("excluded")), "failed_limits": [l["id"] for l in c.get("failed_limits", [])],
+                       "rank": next((s_["rank"] for s_ in sites if s_["id"] == rid), None)})
+
+    return clean({"mission": req.mission, "weights": w, "sites": sites, "stats": stats, "change": change, "probes": probes,
                   "limits": MISSIONS[req.mission]["limits"] if req.limits is None else req.limits})
 
 
@@ -469,6 +486,175 @@ def twin_compare(req: CompareRequest):
         "purpose": req.purpose, "match": ex, "documented": nearest_documented(elat, elon, req.body),
         "rank_among": rank_among, "why": why_text(ex) if ex["score"] is not None else None,
     })
+
+
+# =============================================================================
+# Near Me: documented analog sites by distance, or the best analogs within a radius
+# =============================================================================
+EARTH_CIRCUMFERENCE_HALF_KM = math.pi * RADIUS_KM["earth"]
+
+
+class NearbyRequest(BaseModel):
+    lat: float
+    lon: float
+    radius_km: float = 1000.0
+    mode: str = "nearest"            # "nearest" (geographic) or "best" (similarity within radius)
+    body: Optional[str] = None       # Moon or Mars target, needed for similarity
+    target_lat: Optional[float] = None
+    target_lon: Optional[float] = None
+    purpose: str = "general"
+    documented_only: bool = False
+    limit: int = 20
+
+
+@lru_cache(maxsize=1)
+def _earth_centres():
+    e = store.g["earth"]
+    lat = 90.0 - e.dlat * (np.arange(e.n_lat) + 0.5)
+    lon = -180.0 + e.dlon * (np.arange(e.n_lon) + 0.5)
+    return np.repeat(lat, e.n_lon), np.tile(lon, e.n_lat)
+
+
+@lru_cache(maxsize=16)
+def _twin_score(gid: str, i: int, j: int, purpose: str):
+    """Earth Twin score for every Earth cell (the same array /api/twin ranks), cached per target and purpose."""
+    p, dims, score, cov = twin.score_all(store.g[gid], i, j, purpose)
+    return p, dims, score
+
+
+def _validate_nearby(req: NearbyRequest):
+    for name in ("lat", "lon", "radius_km"):
+        if not math.isfinite(getattr(req, name)):
+            raise HTTPException(422, f"{name} must be a finite number")
+    if not -90.0 <= req.lat <= 90.0:
+        raise HTTPException(422, "latitude must be between -90 and 90")
+    if req.mode not in ("nearest", "best"):
+        raise HTTPException(422, "mode must be 'nearest' or 'best'")
+    if not 10.0 <= req.radius_km <= EARTH_CIRCUMFERENCE_HALF_KM + 1:
+        raise HTTPException(422, f"radius_km must be between 10 and {EARTH_CIRCUMFERENCE_HALF_KM:.0f}")
+    lon = ((req.lon + 180.0) % 360.0) - 180.0
+    limit = max(1, min(int(req.limit), 50))
+    target = None
+    if req.body is not None:
+        need_body(req.body, planetary=True)
+        if req.purpose not in PURPOSES[req.body]:
+            raise HTTPException(422, f"purpose must be one of {list(PURPOSES[req.body])}")
+        if req.target_lat is None or req.target_lon is None or not (math.isfinite(req.target_lat) and math.isfinite(req.target_lon)):
+            raise HTTPException(422, "a Moon or Mars target needs target_lat and target_lon")
+        if abs(req.target_lat) > 90:
+            raise HTTPException(422, "target latitude must be between -90 and 90")
+        target = store.locate(req.body, req.target_lat, req.target_lon)
+    if req.mode == "best" and target is None:
+        raise HTTPException(422, "Ranking by similarity needs a Moon or Mars target; choose one, or rank by distance instead.")
+    return lon, limit, target
+
+
+@app.post("/api/analogs/nearby")
+def analogs_nearby(req: NearbyRequest):
+    lon, limit, target = _validate_nearby(req)
+    lat = req.lat
+    e = store.g["earth"]
+    p = dims = score = None
+    tinfo = None
+    if target is not None:
+        g, i, j = target
+        p, dims, score = _twin_score(g.id, i, j, req.purpose)
+        tlat, tlon = g.centre(i, j)
+        tinfo = {"body": req.body, "lat": tlat, "lon": tlon, "coords": fmt_latlon(tlat, tlon),
+                 "label": pnames[req.body].context(tlat, tlon)["label"], "purpose": req.purpose,
+                 "purpose_label": PURPOSES[req.body][req.purpose]["label"],
+                 "score_context": f"{'Moon' if req.body == 'moon' else 'Mars'} {PURPOSES[req.body][req.purpose]['label'].lower()} similarity",
+                 "comparable": score is not None}
+
+    def similarity_at(slat, slon):
+        if score is None:
+            return None
+        ei, ej = e.index(slat, slon)
+        ex = twin.explain(p, dims, ei, ej, req.purpose)
+        return {"score": ex["score"], "grade": ex["grade"], "coverage": ex["coverage"], "strong": ex["strong"], "weak": ex["weak"]}
+
+    # Documented sites: straight-line (great-circle) distance on Earth's surface.
+    docs = []
+    for site in PINS["earth"]:
+        d = float(gc_km(lat, lon, site["lat"], site["lon"], RADIUS_KM["earth"]))
+        if d <= req.radius_km:
+            docs.append({"kind": "documented", "name": site["name"], "country": site["country"], "lat": site["lat"], "lon": site["lon"],
+                         "coords": fmt_latlon(site["lat"], site["lon"]), "distance_km": d, "theme": site["theme"],
+                         "tags": site["tags"], "source": site["source"], "bodies": site["bodies"]})
+    for dd in docs:
+        sim = similarity_at(dd["lat"], dd["lon"])
+        dd["similarity"] = sim
+
+    regions = []
+    if req.mode == "best":
+        if score is None:
+            raise HTTPException(422, "This Moon or Mars cell has too little data to compare; choose another target.")
+        if not req.documented_only:
+            clat, clon = _earth_centres()
+            dist = gc_km(lat, lon, clat, clon, RADIUS_KM["earth"])
+            flat = score.ravel()
+            masked = np.where((dist <= req.radius_km) & np.isfinite(flat), flat, np.nan)
+            sep = float(min(300.0, max(30.0, req.radius_km / 8.0)))
+            for k in pick_distinct(masked, clat, clon, RADIUS_KM["earth"], sep, limit):
+                ei, ej = divmod(int(k), e.n_lon)
+                rlat, rlon = e.centre(ei, ej)
+                sim = similarity_at(rlat, rlon)
+                regions.append({"kind": "modelled_region", "lat": rlat, "lon": rlon, "coords": fmt_latlon(rlat, rlon),
+                                "place": enames.place(rlat, rlon)["label"], "distance_km": float(dist[k]), "cell_km": e.size_km(ei),
+                                "similarity": sim, "documented_nearby": nearest_documented(rlat, rlon, req.body)})
+        docs = [d for d in docs if d["similarity"] and d["similarity"]["score"] is not None]
+        docs.sort(key=lambda d: (-d["similarity"]["score"], d["distance_km"], d["name"]))
+        regions.sort(key=lambda r: (-r["similarity"]["score"], r["distance_km"]))
+    else:
+        docs.sort(key=lambda d: (d["distance_km"], d["name"]))
+
+    return clean({
+        "query": {"lat": lat, "lon": lon, "radius_km": req.radius_km, "mode": req.mode, "documented_only": req.documented_only,
+                  "limit": limit},
+        "target": tinfo,
+        "documented": docs[:limit],
+        "documented_in_radius": len(docs),
+        "regions": regions[:limit],
+        "catalogue_size": len(PINS["earth"]),
+        "notes": [
+            "Distances are straight-line (great-circle) distances on Earth's surface. They say nothing about roads, borders, permits or access.",
+            "Documented sites come from RADIUM's reference list of published analog sites; a place missing from it may still have been studied.",
+            "Modelled regions are Earth Twin grid cells (about 28 km), not named or verified field sites.",
+        ],
+    })
+
+
+# =============================================================================
+# Research Test Brief
+# =============================================================================
+class BriefRequest(CompareRequest):
+    setting: str = "either"          # "field", "lab" or "either"
+
+
+@app.post("/api/brief")
+def research_brief(req: BriefRequest):
+    if req.setting not in ("field", "lab", "either"):
+        raise HTTPException(422, "setting must be field, lab or either")
+    if not (math.isfinite(req.earth_lat) and math.isfinite(req.earth_lon)) or abs(req.earth_lat) > 90:
+        raise HTTPException(422, "Earth latitude must be between -90 and 90")
+    g, i, j, p, dims, score, cov = twin_setup(req)
+    e = store.g["earth"]
+    ei, ej = e.index(req.earth_lat, req.earth_lon)
+    elat, elon = e.centre(ei, ej)
+    ex = twin.explain(p, dims, ei, ej, req.purpose)
+    plat, plon = g.centre(i, j)
+    doc = nearest_documented(elat, elon, req.body)
+    earth_label = enames.place(elat, elon)["label"]
+    if doc and doc["distance_km"] < 40:
+        earth_label = doc["name"]
+    return clean(briefs.build(
+        body=req.body, purpose=req.purpose, purpose_label=PURPOSES[req.body][req.purpose]["label"],
+        planet_label=pnames[req.body].context(plat, plon)["label"], planet_coords=fmt_latlon(plat, plon), planet_cell_km=g.size_km(i),
+        earth_label=earth_label, earth_coords=fmt_latlon(elat, elon), earth_cell_km=e.size_km(ei),
+        match=ex, documented=doc, setting=req.setting,
+        share={"body": req.body, "lat": round(req.lat, 4), "lon": round(req.lon, 4), "earth_lat": round(req.earth_lat, 4),
+               "earth_lon": round(req.earth_lon, 4), "purpose": req.purpose, "setting": req.setting},
+    ))
 
 
 # =============================================================================

@@ -111,7 +111,51 @@ Design choices:
   sites (`backend/reference.py`) labels results and shows how known sites score. A test confirms that emptying
   the list changes no score.
 
-## 7. Data problems found and how they were handled
+## 7. Planning tools built on the two scores
+
+These tools reuse the two scores above. None of them changes a score, and none adds a third score.
+
+**Three different quantities.** Site suitability (how well a Moon or Mars cell serves a mission), analog
+similarity (how closely an Earth cell matches a Moon or Mars cell for a purpose) and geographic distance on Earth
+are always shown separately. They are never averaged into one number.
+
+**Near Me** (`POST /api/analogs/nearby`). Two rankings, chosen explicitly:
+- *Distance*: RADIUM's 36 documented analog sites, sorted by great-circle distance from the user's point on a
+  sphere of radius 6371.0088 km (`geo.gc_km`), ties broken by name. This says nothing about how good an analog a
+  site is, and nothing about roads, borders, permits or access.
+- *Similarity*: needs a Moon or Mars target and purpose. Earth cells and documented sites inside the radius are
+  ranked by the Earth Twin score, the same array `/api/twin` uses (tests check equality with
+  `/api/twin/compare`). Model regions are thinned with the same greedy non-maximum suppression as elsewhere
+  (minimum spacing radius ÷ 8, clamped to 30–300 km), and only valid land cells are eligible. Distance is shown
+  beside each result and plotted against similarity as a decision aid; it never enters the score.
+The user's location is sent only with the request, is not stored by the service and is never written into
+share links.
+
+**Analog atlas.** Documented sites can be coloured by similarity grade (ordinal, A to F), by environment type or
+by study theme (both categorical). Environment and study-theme tags come from each site's curated theme and note
+in `backend/reference.py`, by explicit keyword rules listed there; a site no rule matches is "Other or mixed".
+They describe what a site has been studied for, are not measurements and never enter a score. Every badge
+carries text (a grade letter or a two-letter code) so that colour is never the only cue.
+
+**Research Test Brief** (`POST /api/brief`). An experiment proposal for one target, one Earth place and one
+purpose. Measured content comes from the Earth Twin comparison: dimensions graded B or better are listed as
+reasons the place may be useful, dimensions below 0.5 as mismatches, dimensions without data as not assessed,
+and the never-scored differences (gravity, pressure, radiation, temperature regime) as conditions Earth cannot
+reproduce. Each dimension links the registered datasets behind it. The protocol text is a reviewed template per
+purpose (`backend/briefs.py`) that describes a class of test; it states nothing about a particular site. Site
+access, logistics, equipment and budget are always "Not assessed. Requires field verification."
+
+**Scenario comparison.** Two sets of weights and hard limits for the same mission are ranked with the unchanged
+`/api/rank` model. Each site is also graded under the other scenario (the `probe` field), so a site outside one
+list is shown as graded, below the top 10, or excluded by a named hard limit, never as zero. The explanation of a
+change is each criterion's contribution difference, value × (share under B − share under A). Identical
+scenarios return identical rankings (tested).
+
+**Share links.** The address hash records the view (mode, world, target, purpose, chosen Earth cell, mission
+weights and limits, scenario B, atlas colouring and Near Me settings). Values read from a link are validated
+(latitude −90..90, longitude −180..180, weights 0..100, known ids only) and anything else is ignored.
+
+## 8. Data problems found and how they were handled
 
 | Problem | Evidence | Handling |
 | --- | --- | --- |
@@ -123,7 +167,7 @@ Design choices:
 | Reanalysis soil wetness reads "saturated" over ice sheets | Value 1.0 across Antarctica | Blanked where the cell is mostly permanent ice |
 | NASA GIBS reference label layers return blank tiles; CARTO label tiles now need a key | Tile probes | Earth labels use OpenFreeMap vector tiles |
 
-## 8. Known limits
+## 9. Known limits
 
 See the app's Methodology page ("What RADIUM cannot tell you") and each dataset's "Limits" entry under Data
 sources. The most important: cells are kilometres across; no indicator is a detection of ice; Mars climate values

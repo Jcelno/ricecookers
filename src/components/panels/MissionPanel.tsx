@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, RotateCcw, Sparkle } from "lucide-react";
+import { ArrowDown, ArrowUp, Columns2, RotateCcw, Sparkle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button, cx, GradeTile, Notice, Section, Spinner, Switch } from "@/components/ui/primitives";
@@ -79,9 +79,12 @@ export function MissionPanel() {
   return (
     <div>
       <header className="px-4 pt-4 pb-3">
-        <h2 className="text-md font-semibold text-regolith-50">Design your mission</h2>
-        <p className="mt-1 mb-2.5 text-xs leading-relaxed text-regolith-400">Choose a mission, then say what matters most. Every cell on the globe is regraded as you move a slider.</p>
+        <h2 className="text-md font-semibold text-regolith-50">Mission Planner</h2>
+        <p className="mt-1 mb-2.5 text-xs leading-relaxed text-regolith-400">Choose a mission, then say what matters most. Every cell on the globe is regraded as you move a slider. Grades here are site suitability for the mission, not Earth analog similarity.</p>
         <MissionPicker missions={meta.missions} value={missionId} onChange={setMission} />
+        <Button size="sm" variant="outline" className="mt-2.5 w-full justify-center" onClick={() => useStore.getState().setSheet("scenarios")} title="Set two versions of these priorities and limits side by side">
+          <Columns2 size={13} /> Compare two scenarios
+        </Button>
       </header>
 
       <Section title="Priorities" aside={

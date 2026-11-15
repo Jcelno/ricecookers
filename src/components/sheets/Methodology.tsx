@@ -189,6 +189,26 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
               </>
             )}
 
+            <h3>Planning tools built on the two scores</h3>
+            <p>
+              Site suitability, analog similarity and distance on Earth are three different quantities. RADIUM shows them side by side and never
+              averages them into one number.
+            </p>
+            <ul>
+              <li><strong>Near Me, by distance</strong> sorts the documented analog sites by great-circle distance on Earth's surface. Being close says
+                nothing about how good an analog a site is, or about roads, borders, permits or access.</li>
+              <li><strong>Near Me, by similarity</strong> needs a Moon or Mars target. It ranks Earth land cells and documented sites inside the radius by
+                the same Earth Twin score shown everywhere else; distance is plotted beside it but never enters the grade. Your location is sent only with
+                the request, is not stored, and is never put in share links.</li>
+              <li><strong>Analog atlas</strong> colours documented sites by grade or by environment and study theme. Those tags come from each site's
+                published study theme by fixed keyword rules; they are descriptions, not measurements, and never affect a score.</li>
+              <li><strong>Research Test Brief</strong> is an experiment proposal. Its matches, mismatches and unscored differences come from the comparison
+                with their datasets; its protocol is a fixed template for the purpose; site access, logistics, equipment and budget are always marked
+                not assessed.</li>
+              <li><strong>Scenario comparison</strong> ranks two sets of priorities and limits with the same model. A site outside one list is shown as
+                graded, below the top ten, or excluded by a named limit, never as zero, and each change is split into criterion contributions.</li>
+            </ul>
+
             <h3>Checks the data have passed</h3>
             <p>Each figure below is computed when the pipeline runs and stored with the grids. None is typed by hand.</p>
             <Table

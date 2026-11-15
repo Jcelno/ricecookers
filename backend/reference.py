@@ -230,5 +230,41 @@ def mars_pins(names):
 
 def earth_pins():
     return [{"id": f"earth-analog-{i}", "name": n, "kind": "analog", "lat": la, "lon": lo, "country": c, "bodies": b,
-             "theme": t, "note": w, "source": ref}
+             "theme": t, "note": w, "source": ref, "tags": site_tags(t, w)}
             for i, (n, la, lo, c, b, t, w, ref) in enumerate(EARTH_ANALOGS)]
+
+
+# -----------------------------------------------------------------------------
+# Tags for the documented analog sites, for colouring and filtering the atlas.
+# Derived only from each site's curated theme and note above, by the explicit keyword rules below.
+# A site can carry several tags; a site no rule matches is "Other or mixed", never a guess.
+# These describe what the site has been studied for. They are not measurements and never enter a score.
+# -----------------------------------------------------------------------------
+ENVIRONMENT_RULES = [
+    ("desert", "Arid desert", r"desert|hyperarid|arid|dry valleys|dry limit"),
+    ("volcanic", "Volcanic or basaltic", r"basalt|volcan|lava|tephra|maar"),
+    ("polar", "Polar, ice or permafrost", r"ice|polar|arctic|permafrost|cold desert"),
+    ("impact", "Impact structure", r"impact"),
+    ("salt", "Salt flat or brine", r"\bsalts?\b|brine|saline|salar|gypsum|\bpans\b"),
+    ("subsurface", "Cave or lava tube", r"lava tube|cave"),
+    ("hydrothermal", "Hydrothermal or spring", r"hydrothermal|spring|acidic"),
+]
+APPLICATION_RULES = [
+    ("mobility", "Operations and mobility", r"operations|crew|test sites|isolation"),
+    ("geology", "Geology and sampling", r"impact|basalt|volcan|anorthosite|carbonates|sediment|layered"),
+    ("ice", "Ice and drilling", r"ice|permafrost"),
+    ("dust", "Dust and aeolian", r"sand|yardang|dust"),
+    ("astrobiology", "Habitability and biosignatures", r"biosignature|microb|life|brine|spring|acidic|hydrothermal|habitab"),
+    ("isru", "Resource use (ISRU)", r"isru|feedstock"),
+]
+
+
+def _tags(text: str, rules):
+    import re
+    hits = [(tid, label) for tid, label, pat in rules if re.search(pat, text, re.I)]
+    return [{"id": t, "label": l} for t, l in hits] or [{"id": "other", "label": "Other or mixed"}]
+
+
+def site_tags(theme: str, note: str):
+    text = f"{theme}. {note}"
+    return {"environment": _tags(text, ENVIRONMENT_RULES), "applications": _tags(text, APPLICATION_RULES)}

@@ -42,7 +42,7 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Data service with auto-reload plus the Vite dev server on port 3000 |
-| `npm test` | 48 scientific and logic checks (`tests/test_science.py`) |
+| `npm test` | 73 checks: science (`tests/test_science.py`) and API rules (`tests/test_api.py`) |
 | `npm run build` | Type-check and build the web app into `dist/` |
 | `npm run pipeline` | Download the source data and rebuild every grid |
 | `node screenshot.mjs http://localhost:3000 label` | Save a screenshot to `temporary screenshots/` |
@@ -66,8 +66,41 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
   buildings, museums, equipment, illustrations and anything tagged as AI-generated are filtered out. Every photo
   carries its author, licence and a link to the original. Earth Twin shows both places together, and colours
   each documented analog site on the map by its A–F grade.
-- **Guide.** A five-step introduction opens on the first visit and from the Guide button at any time.
+- **Near Me.** Set a point on Earth (your device's location with permission, typed coordinates, or a click on the
+  map) and list documented analog sites by straight-line distance, or, with a Moon or Mars target, the best
+  Earth Twin matches within a radius, with a distance-versus-similarity plot. Distance never changes a grade.
+- **Research Test Brief.** From any comparison or Near Me result, build a printable experiment proposal: goal,
+  question, the measured matches and mismatches with their datasets, conditions Earth cannot reproduce, a
+  purpose-specific protocol, and every unknown marked "Not assessed". Print to PDF, copy a link or save JSON.
+- **Scenario comparison.** In the Mission Planner, set two versions of the priorities and hard limits and see
+  how the top sites change, with each change explained by criterion.
+- **Analog atlas.** In Earth Analogs, colour documented sites by grade, environment type or study theme, filter
+  by grade or category, and show or hide documented sites and model matches.
+- **Share links.** The address bar always reopens the current view. The Near Me location is never included.
+- **Help.** A five-step guide is available from Help at any time; it does not open by itself.
 - **Methodology and Data sources.** Both pages are generated from the running code and the dataset registry.
+
+### API additions
+
+```bash
+# Documented analog sites nearest to Las Vegas, by great-circle distance
+curl -s localhost:8000/api/analogs/nearby -H 'content-type: application/json' \
+  -d '{"lat": 36.17, "lon": -115.14, "radius_km": 1500, "mode": "nearest"}'
+
+# Best Earth matches for Gale crater (rover mobility) within 1,500 km
+curl -s localhost:8000/api/analogs/nearby -H 'content-type: application/json' \
+  -d '{"lat": 36.17, "lon": -115.14, "radius_km": 1500, "mode": "best",
+       "body": "mars", "target_lat": -4.59, "target_lon": 137.44, "purpose": "mobility"}'
+
+# Research Test Brief for that target and one Earth cell
+curl -s localhost:8000/api/brief -H 'content-type: application/json' \
+  -d '{"body": "mars", "lat": -4.59, "lon": 137.44, "purpose": "mobility",
+       "earth_lat": 36.38, "earth_lon": -117.88, "setting": "field"}'
+
+# Rank a mission and also grade chosen places under the same weights (used by scenario comparison)
+curl -s localhost:8000/api/rank -H 'content-type: application/json' \
+  -d '{"mission": "mars_human", "probe": [{"lat": 70, "lon": 0}]}'
+```
 
 ## How it is built
 

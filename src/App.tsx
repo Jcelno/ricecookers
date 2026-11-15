@@ -8,12 +8,15 @@ import { MissionPanel } from "@/components/panels/MissionPanel";
 import { TopBar } from "@/components/TopBar";
 import { TwinView } from "@/components/twin/TwinView";
 import { Button, cx, IconButton, Notice, Spinner } from "@/components/ui/primitives";
-import { introSeen } from "@/lib/intro";
+import { NearView } from "@/components/near/NearView";
+import { applyLink, startLinkSync } from "@/lib/deeplink";
 import { useStore } from "@/store";
 
 const Methodology = lazy(() => import("@/components/sheets/Methodology"));
 const Sources = lazy(() => import("@/components/sheets/Sources"));
 const Intro = lazy(() => import("@/components/sheets/Intro"));
+const BriefSheet = lazy(() => import("@/components/sheets/Brief"));
+const Scenarios = lazy(() => import("@/components/sheets/Scenarios"));
 
 function Side({ side, open, children, label }: { side: "left" | "right"; open: boolean; children: React.ReactNode; label: string }) {
   const setPanel = useStore((s) => s.setPanel);
@@ -57,11 +60,13 @@ export default function App() {
   useEffect(() => {
     void init();
   }, [init]);
-  // First visit: open the guide once the app has loaded.
+  // Restore a shared link once the app has loaded, then keep the address in sync with what is on screen.
   const ready = useStore((s) => !!s.meta);
   useEffect(() => {
-    if (ready && !introSeen() && !new URLSearchParams(location.search).has("nointro")) setSheet("intro");
-  }, [ready, setSheet]);
+    if (!ready) return;
+    applyLink(location.hash);
+    return startLinkSync();
+  }, [ready]);
 
   if (metaError) {
     return (
@@ -89,6 +94,8 @@ export default function App() {
       <main className="relative flex min-h-0 flex-1">
         {mode === "twin" ? (
           <TwinView />
+        ) : mode === "near" ? (
+          <NearView />
         ) : (
           <>
             <Side side="left" open={leftOpen} label={mode === "mission" ? "Mission panel" : "Layers panel"}>
@@ -105,6 +112,8 @@ export default function App() {
         {sheet === "methodology" && <Methodology onClose={() => setSheet(null)} />}
         {sheet === "sources" && <Sources onClose={() => setSheet(null)} />}
         {sheet === "intro" && <Intro onClose={() => setSheet(null)} />}
+        {sheet === "brief" && <BriefSheet onClose={() => setSheet(null)} />}
+        {sheet === "scenarios" && <Scenarios onClose={() => setSheet(null)} />}
       </Suspense>
     </div>
   );

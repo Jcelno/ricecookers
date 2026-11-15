@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ExternalLink, Layers, LocateFixed, MapPin, X } from "lucide-react";
+import { ArrowLeftRight, ExternalLink, Layers, LocateFixed, MapPin, Navigation, X } from "lucide-react";
 import { useState } from "react";
 
 import { Photos } from "@/components/ui/Photos";
@@ -28,18 +28,53 @@ const QUICK: Record<Body, { name: string; lat: number; lon: number; span: number
 
 const EVIDENCE_ORDER: Evidence[] = ["observed", "inferred", "modelled", "computed", "interpreted"];
 
+/** One click: Gale crater, rover mobility, compared with its best Earth match. Real API results, nothing canned. */
+export function runWorkedExample() {
+  const st = useStore.getState();
+  st.startTwin({ body: "mars", lat: -4.59, lon: 137.44 });
+  st.setPurpose("mobility");
+  const unsub = useStore.subscribe((s) => {
+    if (s.twin && s.twin.purpose === "mobility" && s.twin.candidates.length && !s.picked) {
+      unsub();
+      void s.pickEarth(s.twin.candidates[0].lat, s.twin.candidates[0].lon, true);
+    }
+  });
+  setTimeout(unsub, 20000);
+}
+
 function Empty({ body }: { body: Body }) {
   const select = useStore((s) => s.select);
   const meta = useStore((s) => s.meta);
+  const mode = useStore((s) => s.mode);
   const name = body === "earth" ? "map" : "globe";
   return (
     <div className="anim-rise p-5">
-      <h2 className="placename placename-lg text-regolith-50">Pick a place</h2>
-      <p className="mt-2 text-sm leading-relaxed text-regolith-300">
-        Click anywhere on the {name}, or choose a pin. RADIUM shows what has been measured there, where each number comes from and how far to trust it.
-      </p>
+      {mode === "explore" ? (
+        <>
+          <h2 className="font-serif text-[1.9rem] leading-[1.08] font-medium tracking-[-0.03em] text-regolith-50" style={{ fontVariationSettings: '"opsz" 48' }}>Use Earth to prepare for other worlds.</h2>
+          <p className="mt-2.5 text-sm leading-[1.65] text-regolith-300">Compare NASA planetary observations with Earth environments, plan field tests, and understand where each analog works, and where it doesn't.</p>
+          <div className="mt-3.5 flex flex-col gap-1.5">
+            <Button variant="solid" className="justify-center" onClick={() => { const q = QUICK[body === "earth" ? "mars" : body][0]; if (body === "earth") useStore.getState().setBody("mars"); void select(body === "earth" ? "mars" : body, q.lat, q.lon, { fly: true, spanKm: q.span }); }}>
+              <MapPin size={14} /> Explore planetary sites
+            </Button>
+            <Button variant="outline" className="justify-center" onClick={() => useStore.getState().setMode("near")}><Navigation size={14} /> Find an Earth analog near me</Button>
+          </div>
+          <button type="button" onClick={runWorkedExample} className="row-ctl -mx-2 mt-3 block w-[calc(100%+16px)] rounded-sm px-2 py-2 text-left">
+            <span className="block text-sm font-medium text-regolith-50">Try a worked example</span>
+            <span className="block text-xs leading-snug text-regolith-400">Gale crater on Mars, rover mobility: see its closest Earth match, why it matches and where it fails. Computed live.</span>
+          </button>
+          <p className="mt-3 border-t border-[var(--hair)] pt-3 text-xs leading-relaxed text-regolith-400">Or click anywhere on the {name}. RADIUM shows what has been measured there, where each number comes from and how far to trust it.</p>
+        </>
+      ) : (
+        <>
+          <h2 className="placename placename-lg text-regolith-50">Pick a place</h2>
+          <p className="mt-2 text-sm leading-relaxed text-regolith-300">
+            Click anywhere on the {name}, or choose a pin. RADIUM shows how well that place suits the mission, factor by factor.
+          </p>
+        </>
+      )}
       <div className="-mx-4 mt-4">
-        <Photos compact id={`featured-${body}`} load={() => featuredPhotos(body)} />
+        <Photos compact hideEmpty id={`featured-${body}`} load={() => featuredPhotos(body)} />
       </div>
       <div className="mt-1 text-xs font-medium text-regolith-400">Places worth a first look</div>
       <ul className="mt-1.5">

@@ -17,6 +17,7 @@ import type { Focus } from "@/store";
 const scratchN = new Cartesian3();
 const scratchV = new Cartesian3();
 function cullToHorizon(v: Viewer, ents: Entity[]) {
+  if (v.isDestroyed()) return;
   const cam = v.camera.positionWC;
   const now = v.clock.currentTime;
   let changed = false;
@@ -151,6 +152,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     v.camera.percentageChanged = 0.002;
 
     const pickLatLon = (pos: Cartesian2) => {
+      if (v.isDestroyed()) return null;
       const c = v.camera.pickEllipsoid(pos, ellipsoid);
       if (!c) return null;
       const g = Cartographic.fromCartesian(c, ellipsoid);
@@ -176,6 +178,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     scene.canvas.addEventListener("mouseleave", leave);
 
     const report = () => {
+      if (v.isDestroyed()) return; // a queued camera event can arrive after the viewer is torn down
       const w = scene.canvas.clientWidth;
       const h = scene.canvas.clientHeight;
       const centre = pickLatLon(new Cartesian2(w / 2, h / 2));

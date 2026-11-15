@@ -81,9 +81,13 @@ async function nasaSearch(term: string, world: "Moon" | "Mars"): Promise<Photo[]
     const d = it.data[0];
     const href = it.links?.find((l) => l.render === "image")?.href;
     if (!d || !href) continue;
-    // Planetary Photojournal releases (PIA…) only: orbital and surface views of the terrain. This keeps out
+    // Planetary Photojournal releases (PIA…) and, for the Moon, LRO releases only: orbital and surface views of the terrain. This keeps out
     // outreach events, hardware, and crew photographs (Apollo surface frames often show astronauts and flags).
-    if (!/^PIA\d{4,}/i.test(d.nasa_id)) continue;
+    const kw = (d.keywords ?? []).join(" ");
+    const lro = world === "Moon" && /^GSFC/.test(d.nasa_id) && /\bLRO\b|Lunar Reconnaissance/i.test(`${d.title} ${d.description ?? ""} ${kw}`);
+    if (!/^PIA\d{4,}/i.test(d.nasa_id) && !lro) continue;  // LRO science releases from Goddard are the Moon's orbital imagery
+    if (/\b(ceres|vesta|mercury|europa|ganymede|callisto|titan|enceladus|pluto|phobos|deimos|asteroid|comet)\b/i.test(`${d.title} ${kw}`)) continue;
+    if (/visuali[sz]ation/i.test(`${d.title} ${kw}`)) continue;
     if (out.some((o) => o.title === d.title)) continue;
     const text = `${d.title} ${d.description ?? ""} ${(d.keywords ?? []).join(" ")}`;
     if (!text.toLowerCase().includes(needle) || !worldWords.test(text)) continue;
@@ -245,7 +249,7 @@ export function featuredPhotos(body: Body): Promise<PhotoSet> {
       return analogPhotos({ name: "Atacama Desert, Yungay", lat: -24.08, lon: -69.92 });
     }
     const [term, world, about] = body === "moon"
-      ? ["Apollo 17", "Moon" as const, "Orbital views of the Apollo 17 landing site in the Taurus–Littrow valley."]
+      ? ["Tycho", "Moon" as const, "Tycho, one of the Moon's youngest large craters, seen by NASA orbiters."]
       : ["Jezero", "Mars" as const, "Jezero crater, where Perseverance is exploring an ancient river delta."];
     return { photos: (await nasaSearch(term, world)).slice(0, 4), basis: `${about} From NASA's image library.` };
   });

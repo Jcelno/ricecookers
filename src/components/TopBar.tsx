@@ -1,7 +1,8 @@
-import { BookOpen, CircleHelp, Database, Search as SearchIcon, X } from "lucide-react";
+import { BookOpen, CircleHelp, Database, Link2, Search as SearchIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
+import { currentLink } from "@/lib/deeplink";
 import { formatCoord } from "@/lib/format";
 import type { Body, SearchHit } from "@/lib/types";
 import { type Mode, useStore } from "@/store";
@@ -25,11 +26,63 @@ const WORLDS: { id: Body; label: string }[] = [
   { id: "mars", label: "Mars" },
   { id: "earth", label: "Earth" },
 ];
-const MODES: { id: Mode; label: string; title: string }[] = [
-  { id: "explore", label: "Explore", title: "Inspect measurements anywhere on the three worlds" },
-  { id: "mission", label: "Design a mission", title: "Grade Moon or Mars sites against mission priorities you set" },
-  { id: "twin", label: "Earth Twin", title: "Find places on Earth that resemble a Moon or Mars site" },
+const MODES: { id: Mode; label: string; short: string; title: string }[] = [
+  { id: "explore", label: "Explore", short: "Explore", title: "Inspect measurements anywhere on the three worlds" },
+  { id: "mission", label: "Mission Planner", short: "Planner", title: "Grade Moon or Mars sites against mission priorities you set, and compare scenarios" },
+  { id: "twin", label: "Earth Analogs", short: "Analogs", title: "Find and compare places on Earth that resemble a Moon or Mars site" },
+  { id: "near", label: "Near Me", short: "Near Me", title: "Find documented analog sites, or the best matches, near a place on Earth" },
 ];
+
+function Menu() {
+  const setSheet = useStore((s) => s.setSheet);
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const off = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("mousedown", off);
+    window.addEventListener("keydown", esc);
+    return () => { window.removeEventListener("mousedown", off); window.removeEventListener("keydown", esc); };
+  }, [open]);
+  const go = (sheet: "methodology" | "sources" | "intro") => { setOpen(false); setSheet(sheet); };
+  const share = async () => {
+    try { await navigator.clipboard.writeText(currentLink()); setNote("Link copied"); } catch { setNote("Copy failed: use the address bar"); }
+    setTimeout(() => { setNote(null); setOpen(false); }, 1600);
+  };
+  const item = "ctl flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm text-regolith-100";
+  return (
+    <div ref={ref} className="relative">
+      <Button onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="menu" title="Methods, data sources, help and sharing">
+        <Database size={15} />
+        <span className="hidden lg:inline">Science &amp; Data</span>
+      </Button>
+      {open && (
+        <div role="menu" className="surface-float anim-fade absolute top-[calc(100%+6px)] right-0 z-50 w-60 rounded-md p-1 ring-1 ring-[var(--hair)]">
+          <button role="menuitem" type="button" className={item} onClick={() => go("methodology")}><BookOpen size={15} /> Methodology</button>
+          <button role="menuitem" type="button" className={item} onClick={() => go("sources")}><Database size={15} /> Data sources</button>
+          <button role="menuitem" type="button" className={item} onClick={() => go("intro")}><CircleHelp size={15} /> Guide to RADIUM</button>
+          <button role="menuitem" type="button" className={item} onClick={() => void share()}><Link2 size={15} /> {note ?? "Copy a link to this view"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Share() {
+  const [note, setNote] = useState<string | null>(null);
+  const share = async () => {
+    try { await navigator.clipboard.writeText(currentLink()); setNote("Copied"); } catch { setNote("Copy failed"); }
+    setTimeout(() => setNote(null), 1800);
+  };
+  return (
+    <Button className="max-sm:hidden" onClick={() => void share()} title="Copy a link that reopens this exact view">
+      <Link2 size={15} />
+      <span className="hidden xl:inline" aria-live="polite">{note ?? "Share"}</span>
+    </Button>
+  );
+}
 
 function Search() {
   const body = useStore((s) => s.body);
@@ -143,7 +196,7 @@ export function TopBar() {
           <button
             key={w.id}
             type="button"
-            aria-pressed={mode !== "twin" && body === w.id}
+            aria-pressed={(mode === "explore" || mode === "mission") && body === w.id}
             onClick={() => setBody(w.id)}
             title={mode === "twin" ? `Leave Earth Twin and explore ${w.label}` : `Explore ${w.label}`}
             className="ctl h-7 rounded-sm px-3 text-sm font-medium text-regolith-300 max-sm:px-2"
@@ -153,7 +206,7 @@ export function TopBar() {
         ))}
       </nav>
 
-      <nav aria-label="Mode" className="flex min-w-0 items-center gap-0.5">
+      <nav aria-label="Mode" className="no-scrollbar flex min-w-0 items-center gap-0.5 max-sm:overflow-x-auto">
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -163,7 +216,7 @@ export function TopBar() {
             onClick={() => setMode(m.id)}
             className={cx("ctl relative h-8 rounded-sm px-2.5 text-sm font-medium whitespace-nowrap max-sm:px-1.5", mode === m.id ? "text-regolith-50" : "text-regolith-400")}
           >
-            {m.id === "mission" ? <><span className="max-md:hidden">Design a mission</span><span className="md:hidden">Mission</span></> : m.id === "twin" ? <><span className="max-sm:hidden">Earth Twin</span><span className="sm:hidden">Twin</span></> : m.label}
+            <span className="max-lg:hidden">{m.label}</span><span className="lg:hidden">{m.short}</span>
             {mode === m.id && <span className="absolute inset-x-2.5 -bottom-[10px] h-0.5 rounded-full bg-world" />}
           </button>
         ))}
@@ -171,18 +224,12 @@ export function TopBar() {
 
       <div className="ml-auto flex items-center gap-1.5 max-sm:gap-0">
         <Search />
-        <Button onClick={() => setSheet("intro")} title="A short guide to using RADIUM">
+        <Share />
+        <Button className="max-sm:hidden" onClick={() => setSheet("intro")} title="A short guide to using RADIUM">
           <CircleHelp size={15} />
-          <span className="hidden lg:inline">Guide</span>
+          <span className="hidden xl:inline">Help</span>
         </Button>
-        <Button className="max-sm:hidden" onClick={() => setSheet("methodology")} title="How RADIUM measures, scores and grades">
-          <BookOpen size={15} />
-          <span className="hidden lg:inline">Methodology</span>
-        </Button>
-        <Button className="max-sm:hidden" onClick={() => setSheet("sources")} title="Every dataset RADIUM uses, with its limits">
-          <Database size={15} />
-          <span className="hidden lg:inline">Data sources</span>
-        </Button>
+        <Menu />
       </div>
     </header>
   );

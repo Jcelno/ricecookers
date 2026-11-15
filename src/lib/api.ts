@@ -1,4 +1,4 @@
-import type { Body, CellInfo, CompareResult, Meta, Pin, Planet, RankResult, SearchHit, Source, TwinResult } from "./types";
+import type { Body, Brief, CellInfo, CompareResult, Meta, NearbyResult, Pin, Planet, RankResult, SearchHit, Source, TwinResult } from "./types";
 
 export class ApiError extends Error {
   constructor(message: string, public status?: number) {
@@ -47,12 +47,18 @@ export const api = {
       { signal },
     ),
   rank: (
-    b: { mission: string; weights?: Record<string, number>; limits?: string[]; prev_weights?: Record<string, number>; prev_limits?: string[]; n?: number },
+    b: { mission: string; weights?: Record<string, number>; limits?: string[]; prev_weights?: Record<string, number>; prev_limits?: string[]; n?: number; probe?: { lat: number; lon: number }[] },
     signal?: AbortSignal,
   ) => post<RankResult>("/api/rank", b, signal),
   twin: (b: { body: Planet; lat: number; lon: number; purpose: string; n?: number }, signal?: AbortSignal) => post<TwinResult>("/api/twin", b, signal),
   compare: (b: { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number }, signal?: AbortSignal) =>
     post<CompareResult>("/api/twin/compare", b, signal),
+  nearby: (
+    b: { lat: number; lon: number; radius_km: number; mode: "nearest" | "best"; body?: Planet; target_lat?: number; target_lon?: number; purpose?: string; documented_only?: boolean; limit?: number },
+    signal?: AbortSignal,
+  ) => post<NearbyResult>("/api/analogs/nearby", b, signal),
+  brief: (b: { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number; setting?: string }, signal?: AbortSignal) =>
+    post<Brief>("/api/brief", b, signal),
 };
 
 // Overlay image URLs (PNG rendered by the API from grid values).
