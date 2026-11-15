@@ -1,5 +1,5 @@
 import {
-  ArrowLeftRight, Bookmark, BookmarkCheck, Columns2, Droplets, ExternalLink, Mountain, Navigation, Radio, Rocket, Sun, Thermometer, Wind, X,
+  Check, Copy, LocateFixed, ArrowLeftRight, Bookmark, BookmarkCheck, Columns2, Droplets, ExternalLink, Mountain, Navigation, Radio, Rocket, Sun, Thermometer, Wind, X,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -13,7 +13,8 @@ import { AssessmentChips, AssessmentGrade, DecisionCards } from "@/components/ui
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Notice, Segmented, Spinner } from "@/components/ui/primitives";
 import { emitTour } from "@/lib/tour/events";
 import { api } from "@/lib/api";
-import { formatKm, formatValue, GRADE_HEX, GRADE_MEANING, inUnit } from "@/lib/format";
+import { copyText } from "@/lib/sharing";
+import { formatCoord, formatKm, formatValue, GRADE_HEX, GRADE_MEANING, inUnit } from "@/lib/format";
 import { photoKey, photosFor } from "@/lib/photos";
 import { openPhotoGallery } from "@/lib/gallery";
 import type { Body, CellInfo, Measure, Planet, Suitability, TwinResult } from "@/lib/types";
@@ -207,6 +208,8 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
   const meta = useStore((s) => s.meta)!;
   const st = useStore();
   const [tab, setTab] = useState<Tab>("overview");
+  const [coordinateCopy, setCoordinateCopy] = useState<"idle" | "copied" | "failed">("idle");
+  useEffect(() => setCoordinateCopy("idle"), [cell]);
   useEffect(() => { if (cell.body === "earth" && (tab === "twins" || tab === "mission")) setTab("overview"); }, [cell.body, tab]);
   const all = useMemo(() => {
     const m = new Map<string, Measure>();
@@ -238,7 +241,14 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
           <div className="min-w-0 flex-1">
             <div className="text-2xs text-regolith-400">{world}{cell.cell.kind === "polar" ? ", polar grid" : ""}</div>
             <h2 className="placename placename-lg text-regolith-50 [overflow-wrap:anywhere]">{catalogSite?.name ?? cell.place.label}</h2>
-            <div className="tnum mt-0.5 text-sm text-regolith-300">{cell.coords} <span className="text-regolith-500">· cell {Math.abs(ns - ew) < 0.3 ? formatKm(ns) : `${formatKm(ns)} × ${formatKm(ew)}`}</span></div>
+            <div className="tnum mt-0.5 flex items-center gap-1 text-sm text-regolith-300">
+              <span title={`Requested position: ${ref.lat}, ${ref.lon}`}>{formatCoord(ref.lat, ref.lon)}</span>
+              <IconButton label={coordinateCopy === "copied" ? "Coordinates copied" : "Copy coordinates"} className="!size-6" onClick={async () => setCoordinateCopy(await copyText(`${ref.lat}, ${ref.lon}`, "Coordinates") ? "copied" : "failed")}>{coordinateCopy === "copied" ? <Check size={12} /> : <Copy size={12} />}</IconButton>
+              <IconButton label="Center map on this place" className="!size-6" onClick={() => st.flyTo(cell.body, ref.lat, ref.lon, cell.body === "earth" ? 900 : 500)}><LocateFixed size={12} /></IconButton>
+            </div>
+            <p className="tnum text-2xs text-regolith-500">Analysis cell {cell.coords} · {Math.abs(ns - ew) < 0.3 ? formatKm(ns) : `${formatKm(ns)} × ${formatKm(ew)}`}</p>
+            {coordinateCopy !== "idle" && <p role="status" className="text-2xs text-regolith-300">{coordinateCopy === "copied" ? "Coordinates copied." : "Copy unavailable. Select these coordinates:"}</p>}
+            {coordinateCopy === "failed" && <input className="field mt-1" aria-label="Coordinates to copy manually" readOnly value={`${ref.lat}, ${ref.lon}`} onFocus={e => e.target.select()} />}
           </div>
           <IconButton label="Clear the selection" onClick={st.clearSelection} className="-mt-1 -mr-2"><X size={16} /></IconButton>
         </div>
