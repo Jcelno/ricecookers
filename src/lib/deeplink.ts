@@ -76,7 +76,7 @@ export function applyLink(hash: string) {
   const validOverlay = kind === "grid" ? available.grid.some((l) => l.id === overlayId) : kind === "tiles" && available.tiles.some((l) => l.id === overlayId);
   const opacity = Number(q.get("op"));
   st.setLayer(body, { ...(base && available.tiles.some((l) => l.id === base) ? { base } : {}), overlay: validOverlay && overlayId ? { id: overlayId, kind: kind as "tiles" | "grid" } : null,
-    ...(q.has("op") && Number.isFinite(opacity) && opacity >= 0 && opacity <= 1 ? { opacity } : {}), labels: q.get("labels") !== "0",
+    ...(q.has("op") && Number.isFinite(opacity) && opacity >= 0 && opacity <= 1 ? { opacity } : {}), labels: q.get("labels") !== "0", boundaries: q.has("boundaries") ? q.get("boundaries") !== "0" : q.get("labels") !== "0",
     ...(q.has("pins") ? { pins: { landing: q.get("pins")!.includes("l"), feature: q.get("pins")!.includes("f"), analog: q.get("pins")!.includes("a") } } : {}) });
   if (mission) {
     const allowed = mission.criteria.map((c) => c.id);
@@ -125,6 +125,7 @@ export function currentLink(): string {
   if (layer.overlay) { q.set("ov", layer.overlay.id); q.set("ok", layer.overlay.kind); }
   q.set("op", String(layer.opacity));
   if (!layer.labels) q.set("labels", "0");
+  if (!layer.boundaries || !layer.labels) q.set("boundaries", layer.boundaries ? "1" : "0");
   q.set("pins", `${layer.pins.landing ? "l" : ""}${layer.pins.feature ? "f" : ""}${layer.pins.analog ? "a" : ""}`);
   if (s.twinOrigin) { q.set("t", `${s.twinOrigin.body},${coords(s.twinOrigin)}`); q.set("p", s.purpose); }
   if (s.twinWeights) q.set("tw", encWeights(s.twinWeights));

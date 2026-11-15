@@ -29,6 +29,7 @@ const HALO = { "text-halo-color": "rgba(6,8,12,0.85)", "text-halo-width": 1.3 };
 export interface EarthMapProps {
   basemap: Basemap | undefined;
   labels: boolean;
+  boundaries?: boolean;
   overlayUrl?: string | null;
   opacity?: number;
   dimBase?: boolean;
@@ -101,7 +102,7 @@ function markerElement(m: SiteMarker) {
 }
 
 export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap(
-  { basemap, labels, overlayUrl, opacity = 0.85, dimBase = false, pins = NO_PINS, markers = NO_MARKERS, selection, focus, onPick, onMarker, onCursor, onView, onStatus },
+  { basemap, labels, boundaries = labels, overlayUrl, opacity = 0.85, dimBase = false, pins = NO_PINS, markers = NO_MARKERS, selection, focus, onPick, onMarker, onCursor, onView, onStatus },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -113,6 +114,7 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
   const cb = useRef({ onPick, onMarker, onCursor, onView, onStatus });
   cb.current = { onPick, onMarker, onCursor, onView, onStatus };
   const lastFocus = useRef(0);
+  const camera = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const baseId = basemap?.id;
 
   useEffect(() => {
@@ -123,10 +125,10 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
       map = new MlMap({
         container: host.current,
         style: styleFor(basemap),
-        center: [12, 22],
-        zoom: 1.55,
+        center: camera.current?.center ?? [12, 22],
+        zoom: Math.min(camera.current?.zoom ?? 1.55, Math.max(12.5, basemap.max_zoom)),
         minZoom: 0.6,
-        maxZoom: 12.5,
+        maxZoom: Math.max(12.5, basemap.max_zoom),
         attributionControl: false,
         dragRotate: false,
         pitchWithRotate: false,
@@ -174,6 +176,8 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
       siteMarkers.current.forEach((m) => m.remove());
       pinMarkers.current = [];
       siteMarkers.current = [];
+      const center = map.getCenter();
+      camera.current = { center: [center.lng, center.lat], zoom: map.getZoom() };
       mapRef.current = null;
       map.remove();
     };
@@ -195,8 +199,8 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    for (const id of LABEL_LAYERS) map.setLayoutProperty(id, "visibility", labels ? "visible" : "none");
-  }, [ready, labels]);
+    for (const id of LABEL_LAYERS) map.setLayoutProperty(id, "visibility", (id === "boundary" ? boundaries : labels) ? "visible" : "none");
+  }, [ready, labels, boundaries]);
 
   // base dimming so data colours read clearly over imagery
   useEffect(() => {

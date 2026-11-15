@@ -125,7 +125,7 @@ export function LayersPanel() {
             <>
               <Switch checked={st.pins.analog} onChange={(v) => setLayer(body, { pins: { ...st.pins, analog: v } })} label="Documented analog sites"
                 hint="Places already used as Moon or Mars analogs in published work. Shown for reference; they never affect a grade." />
-              <Switch checked={st.labels} onChange={(v) => setLayer(body, { labels: v })} label="Borders and place names" hint="Country borders and names from OpenStreetMap." />
+              <><Switch checked={st.labels} onChange={(v) => setLayer(body, { labels: v })} label="Place names" hint="Place names from OpenStreetMap." /><Switch checked={st.boundaries} onChange={(v) => setLayer(body, { boundaries: v })} label="Country boundaries" hint="Administrative boundaries from OpenStreetMap; shown independently of place names." /></>
             </>
           ) : (
             <>

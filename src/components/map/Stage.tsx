@@ -9,6 +9,7 @@ import { shares, useStore } from "@/store";
 
 import { EarthMap, LABEL_ATTRIBUTION } from "./LazyEarthMap";
 import { type GlobeHandle, GlobeView, type ImageOverlay, type SiteMarker, type ViewState } from "./GlobeView";
+import { QuickLayers } from "./QuickLayers";
 import { Tapes, type TapesHandle } from "./Tapes";
 
 const GLOBAL: [number, number, number, number] = [-180, -90, 180, 90];
@@ -200,7 +201,7 @@ export function Stage() {
     <div ref={stageRef} className="relative isolate h-full min-w-0 flex-1 overflow-hidden bg-void" data-stage data-tour="map">
       {body === "earth" ? (
         <EarthMap
-          ref={handle} basemap={basemap} labels={layerState.labels} overlayUrl={earthOverlay} opacity={layerState.opacity} dimBase={dataOverlayOn}
+          ref={handle} basemap={basemap} labels={layerState.labels} boundaries={layerState.boundaries} overlayUrl={earthOverlay} opacity={layerState.opacity} dimBase={dataOverlayOn}
           pins={pins} selection={sel} focus={focus} onPick={onPick} onCursor={onCursor} onView={onView} onStatus={setStatus}
         />
       ) : (
@@ -221,6 +222,8 @@ export function Stage() {
           </div>
         </div>
       )}
+
+      <QuickLayers />
 
       {/* map controls */}
       <div data-tour="map-controls" className="surface-float absolute top-3 right-3 z-20 flex flex-col rounded-md ring-1 ring-[var(--hair)]">
@@ -300,7 +303,7 @@ export function StatusStrip({ body, cursor, view }: { body: Body; cursor: { body
   if (!view && !here) return null;
   return (
     <div className="tnum cond hidden items-center gap-3 rounded-xs bg-black/65 px-2 py-1 text-2xs text-regolith-200 sm:flex" aria-hidden>
-      <span>{here ? `Pointer ${formatCoord(cursor.lat, cursor.lon)}` : view ? `Centre ${formatCoord(view.lat, view.lon)}` : ""}</span>
+      <span>{here ? `Pointer ${formatCoord(cursor.lat, cursor.lon)} · ${meta.bodies[body].name}` : view ? `Centre ${formatCoord(view.lat, view.lon)}` : ""}</span>
       {km ? <span className="text-regolith-400">100 px ≈ {formatKm(km)}</span> : null}
     </div>
   );

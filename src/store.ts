@@ -27,14 +27,15 @@ export interface LayerState {
   opacity: number;
   pins: { landing: boolean; feature: boolean; analog: boolean };
   labels: boolean;
+  boundaries: boolean;
 }
 
 export interface Focus { body: Body; lat: number; lon: number; spanKm?: number; nonce: number }
 
 const DEFAULT_LAYERS: Record<Body, LayerState> = {
-  moon: { base: "LRO_WAC_Mosaic_Global_303ppd_v02", overlay: null, opacity: 0.72, pins: { landing: true, feature: true, analog: false }, labels: true },
-  mars: { base: "Mars_Viking_MDIM21_ClrMosaic_global_232m", overlay: null, opacity: 0.72, pins: { landing: true, feature: true, analog: false }, labels: true },
-  earth: { base: "s2cloudless", overlay: null, opacity: 0.78, pins: { landing: false, feature: false, analog: true }, labels: true },
+  moon: { base: "LRO_WAC_Mosaic_Global_303ppd_v02", overlay: null, opacity: 0.72, pins: { landing: true, feature: true, analog: false }, labels: true, boundaries: true },
+  mars: { base: "Mars_Viking_MDIM21_ClrMosaic_global_232m", overlay: null, opacity: 0.72, pins: { landing: true, feature: true, analog: false }, labels: true, boundaries: true },
+  earth: { base: "s2cloudless", overlay: null, opacity: 0.78, pins: { landing: false, feature: false, analog: true }, labels: true, boundaries: true },
 };
 
 interface State {
