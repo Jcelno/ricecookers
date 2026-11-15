@@ -14,6 +14,8 @@ const DEMOS: Record<string, { body: Planet; site?: string; mode: "explore" | "tw
 };
 let pendingDemo: { hash: string; cancel: () => void } | null = null;
 function cancelPendingDemo() { pendingDemo?.cancel(); pendingDemo = null; }
+/** First-run UI waits until a deferred catalog-backed alias has restored its view. */
+export function hasPendingLinkRestore() { return pendingDemo !== null; }
 
 /** Resolve memorable names using the loaded catalog; no coordinate constants or substitute sites. */
 export function demoLink(hash: string): string | null {

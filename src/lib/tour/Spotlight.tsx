@@ -9,7 +9,9 @@ export function findTourTarget(key: string): HTMLElement | null {
     return pin ? document.querySelector<HTMLElement>(`[data-tour-marker="${CSS.escape(pin.id)}"]`) : null;
   }
   if (key === "map") return document.querySelector<HTMLElement>('[data-tour="map"]') ?? document.querySelector<HTMLElement>('[aria-label="Planetary map"]') ?? document.querySelector<HTMLElement>(".cesium-viewer");
-  if (key === "near-settings") return document.querySelector<HTMLElement>('[aria-label="Near Me settings"]') ?? document.querySelector<HTMLElement>('[aria-label="Enter coordinates"]');
+  if (key === "analogy-breakdown" && innerWidth < 640) return document.querySelector<HTMLElement>('[data-tour="analogy-breakdown"] li');
+  if (key === "catalog") return document.querySelector<HTMLElement>('[data-tour="catalog"] .catalog-filters');
+  if (key === "near-settings") return [...document.querySelectorAll<HTMLElement>('[aria-label="Enter coordinates"]')].find((node) => node.getClientRects().length > 0) ?? null;
   return document.querySelector<HTMLElement>(`[data-tour="${CSS.escape(key)}"]`);
 }
 export function focusTourTarget(key: string) {
@@ -30,7 +32,19 @@ export function useTargetRect(key: string | null): TargetRect | null {
     function update() {
       frame = 0;
       const next = findTourTarget(key!);
-      if (next !== target) { if (target) resize.unobserve(target); target = next; if (target) resize.observe(target); }
+      if (next !== target) {
+        if (target) resize.unobserve(target);
+        target = next;
+        if (target) {
+          resize.observe(target);
+          const bounds = target.getBoundingClientRect();
+          // Reveal once on binding; subsequent camera and layout updates must never steal scrolling.
+          const scrollParent = target.parentElement?.closest<HTMLElement>(".scroll");
+          const clip = scrollParent?.getBoundingClientRect();
+          const clipped = clip && (bounds.bottom > clip.bottom || bounds.top < clip.top);
+          if (bounds.width > 0 && bounds.height > 0 && (clipped || bounds.top >= innerHeight || bounds.bottom <= 0 || bounds.left >= innerWidth || bounds.right <= 0)) target.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+        }
+      }
       if (!target || !target.getClientRects().length || getComputedStyle(target).visibility === "hidden") { setRect(null); return; }
       const box = target.getBoundingClientRect();
       let value: TargetRect = { x: box.x - 6, y: box.y - 6, width: box.width + 12, height: box.height + 12, radius: 10 };

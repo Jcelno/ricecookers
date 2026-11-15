@@ -39,6 +39,66 @@ try {
   }
   {
     const { context, page } = await fresh();
+    await page.evaluateOnNewDocument(() => {
+      const original = requestAnimationFrame.bind(window), cancel = cancelAnimationFrame.bind(window);
+      const pending = new Map(); let holding = true, id = -1;
+      window.requestAnimationFrame = callback => { if (!holding) return original(callback); const token = id--; pending.set(token, callback); return token; };
+      window.cancelAnimationFrame = token => { if (token < 0) pending.delete(token); else cancel(token); };
+      window.__releaseTourFrames = () => { holding = false; for (const callback of pending.values()) original(callback); pending.clear(); };
+    });
+    await page.goto(`${base}/?tour=1#v=2&m=explore&b=moon`);
+    await page.waitForFunction(() => window.__radium?.getState().meta, { timeout: 60000, polling: 100 });
+    await pause(500);
+    assert.equal(await page.$("[data-tour-welcome]"), null, "force flag cannot open the modal before a rendered frame");
+    await page.evaluate(() => window.__releaseTourFrames());
+    await page.waitForSelector("[data-tour-welcome]", { timeout: 60000 });
+    await context.close();
+    console.log("PASS forced shared tour waits for the first rendered frame");
+  }
+  {
+    const { context, page } = await fresh();
+    const held = [];
+    await page.setRequestInterception(true);
+    page.on("request", request => {
+      const url = new URL(request.url());
+      if (url.pathname === "/api/pins" && url.searchParams.get("body") === "mars") held.push(request);
+      else request.continue().catch(() => {});
+    });
+    await page.goto(`${base}/?tour=1#demo/gale-twin`);
+    await page.waitForFunction(() => window.__radium?.getState().meta, { timeout: 60000, polling: 100 });
+    await pause(1200);
+    assert(held.length > 0, "Mars catalog request is deliberately delayed");
+    assert.equal(await page.$("[data-tour-welcome]"), null, "deferred alias restores before forced welcome");
+    await page.evaluate(async () => { window.__tourFrameBodies = []; (await import("/src/lib/tour/events.ts")).onTour(event => { if (event.type === "ready:frame") window.__tourFrameBodies.push(event.payload.body); }); });
+    for (const request of held) await request.continue();
+    await page.waitForSelector("[data-tour-welcome]", { timeout: 60000 });
+    const restored = await page.evaluate(() => { const s = window.__radium.getState(); return { mode: s.mode, target: s.twinOrigin, purpose: s.purpose, frames: window.__tourFrameBodies }; });
+    assert.equal(restored.mode, "twin"); assert.equal(restored.target.body, "mars"); assert.equal(restored.purpose, "mobility");
+    assert(restored.frames.includes("mars"), "welcome waits for the restored Mars globe's own frame");
+    await pause(500);
+    assert(await page.$("[data-tour-welcome]"), "late alias restoration cannot lose the welcome");
+    await context.close();
+    console.log("PASS forced deferred demo alias restores and keeps its welcome");
+  }
+  {
+    const { context, page } = await fresh();
+    await page.goto(`${base}/?tour=1#v=2&m=saved&b=moon`);
+    await page.waitForSelector("[data-tour-welcome]", { timeout: 60000 });
+    assert.equal(await page.evaluate(() => window.__radium.getState().mode), "explore", "forced non-map tour prepares a real Moon stage");
+    await context.close();
+    console.log("PASS force flag prepares a rendered globe from Saved links");
+  }
+  {
+    const { context, page } = await fresh();
+    await page.goto(`${base}/?tour=1#v=2&m=near&b=moon`);
+    await page.waitForSelector("[data-tour-welcome]", { timeout: 60000 });
+    const state = await page.evaluate(() => ({ mode: window.__radium.getState().mode, nearLoc: window.__radium.getState().nearLoc, mapReady: !!window.__maplibre?.isStyleLoaded() }));
+    assert.equal(state.mode, "near"); assert.equal(state.nearLoc, null); assert.equal(state.mapReady, true);
+    await context.close();
+    console.log("PASS forced Near Me tour uses the Earth frame without requesting a private location");
+  }
+  {
+    const { context, page } = await fresh();
     await page.goto(`${base}/#v=2&m=explore&b=mars&s=-4.59,137.44`);
     await page.waitForSelector(".tour-invitation", { timeout: 60000 });
     assert.equal(await page.$("[data-tour-welcome]"), null);
@@ -79,14 +139,28 @@ try {
     assert(await page.$('[data-tour-step="select-site"]'));
     const marker = '[data-tour-marker="mars-feature-Gale"]';
     await page.waitForSelector(marker, { visible: true, timeout: 15000 });
+    // Camera flights and fan placement move the real button after it first becomes visible.
+    // Wait for a settled, hittable marker instead of clicking its previous-frame position.
+    await page.waitForFunction(selector => {
+      const element = document.querySelector(selector);
+      if (!element) return false;
+      const rect = element.getBoundingClientRect(), previous = window.__tourMarkerBounds;
+      const stable = previous && Math.abs(previous.x - rect.x) < .5 && Math.abs(previous.y - rect.y) < .5;
+      window.__tourMarkerBounds = { x: rect.x, y: rect.y, count: stable ? previous.count + 1 : 0 };
+      const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      return window.__tourMarkerBounds.count >= 3 && Number(getComputedStyle(element).opacity) > .75 && (hit === element || element.contains(hit));
+    }, { timeout: 30000, polling: 100 }, marker);
     await page.click(marker);
     await step(page, "read-grade");
     await page.click('[aria-label="Not scored"]');
     await step(page, "turn-on-layer");
+    await page.waitForSelector('[data-tour="slope-layer"]', { visible: true, timeout: 30000 });
     await page.click('[data-tour="slope-layer"]');
     await step(page, "find-twin");
+    await page.waitForSelector('[data-tour="find-twin"]', { visible: true, timeout: 30000 });
     await page.click('[data-tour="find-twin"]');
     await step(page, "save-it");
+    await page.waitForSelector('[data-tour="save-place"]', { visible: true, timeout: 30000 });
     await page.click('[data-tour="save-place"]');
     await page.waitForSelector("[data-tour-finish]", { timeout: 30000 });
     const progress = await page.evaluate(() => JSON.parse(localStorage.getItem("radium.tutorial.v3")));
