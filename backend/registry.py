@@ -344,6 +344,38 @@ SOURCES = [
     },
 ]
 
+SOURCES.extend([
+    {
+        "id": "soilgrids", "body": "earth", "name": "ISRIC SoilGrids 2.0 topsoil predictions",
+        "purpose": "Optional Earth context only; never included in suitability or similarity.",
+        "agency": "ISRIC — World Soil Information",
+        "url": "https://isric.org/explore/soilgrids", "access": "service", "format": "SoilGrids REST API JSON",
+        "coverage": "Global soil mask; missing predictions remain unavailable",
+        "variables": ["Sand", "Silt", "Clay", "Coarse fragments", "Bulk density", "pH in water"],
+        "units": "% (texture and coarse fragments); kg/dm³ (bulk density); pH",
+        "spatial_resolution": "250 m; 0–5 cm depth interval", "temporal_coverage": "SoilGrids 2.0 static spatial prediction",
+        "crs": "WGS 84 point query", "license": "CC BY 4.0; cite ISRIC SoilGrids 2.0.",
+        "limitations": "Modelled topsoil, not a field sample or bedrock mineralogy. ISRIC reports a temporary REST service pause; failed or timed-out requests show Unavailable.",
+        "processing": "On-demand browser request with timeout and abort; mean of the 0–5 cm interval only. Published unit conversion factors are applied, without averaging unequal depth intervals.",
+        "evidence": "modelled",
+    },
+    {
+        "id": "gvp_holocene", "body": "earth", "name": "Smithsonian GVP Holocene volcano centers",
+        "purpose": "Optional nearest-volcano Earth context only; never included in suitability or similarity.",
+        "agency": "Smithsonian Institution, Global Volcanism Program",
+        "url": "https://volcano.si.edu/volcanolist_holocene.cfm", "access": "file", "format": "Trimmed static JSON from the official GVP WFS",
+        "coverage": "Global catalogued Holocene volcanic centers",
+        "variables": ["Volcano identity and center coordinates", "Last known eruption year", "Computed great-circle distance"],
+        "units": "WGS 84 degrees; calendar year (unknown remains null); km",
+        "spatial_resolution": "Catalog point locations; coordinate precision varies. No hazard or landform footprint.",
+        "temporal_coverage": "Volcanoes of the World v5.4.0, 7 Aug 2026; retrieval date and source SHA-256 are stored in the snapshot",
+        "crs": "WGS 84 geographic", "license": "Smithsonian Terms of Use; cite Global Volcanism Program (2026), doi:10.5479/si.GVP.VOTW5-2026.5.4.",
+        "limitations": "Nearest center is not evidence of local lava tubes, caves, subsurface access or present-day volcanic hazard. Eruption history can be incomplete.",
+        "processing": "Official WFS fields trimmed without interpolation. Haversine nearest-center distance uses a 6371 km Earth radius and is labelled computed; source locations and catalog eruption history are observed reference records.",
+        "evidence": "observed",
+    },
+])
+
 BY_ID = {s["id"]: s for s in SOURCES}
 
 # Sources audited and deliberately not used, with the reason — part of the
