@@ -48,6 +48,20 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
 | `npm run pipeline` | Download the source data and rebuild every grid |
 | `node screenshot.mjs http://localhost:3000 label` | Save a screenshot to `temporary screenshots/` |
 
+## Demo script
+
+With the local services running, presenters can jump to three reproducible starting points:
+
+| Link | Opens | One thing to try |
+| --- | --- | --- |
+| [Shackleton](http://localhost:3000/#demo/shackleton) | The verified Shackleton crater catalog record and its real containing analysis cell | Read the evidence and the mission limitations. This is the catalog's crater location, not an invented rim coordinate. |
+| [Gale Earth twins](http://localhost:3000/#demo/gale-twin) | Gale crater in Discover, with the rover-mobility purpose | Compare a documented analog with a new lead, then inspect where the analogy breaks down. |
+| [Lunar mission](http://localhost:3000/#demo/mission-moon) | Lunar permanent base candidates under the default mission weights and hard limits | Change Ice access in Priorities and read the actual “What changed” result. |
+
+Aliases wait for the required catalog record, then resolve to the normal versioned `#v=2` share link.
+They use live model results; no score or comparison outcome is frozen into a demo alias. Shared-link visitors
+get a non-blocking tour invitation. Use [the forced tour](http://localhost:3000/?tour=1) to demonstrate the welcome and seven real tasks instead.
+
 ## What you can do
 
 - **Explore.** Spin 3D globes of the Moon and Mars drawn from real orbital mosaics (LROC WAC, Kaguya

@@ -6,6 +6,33 @@ import { validSite } from "./persistence";
 const MODES: Mode[] = ["explore", "mission", "twin", "near", "compare", "saved"];
 const BODIES: Body[] = ["moon", "mars", "earth"];
 const COLORS: ColorBy[] = ["grade", "environment", "application"];
+const MISSION_STEPS = ["destination", "mission", "priorities", "candidates", "save"] as const;
+const DEMOS: Record<string, { body: Planet; site?: string; mode: "explore" | "twin" | "mission"; mission?: string; purpose?: string }> = {
+  "#demo/shackleton": { body: "moon", site: "moon-feature-Shackleton", mode: "explore" },
+  "#demo/gale-twin": { body: "mars", site: "mars-feature-Gale", mode: "twin", purpose: "mobility" },
+  "#demo/mission-moon": { body: "moon", mode: "mission", mission: "lunar_base" },
+};
+let pendingDemo: { hash: string; cancel: () => void } | null = null;
+function cancelPendingDemo() { pendingDemo?.cancel(); pendingDemo = null; }
+
+/** Resolve memorable names using the loaded catalog; no coordinate constants or substitute sites. */
+export function demoLink(hash: string): string | null {
+  const demo = DEMOS[hash], state = useStore.getState();
+  if (!demo || !state.meta) return null;
+  const site = demo.site ? state.pins[demo.body].find(pin => pin.id === demo.site) : null;
+  if (demo.site && !site) return null;
+  const query = new URLSearchParams({ v: "2", m: demo.mode, b: demo.body });
+  if (site) query.set(demo.mode === "twin" ? "t" : "s", `${demo.mode === "twin" ? `${demo.body},` : ""}${site.lat},${site.lon}`);
+  if (demo.purpose) {
+    if (!state.meta.purposes[demo.body].some(purpose => purpose.id === demo.purpose)) return null;
+    query.set("p", demo.purpose);
+  }
+  if (demo.mission) {
+    if (!state.meta.missions.some(mission => mission.id === demo.mission && mission.body === demo.body)) return null;
+    query.set("mi", demo.mission); query.set("ms", "candidates");
+  }
+  return `#${query}`;
+}
 const position = (v: string | null): { lat: number; lon: number } | null => {
   if (!v) return null;
   const parts = v.split(",");
@@ -30,7 +57,23 @@ const coords = (p: { lat: number; lon: number }) => `${p.lat},${p.lon}`;
 
 /** Accept historical hashes as well as v2 links; ignore malformed input rather than requesting invalid coordinates. */
 export function applyLink(hash: string) {
+  cancelPendingDemo();
   if (hash.length > 16000) return;
+  if (hash.startsWith("#demo/")) {
+    const demo = DEMOS[hash], state = useStore.getState();
+    if (!demo || !state.meta) return;
+    if (demo.site && !state.pins[demo.body].length) {
+      const cancel = useStore.subscribe(next => {
+        if (location.hash !== hash) { cancelPendingDemo(); return; }
+        if (next.pins[demo.body].length) applyLink(hash);
+      });
+      pendingDemo = { hash, cancel };
+      return;
+    }
+    const resolved = demoLink(hash);
+    if (!resolved) return;
+    hash = resolved;
+  }
   const q = new URLSearchParams(hash.replace(/^#/, ""));
   if (!q.toString()) return;
   const st = useStore.getState();
@@ -100,6 +143,10 @@ export function applyLink(hash: string) {
     st.setMode("near");
   } else {
     st.setMode(mode);
+    if (mode === "mission") {
+      const step = q.get("ms");
+      if (MISSION_STEPS.includes(step as typeof MISSION_STEPS[number])) st.setMissionStep(step as typeof MISSION_STEPS[number]);
+    }
     if ((mode === "explore" || mode === "mission") && selection) void useStore.getState().select(useStore.getState().body, selection.lat, selection.lon, { fly: true, spanKm: body === "earth" ? 1200 : 600 });
   }
   const sheet = q.get("sh");
@@ -135,6 +182,7 @@ export function currentLink(): string {
   if ((s.mode === "explore" || s.mode === "mission") && s.selection?.body === s.body) q.set("s", coords(s.selection));
   if (s.mode === "mission" || s.sheet === "scenarios" || s.sheet === "report") {
     q.set("mi", s.missionId);
+    if (s.mode === "mission") q.set("ms", s.missionStep);
     if (s.rawWeights[s.missionId]) q.set("w", encWeights(s.rawWeights[s.missionId]));
     q.set("l", (s.limitsOn[s.missionId] ?? []).join(",") || "-");
     if (s.sheet === "scenarios" && s.scenarioB?.mission === s.missionId) { q.set("wb", encWeights(s.scenarioB.weights)); q.set("lb", s.scenarioB.limits.join(",") || "-"); }
@@ -149,14 +197,15 @@ export function startLinkSync() {
   let timer = 0;
   let restoring = false;
   const unsub = useStore.subscribe(() => {
-    if (restoring) return;
+    if (restoring || pendingDemo?.hash === location.hash) return;
     clearTimeout(timer);
     timer = window.setTimeout(() => {
+      if (pendingDemo?.hash === location.hash) return;
       const url = currentLink();
       if (url !== location.href) { try { history.replaceState(null, "", url); } catch { /* Copy View Link still works in restricted embeds. */ } }
     }, 350);
   });
   const restore = () => { clearTimeout(timer); restoring = true; try { applyLink(location.hash); } finally { restoring = false; } };
   window.addEventListener("hashchange", restore);
-  return () => { clearTimeout(timer); unsub(); window.removeEventListener("hashchange", restore); };
+  return () => { clearTimeout(timer); unsub(); cancelPendingDemo(); window.removeEventListener("hashchange", restore); };
 }
