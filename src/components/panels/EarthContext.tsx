@@ -28,7 +28,7 @@ export default function EarthContext({ lat, lon }: { lat: number; lon: number })
   const requestSoil = async () => {
     soilAbort.current?.abort();
     const abort = new AbortController(); soilAbort.current = abort;
-    setSoilStatus("loading");
+    setSoil(null); setSoilStatus("loading");
     try {
       const value = await fetchSoil(lat, lon, abort.signal);
       if (!abort.signal.aborted) { setSoil(value); setSoilStatus("ready"); }
