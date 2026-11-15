@@ -1,6 +1,26 @@
-import { EvidenceTag } from "@/components/ui/primitives";
-import { decisionFactors, type AssessmentFactor } from "@/lib/assessment";
+import { EvidenceTag, GradeTile } from "@/components/ui/primitives";
+import { CONFIDENCE_RULE, decisionFactors, evidenceConfidence, gradeAtCoverage, type AssessmentFactor } from "@/lib/assessment";
+import type { Grade } from "@/lib/types";
 import { useStore } from "@/store";
+
+export function AssessmentGrade({ grade, coverage, minCoverage, model = "suitability", excluded = false, size = "md" }: {
+  grade: Grade | null | undefined; coverage: number | undefined; minCoverage?: number; model?: "suitability" | "similarity";
+  excluded?: boolean; size?: "xs" | "sm" | "md" | "lg" | "xl";
+}) {
+  const threshold = useStore(s => s.meta?.coverage_thresholds?.[model]);
+  const assessed = gradeAtCoverage(grade, coverage, minCoverage ?? threshold);
+  const insufficient = !excluded && assessed === null;
+  return <span className="inline-flex shrink-0 flex-col items-center gap-0.5"><GradeTile grade={excluded ? null : assessed} size={size} title={excluded ? "Ruled out by a hard limit" : insufficient ? "Insufficient data for this assessment" : undefined} />{insufficient && <span className="max-w-24 text-center text-2xs leading-tight text-regolith-500">Insufficient data</span>}</span>;
+}
+
+export function AssessmentChips({ coverage, factors }: { coverage: number | undefined; factors?: AssessmentFactor[] }) {
+  const confidence = evidenceConfidence(factors);
+  const knownCoverage = coverage !== undefined && Number.isFinite(coverage) && coverage >= 0 && coverage <= 1 + 1e-9;
+  return <span className="inline-flex flex-wrap gap-1 text-2xs leading-snug" aria-label="Coverage and evidence confidence">
+    <span className="rounded-sm border border-[var(--hair)] bg-basalt-800/60 px-1.5 py-0.5 text-regolith-300" title="Computed share of this assessment's weighted criteria with data; not a count of measurements">Coverage {knownCoverage ? `${Math.round(coverage * 100)}%` : "Not assessed"}</span>
+    <span className="rounded-sm border border-[var(--hair)] bg-basalt-800/60 px-1.5 py-0.5 text-regolith-300" title={CONFIDENCE_RULE}>Confidence {confidence.label}</span>
+  </span>;
+}
 
 export function DecisionCards({ factors, compact = false }: { factors: AssessmentFactor[]; compact?: boolean }) {
   const sources = useStore(s => s.meta?.sources_index);

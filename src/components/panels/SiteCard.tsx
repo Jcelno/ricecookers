@@ -9,7 +9,7 @@ import { OrbitalTile } from "@/components/panels/OrbitalTile";
 import { ProfileChart } from "@/components/panels/ProfileChart";
 import { TimelineChart } from "@/components/panels/TimelineChart";
 import { Photos } from "@/components/ui/Photos";
-import { DecisionCards } from "@/components/ui/Assessment";
+import { AssessmentChips, AssessmentGrade, DecisionCards } from "@/components/ui/Assessment";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Notice, Segmented, Spinner } from "@/components/ui/primitives";
 import { emitTour } from "@/lib/tour/events";
 import { api } from "@/lib/api";
@@ -156,8 +156,8 @@ function TwinTeaser({ cell }: { cell: CellInfo }) {
             <li key={c.id}>
               <button type="button" className="row-ctl flex w-full items-center gap-2.5 py-2 text-left" onClick={() => { startTwin(origin); void pickEarth(c.lat, c.lon, true); }}>
                 <span className="grid size-6 shrink-0 place-items-center rounded-full border-2 border-basalt-950 text-[11px] font-bold text-basalt-950" style={{ background: c.grade ? GRADE_HEX[c.grade] : "#7b8fa1" }}>{c.grade ?? "·"}</span>
-                <span className="min-w-0 flex-1"><span className="placename block truncate text-md text-regolith-50">{c.place.label}</span><span className="block truncate text-2xs text-regolith-400">{c.why}</span></span>
-                <GradeTile grade={c.grade} size="sm" />
+                <span className="min-w-0 flex-1"><span className="placename block truncate text-md text-regolith-50">{c.place.label}</span><span className="block truncate text-2xs text-regolith-400">{c.why}</span><span className="mt-1 block"><AssessmentChips coverage={c.coverage} /></span></span>
+                <AssessmentGrade grade={c.grade} coverage={c.coverage} model="similarity" size="sm" />
               </button>
             </li>
           ))}
@@ -259,7 +259,7 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
       {tab === "overview" && (
         <div className="anim-fade">
           {cell.suitability && <section className="space-y-3 px-4 pt-4" aria-label="Mission decision support">
-            <div className="flex items-center gap-3"><GradeTile grade={cell.suitability.excluded ? null : cell.suitability.grade} size="lg" /><div className="min-w-0"><p className="text-xs font-medium text-regolith-100">{meta.missions.find(m => m.id === cell.suitability!.mission)?.label}</p><p className="text-xs text-regolith-400">{cell.suitability.excluded ? "Ruled out by a hard limit" : "Computed mission suitability"}</p></div></div>
+            <div className="flex items-center gap-3"><AssessmentGrade grade={cell.suitability.grade} coverage={cell.suitability.coverage} minCoverage={cell.suitability.min_coverage} excluded={cell.suitability.excluded} size="lg" /><div className="min-w-0"><p className="text-xs font-medium text-regolith-100">{meta.missions.find(m => m.id === cell.suitability!.mission)?.label}</p><p className="mb-1 text-xs text-regolith-400">{cell.suitability.excluded ? "Ruled out by a hard limit" : "Computed mission suitability"}</p><AssessmentChips coverage={cell.suitability.coverage} factors={cell.suitability.factors} /></div></div>
             <DecisionCards factors={cell.suitability.factors} />
           </section>}
           {catalogSite && <section className="m-4 rounded-lg bg-basalt-800 p-3 ring-1 ring-[var(--hair)]"><SiteEvidence site={catalogSite} /></section>}

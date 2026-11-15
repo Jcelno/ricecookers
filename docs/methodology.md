@@ -209,6 +209,37 @@ weights and limits, scenario B, atlas colouring and Near Me settings). Values re
 
 ## 9. Known limits
 
+### Coverage, evidence confidence and decision cards
+
+Coverage is the computed share of the assessment's normalized weight for which a criterion has data. The UI
+uses the thresholds returned by the backend: **60% for mission suitability**, **80% for analog similarity**.
+Below the applicable threshold the overall letter is withheld and the tile says **Insufficient data**. A hard
+limit remains a separate exclusion, regardless of coverage. Individual criterion grades are not overall grades;
+the backend does not publish a separate weighted coverage for each criterion, and the UI does not invent one.
+
+Confidence is an **interpreted, conservative source-mix summary**, not a probability, error bar, validation
+result or NASA assurance. It uses only scored, positive-weight criteria and the available input measurements
+that contributed to them. Each criterion's weight is counted once, using its least direct available evidence:
+inferred takes precedence, then modelled/interpreted, then observed/computed. This deliberately avoids treating
+a criterion with many input fields as more important than one with few. Geology's affinity rule also counts as
+interpreted evidence. The class shares are normalized over contributing criterion weights:
+
+- **Low:** more than 40% of weight is inferred.
+- **Medium:** otherwise, more than 40% is modelled/interpreted.
+- **High:** otherwise, more than 50% is observed/computed.
+- **Medium:** the remaining mixed cases, including a tie at 50% direct evidence.
+- **Not assessed:** no scored criteria or missing evidence provenance for any contributing criterion. A teaser
+  that has scores without input provenance reports this explicitly; it does not infer confidence from a grade.
+
+These fixed, RADIUM-defined boundaries describe evidence classes; high confidence does not improve spatial
+resolution or make an interpreted scoring rubric a validated engineering result. Input sources and native
+resolutions remain available in the location panel and comparison evidence. Missing measurements and
+zero-weight criteria do not enter the confidence mixture.
+
+The **Primary strength** card is the available criterion with the largest `criterion score × normalized weight`.
+The **Limiting factor** is the lowest available criterion score among positive-weight criteria. A score of zero
+is valid; missing is not zero. The cards quote the existing criterion score and weight and create no new score.
+
 See the app's Methodology page ("What RADIUM cannot tell you") and each dataset's "Limits" entry under Data
 sources. The most important: cells are kilometres across; no indicator is a detection of ice; Mars climate values
 come from a model; composition products are tens to hundreds of kilometres coarse.

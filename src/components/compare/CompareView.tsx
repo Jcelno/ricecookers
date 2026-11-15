@@ -7,6 +7,8 @@ import { EarthMap } from "@/components/map/LazyEarthMap";
 import { GlobeView } from "@/components/map/GlobeView";
 import { Photos } from "@/components/ui/Photos";
 import { Button, cx, GradeTile, Notice, Spinner } from "@/components/ui/primitives";
+import { AssessmentChips, AssessmentGrade } from "@/components/ui/Assessment";
+import { similarityFactors } from "@/lib/assessment";
 import { GRADE_HEX, GRADE_MEANING, pct } from "@/lib/format";
 import { photoKey, photosFor } from "@/lib/photos";
 import type { CellInfo, DimDetail, Pair, Planet } from "@/lib/types";
@@ -147,12 +149,12 @@ function PairView() {
         <section className="mt-5 grid gap-5 rounded-md bg-basalt-900/60 p-4 ring-1 ring-[var(--hair)] lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0">
             <div className="flex items-center gap-3.5">
-              <GradeTile grade={m.grade} size="xl" />
+              <AssessmentGrade grade={m.grade} coverage={m.coverage} model="similarity" size="xl" />
               <div>
                 <div className="text-xs text-regolith-400">{meta.purposes[body].find((p) => p.id === purpose)?.label} similarity</div>
                 <div className="text-lg font-semibold text-regolith-50">{m.grade ? `${GRADE_MEANING[m.grade]} analog` : "Cannot be graded"}</div>
                 <div className="mt-0.5 flex flex-wrap gap-1.5 text-2xs">
-                  <span className="rounded-xs bg-basalt-700 px-1.5 py-0.5 text-regolith-200" title="Share of this purpose's weighted comparison that had data on both worlds">Coverage {pct(m.coverage)}</span>
+                  <AssessmentChips coverage={m.coverage} factors={similarityFactors(m.dimensions, c.planet, c.earth)} />
                   {c.rank_among && <span className="rounded-xs bg-basalt-700 px-1.5 py-0.5 text-regolith-200" title="Land cells on Earth with a higher score for this target and purpose">{c.rank_among.better_cells.toLocaleString("en-US")} of {c.rank_among.cells.toLocaleString("en-US")} cells match better</span>}
                   <span className="rounded-xs px-1.5 py-0.5 text-regolith-300 ring-1 ring-[var(--hair)]">RADIUM scale, not a NASA rating</span>
                 </div>

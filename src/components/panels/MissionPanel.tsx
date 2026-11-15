@@ -6,7 +6,7 @@ import { downloadCsv } from "@/lib/csv";
 import { GRADE_MEANING, pct, plural } from "@/lib/format";
 import type { Grade, Mission, SiteCard } from "@/lib/types";
 import { RegistrySelect } from "@/components/catalog/SiteCatalog";
-import { DecisionCards } from "@/components/ui/Assessment";
+import { AssessmentChips, AssessmentGrade, DecisionCards } from "@/components/ui/Assessment";
 import { shares, useStore } from "@/store";
 
 function MissionPicker({ missions, value, onChange }: { missions: Mission[]; value: string; onChange: (id: string) => void }) {
@@ -125,7 +125,7 @@ export function MissionPanel() {
                   <div className="text-2xs text-regolith-400">Selected site</div>
                   <div className="placename text-md text-regolith-50">{destination.place.label}</div>
                   <div className="tnum text-2xs text-regolith-400">{destination.coords}</div>
-                  {destination.suitability && <div className="mt-1.5 flex items-center gap-2 text-xs text-regolith-200"><GradeTile grade={destination.suitability.excluded ? null : destination.suitability.grade} size="sm" />{destination.suitability.excluded ? "Ruled out by a hard limit" : destination.suitability.grade ? `${GRADE_MEANING[destination.suitability.grade]} for ${mission.label.toLowerCase()}` : "Not enough data to grade"}</div>}
+                  {destination.suitability && <><div className="mt-1.5 flex items-center gap-2 text-xs text-regolith-200"><AssessmentGrade grade={destination.suitability.grade} coverage={destination.suitability.coverage} minCoverage={destination.suitability.min_coverage} excluded={destination.suitability.excluded} size="sm" />{destination.suitability.excluded ? "Ruled out by a hard limit" : destination.suitability.grade ? `${GRADE_MEANING[destination.suitability.grade]} for ${mission.label.toLowerCase()}` : "Not enough data to grade"}</div><div className="mt-2"><AssessmentChips coverage={destination.suitability.coverage} factors={destination.suitability.factors} /></div></>}
                 </>
               ) : <p className="text-xs leading-snug text-regolith-300">Click the globe to choose a site, or pick one below. You can also plan without a site: step 4 lists the best candidates.</p>}
             </div>
@@ -225,7 +225,7 @@ export function MissionPanel() {
                     className="row-ctl grid min-w-0 flex-1 grid-cols-[18px_32px_1fr] items-center gap-x-2.5 py-2 pr-1 pl-4 text-left"
                   >
                     <span className="tnum text-right text-xs text-regolith-400">{s.rank}</span>
-                    <GradeTile grade={s.grade} />
+                    <AssessmentGrade grade={s.grade} coverage={s.coverage} minCoverage={s.min_coverage} />
                     <span className="min-w-0">
                       <span className="placename block truncate text-md text-regolith-50">{s.place}</span>
                       <span className="flex items-center gap-2">
@@ -250,7 +250,7 @@ export function MissionPanel() {
                     />
                   </label>
                 </div>
-                <div className="px-4 pb-2.5"><DecisionCards factors={s.factors} compact /></div>
+                <div className="space-y-1.5 px-4 pb-2.5"><AssessmentChips coverage={s.coverage} factors={s.factors} /><DecisionCards factors={s.factors} compact /></div>
               </li>
             );
           })}
@@ -271,7 +271,7 @@ export function MissionPanel() {
               <tbody>
                 <tr className="border-t border-[var(--hair)]">
                   <td className="py-1.5 text-regolith-300">Overall</td>
-                  {chosen.map((s) => <td key={s.id} className="py-1.5"><GradeTile grade={s.grade} size="sm" /></td>)}
+                  {chosen.map((s) => <td key={s.id} className="py-1.5"><AssessmentGrade grade={s.grade} coverage={s.coverage} minCoverage={s.min_coverage} size="sm" /><div className="mt-1"><AssessmentChips coverage={s.coverage} factors={s.factors} /></div></td>)}
                 </tr>
                 {mission.criteria.map((c) => (
                   <tr key={c.id} className="border-t border-[var(--hair)]">

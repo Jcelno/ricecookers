@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { SiteCard } from "@/components/panels/SiteCard";
 import { Photos } from "@/components/ui/Photos";
+import { AssessmentChips, AssessmentGrade } from "@/components/ui/Assessment";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Meter, Notice, Section, Spinner } from "@/components/ui/primitives";
 import { featuredPhotos, photoKey, photosFor } from "@/lib/photos";
 import { formatKm, formatMeasure, formatValue, GRADE_MEANING, inUnit, pct } from "@/lib/format";
@@ -142,7 +143,7 @@ export function SuitabilityBlock({ s }: { s: Suitability }) {
   return (
     <section className="hair-t">
       <div className="flex items-center gap-3.5 px-4 pt-4 pb-3">
-        <GradeTile grade={s.excluded ? null : s.grade} size="xl" title={s.excluded ? "Ruled out by a hard limit" : undefined} />
+        <AssessmentGrade grade={s.grade} coverage={s.coverage} minCoverage={s.min_coverage} excluded={s.excluded} size="xl" />
         <div className="min-w-0">
           <div className="text-xs text-regolith-400">{mission?.label}</div>
           <div className="text-lg leading-tight font-semibold text-regolith-50">
@@ -155,6 +156,7 @@ export function SuitabilityBlock({ s }: { s: Suitability }) {
                 ? `Based on ${pct(s.coverage)} of the weighted criteria; the rest have no data here.`
                 : "All criteria have data here."}
           </div>
+          <div className="mt-2"><AssessmentChips coverage={s.coverage} factors={s.factors} /></div>
         </div>
       </div>
       {s.failed_limits.length > 0 && (

@@ -25,6 +25,7 @@ export interface Mission { id: string; body: Planet; label: string; summary: str
 export interface Purpose { id: string; label: string; blurb: string; weights: Record<string, number> }
 
 export interface Meta {
+  coverage_thresholds?: { suitability: number; similarity: number };
   bodies: Record<Body, { name: string; radius_km: number; grids: string[]; cell_note: string; gravity: number }>;
   evidence: Record<Evidence, { label: string; desc: string }>;
   categories: { id: string; label: string }[];
@@ -51,10 +52,10 @@ export interface Group { id: string; label: string; items: Measure[] }
 export interface Factor {
   id: string; label: string; short: string; question: string; weight: number; value: number | null; grade: Grade | null;
   contribution: number | null; rule: string; caveat: string;
-  inputs: { id: string; label: string; unit: string; dec: number; fmt?: string | null; value: number | null; evidence: Evidence }[];
+  inputs: { id: string; label: string; unit: string; dec: number; fmt?: string | null; value: number | null; evidence: Evidence; source?: string | null; res?: string }[];
 }
 export interface Suitability {
-  mission: string; score: number | null; grade: Grade | null; meaning: string | null; coverage: number; excluded: boolean;
+  mission: string; score: number | null; grade: Grade | null; meaning: string | null; coverage: number; min_coverage?: number; excluded: boolean;
   failed_limits: Limit[]; factors: Factor[];
 }
 
@@ -97,8 +98,8 @@ export interface CellInfo {
 
 export interface SiteCard {
   id: string; grid: string; lat: number; lon: number; coords: string; place: string; score: number | null; grade: Grade | null;
-  coverage: number; cell_km: [number, number]; rank: number;
-  factors: { id: string; short: string; label: string; value: number | null; grade: Grade | null; weight: number }[];
+  coverage: number; min_coverage?: number; cell_km: [number, number]; rank: number;
+  factors: { id: string; short: string; label: string; value: number | null; grade: Grade | null; weight: number; contribution?: number | null; inputs?: Factor["inputs"] }[];
   prev_rank?: number | null; prev_grade?: Grade | null; prev_score?: number | null;
   drivers?: { id: string; label: string; delta_weight: number; value: number; effect: number }[];
 }

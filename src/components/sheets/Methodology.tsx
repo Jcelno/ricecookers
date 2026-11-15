@@ -68,6 +68,10 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
           <p>Analysis cells are about 15 km on the Moon, 30 km on Mars and 28 km on Earth at the equator, with separate 2.4 km lunar polar cells. A precise site coordinate sits within a cell. Source measurements can be coarser than the cell, so zooming does not improve their scientific resolution.</p>
           <h3>Unknown is never zero</h3>
           <p>Missing criteria are excluded from the weighted calculation and the available coverage is reported. Below the model's coverage threshold, no grade is assigned. A high grade with partial coverage must be read alongside the unknowns. Regional averages cannot certify a landing ellipse.</p>
+          <h3>Coverage and evidence confidence</h3>
+          <p>Coverage is the computed share of weighted criteria with data. Letters are withheld below {pct(meta.coverage_thresholds?.suitability ?? 0.6)} for suitability and {pct(meta.coverage_thresholds?.similarity ?? 0.8)} for similarity. Confidence is an interpreted source-mix summary, not statistical certainty or a NASA assurance.</p>
+          <p>Each scored criterion counts once at its weight, using its least direct available input class: inferred, then modelled/interpreted, then observed/computed. More than 40% inferred means Low; otherwise more than 40% modelled/interpreted means Medium; otherwise a majority observed/computed means High. Remaining mixed cases are Medium. Missing input provenance means Not assessed.</p>
+          <p>Primary strength is the highest weighted contribution; limiting factor is the lowest available positive-weight criterion score. Both describe existing criteria and add no new score. Select Decision evidence and resolution to inspect their sources.</p>
           <h3>Earth has limits as an analog</h3>
           <p>Earth cannot reproduce lunar or Martian gravity, atmospheric pressure or radiation. Lunar temperatures are also excluded from similarity. Geology or rover tests may still be useful, provided the experiment accounts for those differences.</p>
           {level === "intermediate" && <>
@@ -162,6 +166,8 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
             )}
 
             <h3>Grades</h3>
+            <h4>Evidence confidence is separate from the grade</h4>
+            <p>Confidence is an interpreted summary of the contributing inputs, normalized over scored positive-weight criteria. Each criterion is counted once, conservatively assigned to inferred if any available input is inferred, otherwise modelled/interpreted if any such input is present, otherwise observed/computed. Geology's affinity rule counts as interpreted. More than 40% inferred yields Low; otherwise more than 40% modelled/interpreted yields Medium; otherwise more than 50% observed/computed yields High. Remaining mixed cases are Medium. Missing contributing provenance yields Not assessed. This is not a statistical confidence interval, and never changes a grade or conceals native resolution.</p>
             <p>Both models report a letter. The edges are fixed, the same for both, and apply to the 0–1 score. Grades are RADIUM's own scale for comparing options. They are not a NASA rating or a certification of any site.</p>
             <div className="my-3 flex flex-wrap gap-2">
               {(m.grade_edges as { grade: Grade; min: number; meaning: string }[]).map((g) => (
