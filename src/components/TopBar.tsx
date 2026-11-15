@@ -30,6 +30,7 @@ const MODES: { id: Mode; label: string; short: string; title: string }[] = [
   { id: "explore", label: "Explore", short: "Explore", title: "Inspect measurements anywhere on the three worlds" },
   { id: "mission", label: "Mission Planner", short: "Planner", title: "Grade Moon or Mars sites against mission priorities you set, and compare scenarios" },
   { id: "twin", label: "Earth Analogs", short: "Analogs", title: "Find and compare places on Earth that resemble a Moon or Mars site" },
+  { id: "compare", label: "Compare", short: "Compare", title: "The selected Moon or Mars site and Earth place side by side" },
   { id: "near", label: "Near Me", short: "Near Me", title: "Find documented analog sites, or the best matches, near a place on Earth" },
 ];
 

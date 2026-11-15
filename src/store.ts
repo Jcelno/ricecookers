@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { api, ApiError } from "@/lib/api";
 import type { Body, CellInfo, CompareResult, Grade, Meta, NearbyResult, Pin, Planet, RankResult, TwinResult } from "@/lib/types";
 
-export type Mode = "explore" | "mission" | "twin" | "near";
+export type Mode = "explore" | "mission" | "twin" | "near" | "compare";
 export type ColorBy = "grade" | "environment" | "application";
 export type Units = "km" | "mi";
 export interface BriefRequest { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number }
@@ -75,7 +75,7 @@ interface State {
   catFilter: string[] | null;
 
   // Near Me. The location stays in this browser tab: it is sent only with a Near Me request and never put in share links.
-  nearLoc: { lat: number; lon: number; source: "device" | "manual" | "map" } | null;
+  nearLoc: { lat: number; lon: number; source: "device" | "manual" | "map" | "search"; label?: string } | null;
   nearRadius: number;
   nearMode: "nearest" | "best";
   nearDocOnly: boolean;
@@ -193,7 +193,9 @@ export const useStore = create<State>((set, get) => ({
 
   // On narrow screens panels float over the map, so they start closed.
   leftOpen: typeof window === "undefined" || window.innerWidth >= 1100,
-  rightOpen: typeof window === "undefined" || window.innerWidth >= 760,
+  // The right panel opens at the start on every screen size: on phones it is a bottom sheet over the map,
+  // so first-time visitors see what RADIUM is for. It can be closed.
+  rightOpen: true,
   sheet: null,
 
   init: async () => {
@@ -218,7 +220,7 @@ export const useStore = create<State>((set, get) => ({
     if (s.body === b && s.mode !== "twin") return;
     let mode = s.mode;
     let missionId = s.missionId;
-    if (mode === "twin" || mode === "near") mode = "explore";
+    if (mode === "twin" || mode === "near" || mode === "compare") mode = "explore";
     if (mode === "mission") {
       if (b === "earth") mode = "explore";
       else if (s.meta) {
@@ -247,6 +249,11 @@ export const useStore = create<State>((set, get) => ({
     }
     if (m === "twin") {
       get().startTwin();
+      return;
+    }
+    if (m === "compare") {
+      if (s.twinOrigin) document.documentElement.dataset.world = s.twinOrigin.body;
+      set({ mode: m });
       return;
     }
     if (m === "near") {

@@ -1,4 +1,4 @@
-import type { Body, Brief, CellInfo, CompareResult, Meta, NearbyResult, Pin, Planet, RankResult, SearchHit, Source, TwinResult } from "./types";
+import type { Body, Brief, Profile, CellInfo, CompareResult, Meta, NearbyResult, Pin, Planet, RankResult, SearchHit, Source, TwinResult } from "./types";
 
 export class ApiError extends Error {
   constructor(message: string, public status?: number) {
@@ -53,6 +53,8 @@ export const api = {
   twin: (b: { body: Planet; lat: number; lon: number; purpose: string; n?: number }, signal?: AbortSignal) => post<TwinResult>("/api/twin", b, signal),
   compare: (b: { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number }, signal?: AbortSignal) =>
     post<CompareResult>("/api/twin/compare", b, signal),
+  profile: (body: Body, lat: number, lon: number, axis: "ns" | "ew", signal?: AbortSignal) =>
+    request<Profile>(`/api/profile?${qs({ body, lat, lon, axis })}`, { signal }),
   nearby: (
     b: { lat: number; lon: number; radius_km: number; mode: "nearest" | "best"; body?: Planet; target_lat?: number; target_lon?: number; purpose?: string; documented_only?: boolean; limit?: number },
     signal?: AbortSignal,

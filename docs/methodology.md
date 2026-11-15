@@ -151,6 +151,25 @@ list is shown as graded, below the top 10, or excluded by a named hard limit, ne
 change is each criterion's contribution difference, value × (share under B − share under A). Identical
 scenarios return identical rankings (tested).
 
+**Compare view.** Shows the same `/api/twin/compare` result as Earth Analogs, laid out side by side. The radar
+plots only the normalised (0–1) similarity scores of dimensions that were compared; raw quantities in different
+units are never put on one axis. A dimension without data is drawn as "not compared", never as a low score.
+
+**Regional terrain profile** (`GET /api/profile`). Cell-mean elevation of the global grid (Moon and Mars 0.5°,
+Earth 0.25°) for up to 30 cells either side of the selected cell, north–south or east–west. Earth water cells are
+missing, not zero. At 15–30 km per point it shows regional relief only and says nothing about landing hazards.
+
+**Place search** (Near Me). Uses RADIUM's own name lists, including Natural Earth's 7,342 populated places (public
+domain), so no query is sent to an outside geocoding service.
+
+**Offline example.** `scripts/build_snapshot.py` runs the real API in-process for the worked example and stores
+the responses unchanged in `public/demo/snapshot.json`, with the time and build. The app shows it only when the
+data service is unreachable and labels it as a saved example.
+
+**Reference list.** The 36 documented analog sites cite either a peer-reviewed paper or a named field programme.
+22 journal and book citations were checked against Crossref on 2026-11-14 (authors, year, journal, volume and
+pages) and carry their DOI; programme-only entries (for example HI-SEAS, AMASE, Desert RATS) cite the programme.
+
 **Share links.** The address hash records the view (mode, world, target, purpose, chosen Earth cell, mission
 weights and limits, scenario B, atlas colouring and Near Me settings). Values read from a link are validated
 (latitude −90..90, longitude −180..180, weights 0..100, known ids only) and anything else is ignored.

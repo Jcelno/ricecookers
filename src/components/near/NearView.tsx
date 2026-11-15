@@ -1,12 +1,14 @@
-import { ArrowLeftRight, FileText, Home, LocateFixed, MapPin, Minus, Plus, X } from "lucide-react";
-import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { ArrowLeftRight, Download, FileText, Home, LocateFixed, MapPin, Minus, Plus, X } from "lucide-react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/EarthMap";
 import type { GlobeHandle, SiteMarker, ViewState } from "@/components/map/GlobeView";
 import { Tapes, type TapesHandle } from "@/components/map/Tapes";
 import { Button, cx, GradeTile, IconButton, Notice, Segmented, Spinner, Switch } from "@/components/ui/primitives";
 import { GRADE_HEX, GRADE_MEANING } from "@/lib/format";
-import type { Grade, NearbyDocumented, NearbyRegion, Planet } from "@/lib/types";
+import { api } from "@/lib/api";
+import { downloadCsv } from "@/lib/csv";
+import type { Grade, NearbyDocumented, NearbyRegion, Planet, SearchHit } from "@/lib/types";
 import { useStore } from "@/store";
 
 const KM_PER_MI = 1.609344;
@@ -30,6 +32,46 @@ const radiusText = (km: number, units: "km" | "mi") => (km >= 20000 ? "Whole Ear
 const itemName = (it: Item) => (it.kind === "documented" ? it.name : it.place);
 
 /* --------------------------------------------------------------- controls */
+/** Place search over RADIUM's own name lists (Natural Earth places, states, countries, regions). No third-party geocoder. */
+function PlaceSearch({ onPick }: { onPick: (h: SearchHit) => void }) {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [state, setState] = useState<"idle" | "loading" | "none" | "error">("idle");
+  useEffect(() => {
+    if (q.trim().length < 2) { setHits([]); setState("idle"); return; }
+    const ac = new AbortController();
+    const t = setTimeout(() => {
+      setState("loading");
+      api.search("earth", q.trim(), ac.signal).then(
+        (r) => { setHits(r.slice(0, 7)); setState(r.length ? "idle" : "none"); },
+        (e) => { if (e?.name !== "AbortError") setState("error"); },
+      );
+    }, 250);
+    return () => { clearTimeout(t); ac.abort(); };
+  }, [q]);
+  return (
+    <div className="relative mt-2.5">
+      <label className="text-2xs text-regolith-400">Search for a place
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="City, region or country" className="field mt-0.5" role="combobox" aria-expanded={hits.length > 0} aria-controls="near-place-hits" autoComplete="off" />
+      </label>
+      {hits.length > 0 && (
+        <ul id="near-place-hits" role="listbox" className="surface-float absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-auto rounded-md p-1 ring-1 ring-[var(--hair)]">
+          {hits.map((h) => (
+            <li key={`${h.name}${h.lat}${h.lon}`}>
+              <button type="button" role="option" aria-selected={false} onClick={() => { onPick(h); setQ(""); setHits([]); }} className="row-ctl block w-full rounded-sm px-2 py-1.5 text-left">
+                <span className="block truncate text-sm text-regolith-50">{h.name}</span>
+                <span className="block text-2xs text-regolith-400">{h.type === "place" ? "City or town" : h.type === "country" ? "Country" : h.type === "state" ? "State or province" : h.type}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {state === "none" && <p className="mt-1 text-2xs text-regolith-400">No match. Try another spelling, or enter coordinates.</p>}
+      {state === "error" && <p className="mt-1 text-2xs text-alert">Search is unavailable right now. Enter coordinates or click the map instead.</p>}
+    </div>
+  );
+}
+
 function Location() {
   const nearLoc = useStore((s) => s.nearLoc);
   const setNear = useStore((s) => s.setNear);
@@ -82,23 +124,24 @@ function Location() {
           <MapPin size={15} className="shrink-0 text-world" />
           <span className="tnum min-w-0 flex-1 text-regolith-100">
             {Math.abs(nearLoc.lat).toFixed(2)}°{nearLoc.lat >= 0 ? "N" : "S"}, {Math.abs(nearLoc.lon).toFixed(2)}°{nearLoc.lon >= 0 ? "E" : "W"}
-            <span className="block text-2xs text-regolith-400">{nearLoc.source === "device" ? "From this device" : nearLoc.source === "map" ? "Picked on the map" : "Entered by hand"}</span>
+            <span className="block text-2xs text-regolith-400">{nearLoc.source === "device" ? "From this device" : nearLoc.source === "map" ? "Picked on the map" : nearLoc.source === "search" ? nearLoc.label : "Entered by hand"}</span>
           </span>
           <IconButton label="Forget this location" onClick={() => setNear({ nearLoc: null })} className="size-7"><X size={14} /></IconButton>
         </div>
       ) : (
-        <p className="mt-1 text-xs leading-snug text-regolith-400">Use your device's location, type coordinates, or click anywhere on the map.</p>
+        <p className="mt-1 text-xs leading-snug text-regolith-400">Use your device's location, search for a place, type coordinates, or click anywhere on the map.</p>
       )}
       <Button variant="solid" size="sm" className="mt-2.5 w-full justify-center" onClick={locate} disabled={busy}>
         <LocateFixed size={14} /> {busy ? "Finding your location…" : "Use my location"}
       </Button>
+      <PlaceSearch onPick={(h) => { setNear({ nearLoc: { lat: h.lat, lon: h.lon, source: "search", label: h.name } }); flyTo("earth", h.lat, h.lon, 2500); }} />
       <form onSubmit={submit} className="mt-2.5 grid grid-cols-[1fr_1fr_auto] items-end gap-1.5" aria-label="Enter coordinates">
         <label className="text-2xs text-regolith-400">Latitude<input inputMode="decimal" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="36.10 (N +, S −)" className="field mt-0.5" /></label>
         <label className="text-2xs text-regolith-400">Longitude<input inputMode="decimal" value={lon} onChange={(e) => setLon(e.target.value)} placeholder="-115.20 (E +, W −)" className="field mt-0.5" /></label>
         <Button size="sm" variant="outline" type="submit">Set</Button>
       </form>
       {msg && <p className="mt-2 text-xs leading-snug text-alert" role="alert">{msg}</p>}
-      <p className="mt-2.5 text-2xs leading-snug text-regolith-500">Your location stays in this browser tab. It is sent only to RADIUM's own service to compute distances, is not stored, and is never added to share links.</p>
+      <p className="mt-2.5 text-2xs leading-snug text-regolith-500">Your location stays in this browser tab. It is sent only to RADIUM's own service to compute distances, is not stored, and is never added to share links. Place search uses RADIUM's built-in Natural Earth name lists, not an outside service.</p>
     </section>
   );
 }
@@ -299,6 +342,17 @@ function Results() {
       <header className="px-4 pt-4 pb-2">
         <h2 className="text-md font-semibold text-regolith-50">{items.length ? `${items.length} result${items.length === 1 ? "" : "s"}` : "Nothing within this radius"}</h2>
         <p className="mt-0.5 text-xs leading-snug text-regolith-300">{ctx}.</p>
+        {items.length > 0 && (
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => downloadCsv(`radium-near-${r.query.mode}.csv`,
+            ["rank", "type", "name", "lat", "lon", "distance_km", "similarity_score", "similarity_grade", "similarity_coverage", "score_context", "source"],
+            items.map((it) => [it.n, it.kind === "documented" ? "documented_site" : "modelled_region", itemName(it), it.lat, it.lon, it.distance_km,
+              it.similarity?.score ?? null, it.similarity?.grade ?? null, it.similarity?.coverage ?? null, r.target?.score_context ?? null,
+              it.kind === "documented" ? it.source : "RADIUM Earth Twin grid cell (0.25 deg)"]),
+            [`RADIUM Near Me export. Mode: ${r.query.mode}. Radius ${r.query.radius_km} km.`, "distance_km is great-circle distance on Earth's surface; it says nothing about access.",
+              "similarity_* is Earth Twin similarity to the stated target (RADIUM's own scale, not a NASA rating); empty means not graded.", "The starting location is not included."])}>
+            <Download size={13} /> Download CSV
+          </Button>
+        )}
         {r.target && <p className="mt-1 text-2xs leading-snug text-regolith-500">Grades are Earth Twin similarity to the {r.target.body === "moon" ? "Moon" : "Mars"} target ({r.target.purpose_label.toLowerCase()}), on RADIUM's own A–F scale. They are not mission suitability and not NASA ratings.</p>}
       </header>
       {items.length === 0 ? (

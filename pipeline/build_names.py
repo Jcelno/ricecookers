@@ -63,6 +63,21 @@ def natural_earth():
     slim("ne_50m_admin_1_states_provinces", ["name", "admin", "iso_a2"], "earth_admin1.geojson")
     slim("ne_10m_geography_regions_polys", ["name", "featurecla", "region", "scalerank"], "earth_regions.geojson")
 
+    # Cities and towns, for typing a starting point by name in Near Me (no third-party geocoder needed).
+    d = json.load(open(src / "ne_10m_populated_places_simple.geojson"))
+    places = []
+    for f in d["features"]:
+        p = {k.lower(): v for k, v in f["properties"].items()}
+        g = f.get("geometry") or {}
+        if g.get("type") != "Point" or not p.get("name"):
+            continue
+        lon, lat = g["coordinates"][:2]
+        places.append({"name": p["name"], "ascii": p.get("nameascii") or p["name"], "admin1": p.get("adm1name") or "", "country": p.get("adm0name") or "",
+                       "lat": round(float(lat), 4), "lon": round(float(lon), 4), "pop": int(p.get("pop_max") or 0)})
+    places.sort(key=lambda x: -x["pop"])
+    (dst / "earth_places.json").write_text(json.dumps(places, ensure_ascii=False, separators=(",", ":")))
+    print(f"earth_places.json: {len(places)} populated places")
+
 
 def main():
     iau("moon")

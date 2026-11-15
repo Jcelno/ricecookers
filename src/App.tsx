@@ -8,6 +8,7 @@ import { MissionPanel } from "@/components/panels/MissionPanel";
 import { TopBar } from "@/components/TopBar";
 import { TwinView } from "@/components/twin/TwinView";
 import { Button, cx, IconButton, Notice, Spinner } from "@/components/ui/primitives";
+import { CompareView } from "@/components/compare/CompareView";
 import { NearView } from "@/components/near/NearView";
 import { applyLink, startLinkSync } from "@/lib/deeplink";
 import { useStore } from "@/store";
@@ -17,6 +18,7 @@ const Sources = lazy(() => import("@/components/sheets/Sources"));
 const Intro = lazy(() => import("@/components/sheets/Intro"));
 const BriefSheet = lazy(() => import("@/components/sheets/Brief"));
 const Scenarios = lazy(() => import("@/components/sheets/Scenarios"));
+const OfflineDemo = lazy(() => import("@/components/OfflineDemo"));
 
 function Side({ side, open, children, label }: { side: "left" | "right"; open: boolean; children: React.ReactNode; label: string }) {
   const setPanel = useStore((s) => s.setPanel);
@@ -70,12 +72,16 @@ export default function App() {
 
   if (metaError) {
     return (
-      <div className="grid h-full place-items-center p-6">
-        <div className="max-w-md">
-          <h1 className="mb-3 text-md font-semibold tracking-[0.14em] text-regolith-50">RADIUM</h1>
-          <Notice tone="error" title="The data service is not running" action={<Button variant="outline" size="sm" onClick={() => void init()}>Try again</Button>}>
-            {metaError}
-          </Notice>
+      <div className="flex h-full flex-col">
+        <div className="hair-b flex items-center gap-3 px-4 py-3">
+          <h1 className="text-md font-semibold tracking-[0.14em] text-regolith-50">RADIUM</h1>
+          <span className="text-xs text-regolith-400">{metaError}</span>
+          <Button className="ml-auto" variant="outline" size="sm" onClick={() => void init()}>Try again</Button>
+        </div>
+        <div className="min-h-0 flex-1">
+          <Suspense fallback={<div className="p-6"><Spinner label="Opening the saved example" /></div>}>
+            <OfflineDemo onRetry={() => void init()} />
+          </Suspense>
         </div>
       </div>
     );
@@ -96,6 +102,8 @@ export default function App() {
           <TwinView />
         ) : mode === "near" ? (
           <NearView />
+        ) : mode === "compare" ? (
+          <CompareView />
         ) : (
           <>
             <Side side="left" open={leftOpen} label={mode === "mission" ? "Mission panel" : "Layers panel"}>

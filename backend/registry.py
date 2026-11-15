@@ -296,7 +296,7 @@ SOURCES = [
         "url": "https://www.naturalearthdata.com/",
         "access": "file", "format": "GeoJSON",
         "coverage": "Global",
-        "variables": ["Country", "State / province (large countries)", "Named deserts, ranges, plateaus, islands"],
+        "variables": ["Country", "State / province (large countries)", "Named deserts, ranges, plateaus, islands", "Populated places (cities and towns), used only to search for a starting point"],
         "units": "—",
         "spatial_resolution": "1:50 million (boundaries), 1:10 million (physical regions)",
         "temporal_coverage": "Current release at download time",

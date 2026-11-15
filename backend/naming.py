@@ -91,6 +91,8 @@ class Earth:
             return geoms, props, STRtree(geoms)
 
         self.c_geom, self.c_prop, self.c_tree = load("earth_countries.geojson")
+        pp = NAMES / "earth_places.json"
+        self.places = json.loads(pp.read_text()) if pp.exists() else []
         self.a_geom, self.a_prop, self.a_tree = load("earth_admin1.geojson")
         rg, rp, _ = load("earth_regions.geojson")
         keep = [k for k, p in enumerate(rp) if p.get("featurecla") in self.REGION_CLASSES and p.get("name")]
@@ -142,6 +144,14 @@ class Earth:
                     out.append({"name": n.title() if n.isupper() else n, "type": kind if kind != "region" else p.get("featurecla", "region"),
                                 "lat": round(c.y, 3), "lon": round(c.x, 3), "diam_km": 0.0, "link": "",
                                 "_rank": (0 if n.lower().startswith(q) else 1, len(n))})
+        # Cities and towns (Natural Earth populated places): exact or prefix matches first, then larger places.
+        for p in self.places:
+            n, a = p["name"].lower(), p["ascii"].lower()
+            if q in n or q in a:
+                where = ", ".join(x for x in (p["admin1"], p["country"]) if x and x != p["name"])
+                out.append({"name": p["name"] + (f", {where}" if where else ""), "type": "place", "lat": p["lat"], "lon": p["lon"],
+                            "diam_km": 0.0, "link": "",
+                            "_rank": (0 if q in (n, a) else 0.5 if n.startswith(q) or a.startswith(q) else 1.5, -p["pop"] / 1e9)})
         out.sort(key=lambda x: x["_rank"])
         for o in out:
             o.pop("_rank")

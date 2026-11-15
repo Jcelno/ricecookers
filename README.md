@@ -42,7 +42,7 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Data service with auto-reload plus the Vite dev server on port 3000 |
-| `npm test` | 73 checks: science (`tests/test_science.py`) and API rules (`tests/test_api.py`) |
+| `npm test` | 80 checks: science (`tests/test_science.py`) and API rules (`tests/test_api.py`) |
 | `npm run build` | Type-check and build the web app into `dist/` |
 | `npm run pipeline` | Download the source data and rebuild every grid |
 | `node screenshot.mjs http://localhost:3000 label` | Save a screenshot to `temporary screenshots/` |
@@ -66,8 +66,8 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
   buildings, museums, equipment, illustrations and anything tagged as AI-generated are filtered out. Every photo
   carries its author, licence and a link to the original. Earth Twin shows both places together, and colours
   each documented analog site on the map by its A–F grade.
-- **Near Me.** Set a point on Earth (your device's location with permission, typed coordinates, or a click on the
-  map) and list documented analog sites by straight-line distance, or, with a Moon or Mars target, the best
+- **Near Me.** Set a point on Earth (your device's location with permission, a city or region found in RADIUM's
+  built-in Natural Earth name list, typed coordinates, or a click on the map) and list documented analog sites by straight-line distance, or, with a Moon or Mars target, the best
   Earth Twin matches within a radius, with a distance-versus-similarity plot. Distance never changes a grade.
 - **Research Test Brief.** From any comparison or Near Me result, build a printable experiment proposal: goal,
   question, the measured matches and mismatches with their datasets, conditions Earth cannot reproduce, a
@@ -76,6 +76,15 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
   how the top sites change, with each change explained by criterion.
 - **Analog atlas.** In Earth Analogs, colour documented sites by grade, environment type or study theme, filter
   by grade or category, and show or hide documented sites and model matches.
+- **Compare.** The chosen Moon or Mars site and Earth place side by side: maps, photographs, cell sizes, a
+  purpose selector that recomputes live, a radar and bars of the normalised similarity dimensions with the
+  measured values in their units, and separate lists of strengths, mismatches and what Earth cannot reproduce.
+- **Regional terrain profile.** Cell-mean elevation along a north–south or east–west line through any selected
+  cell, labelled as regional screening, not a landing-hazard profile.
+- **Exports.** Near Me results and Earth Analogs matches download as CSV with explicit field names; briefs
+  print to PDF or save as JSON.
+- **Offline example.** If the data service cannot be reached, the app opens one saved, real result (the worked
+  Gale crater example) labelled as saved, never as live. Rebuild it with `npm run snapshot`.
 - **Share links.** The address bar always reopens the current view. The Near Me location is never included.
 - **Help.** A five-step guide is available from Help at any time; it does not open by itself.
 - **Methodology and Data sources.** Both pages are generated from the running code and the dataset registry.
@@ -96,6 +105,9 @@ curl -s localhost:8000/api/analogs/nearby -H 'content-type: application/json' \
 curl -s localhost:8000/api/brief -H 'content-type: application/json' \
   -d '{"body": "mars", "lat": -4.59, "lon": 137.44, "purpose": "mobility",
        "earth_lat": 36.38, "earth_lon": -117.88, "setting": "field"}'
+
+# Regional elevation profile (cell means) through Gale crater, north to south
+curl -s 'localhost:8000/api/profile?body=mars&lat=-4.59&lon=137.44&axis=ns'
 
 # Rank a mission and also grade chosen places under the same weights (used by scenario comparison)
 curl -s localhost:8000/api/rank -H 'content-type: application/json' \

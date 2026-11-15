@@ -146,3 +146,41 @@ def test_probe_reports_limit_exclusion_instead_of_a_zero():
     far_north = r["probes"][-1]
     assert far_north["excluded"] and "mars_lat50" in far_north["failed_limits"]
     assert all(math.isfinite(p["score"]) for p in r["probes"] if p["score"] is not None)
+
+
+# ----------------------------------------------------------- terrain profile
+def test_profile_is_cell_means_along_the_requested_line():
+    r = client.get("/api/profile", params={"body": "mars", "lat": -4.59, "lon": 137.44, "axis": "ns"}).json()
+    offs = [p["offset_km"] for p in r["points"]]
+    assert offs == sorted(offs) and min(offs) < 0 < max(offs)
+    centre = min(r["points"], key=lambda p: abs(p["offset_km"]))
+    assert centre["offset_km"] == pytest.approx(0, abs=1e-6)
+    from backend.app import store
+    g = store.g["mars"]
+    i, j = g.index(-4.59, 137.44)
+    assert centre["elev_m"] == pytest.approx(float(g.a["elev_mean"][i, j]))
+    assert all(abs(p["lon"] - centre["lon"]) < 1e-9 for p in r["points"])          # north–south line keeps longitude
+
+
+def test_profile_marks_earth_water_as_missing_not_zero():
+    r = client.get("/api/profile", params={"body": "earth", "lat": 0, "lon": -30, "axis": "ew"}).json()  # mid-Atlantic
+    assert all(p["elev_m"] is None for p in r["points"])
+
+
+def test_profile_rejects_bad_input():
+    assert client.get("/api/profile", params={"body": "moon", "lat": 95, "lon": 0}).status_code == 422
+    assert client.get("/api/profile", params={"body": "moon", "lat": 0, "lon": 0, "axis": "up"}).status_code == 422
+
+
+# -------------------------------------------------------------- place search
+@pytest.mark.parametrize("q,expect", [("las vegas", "Las Vegas, Nevada"), ("sao paulo", "São Paulo"), ("reykjavik", "Reykjavík")])
+def test_earth_place_search_finds_cities_from_the_built_in_list(q, expect):
+    hits = client.get("/api/search", params={"body": "earth", "q": q}).json()["results"]
+    assert hits and hits[0]["name"].startswith(expect) and hits[0]["type"] == "place"
+
+
+# ------------------------------------------------------------ reference list
+def test_documented_sites_carry_tags_and_citations():
+    for p in PINS["earth"]:
+        assert p["source"] and p["tags"]["environment"] and p["tags"]["applications"]
+    assert sum("doi:" in p["source"] for p in PINS["earth"]) >= 20

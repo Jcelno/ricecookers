@@ -1,6 +1,7 @@
 import { ArrowLeftRight, ExternalLink, Layers, LocateFixed, MapPin, Navigation, X } from "lucide-react";
 import { useState } from "react";
 
+import { ProfileChart } from "@/components/panels/ProfileChart";
 import { Photos } from "@/components/ui/Photos";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Meter, Notice, Section, Spinner } from "@/components/ui/primitives";
 import { featuredPhotos, photoKey, photosFor } from "@/lib/photos";
@@ -314,6 +315,9 @@ export function LocationPanel() {
       {cell.suitability && <SuitabilityBlock s={cell.suitability} />}
       <Section title="Photographs">
         <Photos id={photoKey(cell)} load={() => photosFor(cell)} />
+      </Section>
+      <Section title="Regional terrain profile" defaultOpen={false}>
+        <ProfileChart body={cell.body} lat={cell.cell.lat} lon={cell.cell.lon} />
       </Section>
       <CellDetails cell={cell} />
     </div>

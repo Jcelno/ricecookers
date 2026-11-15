@@ -50,6 +50,66 @@ function Dim({ d, world }: { d: BriefDim; world: string }) {
 const H = ({ children }: { children: ReactNode }) => <h3 className="mt-6 mb-1 font-serif text-xl font-medium tracking-[-0.02em] text-regolith-50">{children}</h3>;
 const List = ({ items }: { items: string[] }) => <ul className="list-disc space-y-0.5 pl-5 text-sm leading-relaxed text-regolith-200">{items.map((i) => <li key={i}>{i}</li>)}</ul>;
 
+/** The brief itself, used by the sheet and by the offline saved example. */
+export function BriefArticle({ brief, link }: { brief: Brief; link?: string }) {
+  const world = brief.target.body === "moon" ? "Moon" : "Mars";
+  return (
+      <article className="print-area mx-auto max-w-[720px]">
+        <p className="text-xs text-regolith-400">Research Test Brief, experiment proposal</p>
+        <h2 className="mt-1 font-serif text-[2rem] leading-[1.12] font-medium tracking-[-0.03em] text-regolith-50" style={{ fontVariationSettings: '"opsz" 48' }}>{brief.title}</h2>
+        <div className="mt-3"><Notice tone="warn">{brief.disclaimer}</Notice></div>
+        {!brief.usable && brief.usable_note && <div className="mt-2"><Notice tone="error" title="Weak basis for this test">{brief.usable_note}</Notice></div>}
+    
+        <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+          <dt className="text-regolith-400">{world} target</dt><dd className="text-regolith-100"><span className="placename">{brief.target.label}</span>, <span className="tnum">{brief.target.coords}</span>, one {Math.round(brief.target.cell_km[0])} km cell</dd>
+          <dt className="text-regolith-400">Earth place</dt><dd className="text-regolith-100"><span className="placename">{brief.earth.label}</span>, <span className="tnum">{brief.earth.coords}</span>, one {Math.round(brief.earth.cell_km[0])} km cell{brief.earth.documented ? `. ${brief.earth.documented.name} (documented analog site) is ${Math.round(brief.earth.documented.distance_km)} km away.` : ". Not a documented analog site; found by the data alone."}</dd>
+          <dt className="text-regolith-400">Purpose</dt><dd className="text-regolith-100">{brief.purpose.label}</dd>
+          <dt className="text-regolith-400">Similarity</dt><dd className="flex items-center gap-2 text-regolith-100"><GradeTile grade={brief.match.grade} size="sm" /> {brief.match.meaning ?? "Not graded"}, from {pct(brief.match.coverage)} of the weighted comparison. RADIUM's own scale, not a NASA rating.</dd>
+        </dl>
+    
+        <H>Goal</H><p className="text-sm leading-relaxed text-regolith-200">{brief.goal}</p>
+        <H>Research question</H><p className="text-sm leading-relaxed text-regolith-200">{brief.question} <span className="text-regolith-400">(A question to test, not a finding.)</span></p>
+    
+        <H>Why this place may be useful</H>
+        {brief.why_useful.length ? <ul className="divide-y divide-[var(--hair)]">{brief.why_useful.map((d) => <Dim key={d.id} d={d} world={world} />)}</ul>
+          : <p className="text-sm text-regolith-300">No compared dimension reaches grade B here.</p>}
+    
+        <H>Known mismatches</H>
+        {brief.mismatches.length > 0 && <ul className="divide-y divide-[var(--hair)]">{brief.mismatches.map((d) => <Dim key={d.id} d={d} world={world} />)}</ul>}
+        <ul className="mt-2 space-y-1.5">
+          {brief.cannot_reproduce.map((b) => (
+            <li key={b.label} className="brief-block text-sm leading-snug"><span className="font-medium text-regolith-50">{b.label}:</span> <span className="tnum text-regolith-200">{b.planet} vs {b.earth}.</span> <span className="text-regolith-300">{b.text}</span></li>
+          ))}
+        </ul>
+        {brief.not_assessed.length > 0 && (<><H>Not assessed</H><List items={brief.not_assessed.map((n) => `${n.label}: ${n.text}`)} /></>)}
+    
+        <H>Proposed protocol ({brief.protocol.setting === "either" ? "field or laboratory" : brief.protocol.setting})</H>
+        <dl className="space-y-2 text-sm leading-relaxed">
+          <div><dt className="text-regolith-400">Test article or instrument class</dt><dd className="text-regolith-200">{brief.protocol.instrument_class}</dd></div>
+          <div><dt className="text-regolith-400">Keep controlled</dt><dd><List items={brief.protocol.controlled} /></dd></div>
+          <div><dt className="text-regolith-400">Measure</dt><dd><List items={brief.protocol.measured} /></dd></div>
+          <div><dt className="text-regolith-400">Data to collect</dt><dd><List items={brief.protocol.data_to_collect} /></dd></div>
+          <div><dt className="text-regolith-400">How to compare</dt><dd className="text-regolith-200">{brief.protocol.comparison}</dd></div>
+          <div><dt className="text-regolith-400">What would be informative</dt><dd className="text-regolith-200">{brief.protocol.informative_outcome}</dd></div>
+          <div><dt className="text-regolith-400">Needs a laboratory</dt><dd className="text-regolith-200">{brief.protocol.laboratory_needs}</dd></div>
+        </dl>
+    
+        <H>Preparation and constraints</H><List items={brief.preparation} />
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          {Object.entries(brief.unknowns).map(([k, v]) => (<Fragment key={k}><dt className="text-regolith-400">{k.replace("_", " ").replace(/^./, (c) => c.toUpperCase())}</dt><dd className="text-regolith-200">{v}</dd></Fragment>))}
+        </dl>
+    
+        {brief.earth.documented && (<><H>Published work at the nearby site</H><p className="text-sm text-regolith-200">{brief.earth.documented.name}: {brief.earth.documented.source}</p></>)}
+    
+        <footer className="hair-t mt-8 pt-3 text-2xs leading-relaxed text-regolith-500">
+          Generated {brief.meta.generated_utc} by RADIUM {brief.meta.radium_version} (build {brief.meta.build}) from the Earth Twin comparison for these settings: {Object.entries(brief.meta.settings).map(([k, v]) => `${k}=${v}`).join(", ")}.
+          Every value above comes from the datasets linked beside it; see the app's Data sources page for licences and limits.{" "}
+          {link && <a className="link inline-flex items-center gap-0.5" href={link}>Reopen this brief <ExternalLink size={10} /></a>}
+        </footer>
+      </article>
+  );
+}
+
 export default function BriefSheet({ onClose }: { onClose: () => void }) {
   const req = useStore((s) => s.brief);
   const [setting, setSetting] = useState("either");
@@ -110,59 +170,7 @@ export default function BriefSheet({ onClose }: { onClose: () => void }) {
             : err ? <Notice tone="error" title="The brief could not be built">{err}</Notice>
               : !brief ? <Spinner label="Assembling the brief from the comparison" />
                 : (
-                  <article className="print-area mx-auto max-w-[720px]">
-                    <p className="text-xs text-regolith-400">Research Test Brief, experiment proposal</p>
-                    <h2 className="mt-1 font-serif text-[2rem] leading-[1.12] font-medium tracking-[-0.03em] text-regolith-50" style={{ fontVariationSettings: '"opsz" 48' }}>{brief.title}</h2>
-                    <div className="mt-3"><Notice tone="warn">{brief.disclaimer}</Notice></div>
-                    {!brief.usable && brief.usable_note && <div className="mt-2"><Notice tone="error" title="Weak basis for this test">{brief.usable_note}</Notice></div>}
-
-                    <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                      <dt className="text-regolith-400">{world} target</dt><dd className="text-regolith-100"><span className="placename">{brief.target.label}</span>, <span className="tnum">{brief.target.coords}</span>, one {Math.round(brief.target.cell_km[0])} km cell</dd>
-                      <dt className="text-regolith-400">Earth place</dt><dd className="text-regolith-100"><span className="placename">{brief.earth.label}</span>, <span className="tnum">{brief.earth.coords}</span>, one {Math.round(brief.earth.cell_km[0])} km cell{brief.earth.documented ? `. ${brief.earth.documented.name} (documented analog site) is ${Math.round(brief.earth.documented.distance_km)} km away.` : ". Not a documented analog site; found by the data alone."}</dd>
-                      <dt className="text-regolith-400">Purpose</dt><dd className="text-regolith-100">{brief.purpose.label}</dd>
-                      <dt className="text-regolith-400">Similarity</dt><dd className="flex items-center gap-2 text-regolith-100"><GradeTile grade={brief.match.grade} size="sm" /> {brief.match.meaning ?? "Not graded"}, from {pct(brief.match.coverage)} of the weighted comparison. RADIUM's own scale, not a NASA rating.</dd>
-                    </dl>
-
-                    <H>Goal</H><p className="text-sm leading-relaxed text-regolith-200">{brief.goal}</p>
-                    <H>Research question</H><p className="text-sm leading-relaxed text-regolith-200">{brief.question} <span className="text-regolith-400">(A question to test, not a finding.)</span></p>
-
-                    <H>Why this place may be useful</H>
-                    {brief.why_useful.length ? <ul className="divide-y divide-[var(--hair)]">{brief.why_useful.map((d) => <Dim key={d.id} d={d} world={world} />)}</ul>
-                      : <p className="text-sm text-regolith-300">No compared dimension reaches grade B here.</p>}
-
-                    <H>Known mismatches</H>
-                    {brief.mismatches.length > 0 && <ul className="divide-y divide-[var(--hair)]">{brief.mismatches.map((d) => <Dim key={d.id} d={d} world={world} />)}</ul>}
-                    <ul className="mt-2 space-y-1.5">
-                      {brief.cannot_reproduce.map((b) => (
-                        <li key={b.label} className="brief-block text-sm leading-snug"><span className="font-medium text-regolith-50">{b.label}:</span> <span className="tnum text-regolith-200">{b.planet} vs {b.earth}.</span> <span className="text-regolith-300">{b.text}</span></li>
-                      ))}
-                    </ul>
-                    {brief.not_assessed.length > 0 && (<><H>Not assessed</H><List items={brief.not_assessed.map((n) => `${n.label}: ${n.text}`)} /></>)}
-
-                    <H>Proposed protocol ({brief.protocol.setting === "either" ? "field or laboratory" : brief.protocol.setting})</H>
-                    <dl className="space-y-2 text-sm leading-relaxed">
-                      <div><dt className="text-regolith-400">Test article or instrument class</dt><dd className="text-regolith-200">{brief.protocol.instrument_class}</dd></div>
-                      <div><dt className="text-regolith-400">Keep controlled</dt><dd><List items={brief.protocol.controlled} /></dd></div>
-                      <div><dt className="text-regolith-400">Measure</dt><dd><List items={brief.protocol.measured} /></dd></div>
-                      <div><dt className="text-regolith-400">Data to collect</dt><dd><List items={brief.protocol.data_to_collect} /></dd></div>
-                      <div><dt className="text-regolith-400">How to compare</dt><dd className="text-regolith-200">{brief.protocol.comparison}</dd></div>
-                      <div><dt className="text-regolith-400">What would be informative</dt><dd className="text-regolith-200">{brief.protocol.informative_outcome}</dd></div>
-                      <div><dt className="text-regolith-400">Needs a laboratory</dt><dd className="text-regolith-200">{brief.protocol.laboratory_needs}</dd></div>
-                    </dl>
-
-                    <H>Preparation and constraints</H><List items={brief.preparation} />
-                    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                      {Object.entries(brief.unknowns).map(([k, v]) => (<Fragment key={k}><dt className="text-regolith-400">{k.replace("_", " ").replace(/^./, (c) => c.toUpperCase())}</dt><dd className="text-regolith-200">{v}</dd></Fragment>))}
-                    </dl>
-
-                    {brief.earth.documented && (<><H>Published work at the nearby site</H><p className="text-sm text-regolith-200">{brief.earth.documented.name}: {brief.earth.documented.source}</p></>)}
-
-                    <footer className="hair-t mt-8 pt-3 text-2xs leading-relaxed text-regolith-500">
-                      Generated {brief.meta.generated_utc} by RADIUM {brief.meta.radium_version} (build {brief.meta.build}) from the Earth Twin comparison for these settings: {Object.entries(brief.meta.settings).map(([k, v]) => `${k}=${v}`).join(", ")}.
-                      Every value above comes from the datasets linked beside it; see the app's Data sources page for licences and limits.{" "}
-                      <a className="link inline-flex items-center gap-0.5" href={currentLink()}>Reopen this brief <ExternalLink size={10} /></a>
-                    </footer>
-                  </article>
+                  <BriefArticle brief={brief} link={currentLink()} />
                 )}
         </div>
       </div>

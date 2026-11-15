@@ -55,7 +55,8 @@ FILES: list[tuple[str, str]] = [
      "earth/ETOPO_2022_v1_60s_N90W180_surface.nc"),
     ("https://doi.pangaea.de/10.1594/PANGAEA.788537?format=textfile", "earth/glim_pangaea_788537.zip"),
     *[(f"{NE}/{n}.geojson", f"earth/naturalearth/{n}.geojson")
-      for n in ("ne_50m_admin_0_countries", "ne_50m_admin_1_states_provinces", "ne_10m_geography_regions_polys")],
+      for n in ("ne_50m_admin_0_countries", "ne_50m_admin_1_states_provinces", "ne_10m_geography_regions_polys",
+                "ne_10m_populated_places_simple")],
     # ---- IAU nomenclature
     (f"{NAMES}/MOON_nomenclature_center_pts.zip", "nomenclature/MOON_nomenclature_center_pts.zip"),
     (f"{NAMES}/MARS_nomenclature_center_pts.zip", "nomenclature/MARS_nomenclature_center_pts.zip"),

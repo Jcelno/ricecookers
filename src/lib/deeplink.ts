@@ -4,7 +4,7 @@
 import { useStore, type ColorBy, type Mode } from "@/store";
 import type { Body, Planet } from "./types";
 
-const MODES: Mode[] = ["explore", "mission", "twin", "near"];
+const MODES: Mode[] = ["explore", "mission", "twin", "near", "compare"];
 const BODIES: Body[] = ["moon", "mars", "earth"];
 const COLORS: ColorBy[] = ["grade", "environment", "application"];
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
@@ -71,9 +71,10 @@ export function applyLink(hash: string) {
 
   const sel = latlon(q.get("s"));
   const earth = latlon(q.get("e"));
-  if (mode === "twin" && target) {
+  if ((mode === "twin" || mode === "compare") && target) {
     st.startTwin(target);
     if (earth) void useStore.getState().pickEarth(earth.lat, earth.lon, true);
+    if (mode === "compare") useStore.getState().setMode("compare");
   } else if (mode === "near") {
     const nr = Number(q.get("nr"));
     useStore.setState({
@@ -105,11 +106,11 @@ export function currentLink(): string {
   q.set("m", s.mode);
   q.set("b", s.body);
   if (s.colorBy !== "grade") q.set("c", s.colorBy);
-  if (s.twinOrigin && (s.mode === "twin" || s.mode === "near" || s.sheet === "brief")) {
+  if (s.twinOrigin && (s.mode === "twin" || s.mode === "near" || s.mode === "compare" || s.sheet === "brief")) {
     q.set("t", `${s.twinOrigin.body},${r4(s.twinOrigin.lat)},${r4(s.twinOrigin.lon)}`);
     q.set("p", s.purpose);
   }
-  if (s.mode === "twin" && s.picked) q.set("e", `${r4(s.picked.lat)},${r4(s.picked.lon)}`);
+  if ((s.mode === "twin" || s.mode === "compare") && s.picked) q.set("e", `${r4(s.picked.lat)},${r4(s.picked.lon)}`);
   if (s.sheet === "brief" && s.brief) {
     q.set("t", `${s.brief.body},${r4(s.brief.lat)},${r4(s.brief.lon)}`);
     q.set("p", s.brief.purpose);

@@ -658,6 +658,40 @@ def research_brief(req: BriefRequest):
 
 
 # =============================================================================
+# Regional terrain profile: cell-mean elevation along a transect through one cell
+# =============================================================================
+@app.get("/api/profile")
+def terrain_profile(body: str, lat: float, lon: float, axis: str = "ns", half: int = 12):
+    need_body(body)
+    if not (math.isfinite(lat) and math.isfinite(lon)) or abs(lat) > 90:
+        raise HTTPException(422, "latitude must be between -90 and 90")
+    if axis not in ("ns", "ew"):
+        raise HTTPException(422, "axis must be ns or ew")
+    half = max(3, min(int(half), 30))
+    g = store.g[body]                     # always the global grid: one consistent cell size along the line
+    i, j = g.index(lat, ((lon + 180.0) % 360.0) - 180.0)
+    clat, clon = g.centre(i, j)
+    elev = g.a["elev_mean"]
+    slope = g.a.get("slope_med")
+    pts = []
+    for k in range(-half, half + 1):
+        ii, jj = (i + k, j) if axis == "ns" else (i, (j + k) % g.n_lon)
+        if not 0 <= ii < g.n_lat:
+            continue
+        plat, plon = g.centre(ii, jj)
+        e = float(elev[ii, jj])
+        ok = math.isfinite(e) and (body != "earth" or bool(g.valid[ii, jj]))
+        d = float(gc_km(clat, clon, plat, plon, RADIUS_KM[body])) * (1 if k >= 0 else -1)
+        sv = float(slope[ii, jj]) if slope is not None else float("nan")
+        pts.append({"offset_km": d, "lat": plat, "lon": plon, "elev_m": e if ok else None,
+                    "slope_deg": sv if ok and math.isfinite(sv) else None})
+    return clean({"body": body, "axis": axis, "centre": {"lat": clat, "lon": clon, "coords": fmt_latlon(clat, clon)},
+                  "cell_km": g.size_km(i), "points": pts,
+                  "source": {"moon": "lola_gdr", "mars": "mola_megdr", "earth": "etopo2022"}[body],
+                  "note": "Cell-mean elevation on RADIUM's global grid. A regional screening profile, not a landing-hazard or traverse profile."})
+
+
+# =============================================================================
 # Map overlays (PNG)
 # =============================================================================
 def png_response(data: bytes):

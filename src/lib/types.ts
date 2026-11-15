@@ -174,3 +174,8 @@ export interface Brief {
 }
 
 export interface Probe { id: string; lat: number; lon: number; score: number | null; grade: Grade | null; coverage: number; excluded: boolean; failed_limits: string[]; rank: number | null }
+
+export interface Profile {
+  body: Body; axis: "ns" | "ew"; centre: { lat: number; lon: number; coords: string }; cell_km: [number, number];
+  points: { offset_km: number; lat: number; lon: number; elev_m: number | null; slope_deg: number | null }[]; source: string; note: string;
+}

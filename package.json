@@ -18,7 +18,8 @@
     "predev": "node scripts/copy-assets.mjs",
     "prebuild": "node scripts/copy-assets.mjs",
     "preweb": "node scripts/copy-assets.mjs",
-    "api:prod": ".venv/bin/python -W ignore -m uvicorn backend.app:app --port 8000 --log-level warning"
+    "api:prod": ".venv/bin/python -W ignore -m uvicorn backend.app:app --port 8000 --log-level warning",
+    "snapshot": ".venv/bin/python -W ignore scripts/build_snapshot.py"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",

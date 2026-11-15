@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Home, Minus, Navigation, Plus, RotateCcw } from "lucide-react";
+import { ArrowLeft, Columns2, Download, FileText, Home, Minus, Navigation, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/EarthMap";
@@ -9,6 +9,7 @@ import { Photos } from "@/components/ui/Photos";
 import { Button, cx, GradeTile, IconButton, Meter, Notice, Section, Segmented, Spinner, Switch } from "@/components/ui/primitives";
 import { overlay } from "@/lib/api";
 import { badgeFor, categoriesFor, pinCategories } from "@/lib/atlas";
+import { downloadCsv } from "@/lib/csv";
 import { photoKey, photosFor } from "@/lib/photos";
 import { formatCoord, formatKm, GRADE_HEX, formatMeasure, formatValue, GRADE_MEANING, pct } from "@/lib/format";
 import type { Candidate, CellInfo, CompareResult, DimDetail, DocumentedSite, Measure, Planet } from "@/lib/types";
@@ -237,6 +238,14 @@ function Results() {
         {twin.planet_coverage < 0.999 && (
           <div className="mt-2"><Notice tone="info">Only {pct(twin.planet_coverage)} of this comparison could be made: {twin.dimensions.filter((d) => !d.available).map((d) => d.label.toLowerCase()).join(", ")} has no data at the planetary site.</Notice></div>
         )}
+        <Button size="sm" variant="outline" className="mt-2" onClick={() => downloadCsv(`radium-earth-analogs-${twin.planet.body}-${twin.purpose}.csv`,
+          ["rank", "type", "place", "lat", "lon", "similarity_score", "similarity_grade", "coverage", ...twin.dimensions.map((d) => `${d.id}_grade`), "documented_site_within_150km", "documented_distance_km"],
+          [...twin.candidates.map((c) => [c.rank, "modelled_region", c.place.label, c.lat, c.lon, c.score, c.grade, c.coverage, ...twin.dimensions.map((d) => c.dimensions.find((x) => x.id === d.id)?.grade ?? null), c.documented?.name ?? null, c.documented?.distance_km ?? null]),
+           ...twin.documented.map((d) => [null, "documented_site", d.name, d.lat, d.lon, d.analysed ? d.score : null, d.analysed ? d.grade : null, null, ...twin.dimensions.map(() => null), d.name, 0])],
+          [`RADIUM Earth Analogs export. Target: ${twin.planet.body} ${twin.planet.coords} (${twin.planet.place.label}). Purpose: ${twin.purpose}.`,
+           "Scores are Earth Twin similarity (0-1) on RADIUM's own scale, not NASA ratings; empty means no data.", "Modelled regions are 0.25 deg grid cells, not verified field sites."])}>
+          <Download size={13} /> Download CSV
+        </Button>
         <div className="-mx-2 mt-2"><Switch checked={showOverlay} onChange={(v) => useStore.setState({ showTwinOverlay: v })} label="Colour all of Earth by match grade" /></div>
       </header>
       <div role="tablist" aria-label="Lists" className="hair-t flex gap-1 px-3 pt-2">
@@ -397,6 +406,7 @@ function Comparison({ c }: { c: CompareResult }) {
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Button size="sm" variant="solid" onClick={() => useStore.getState().openBrief({ lat: c.earth.cell.lat, lon: c.earth.cell.lon })}><FileText size={13} /> Create a test brief</Button>
+          <Button size="sm" variant="outline" onClick={() => useStore.getState().setMode("compare")}><Columns2 size={13} /> Full side-by-side view</Button>
           <Button size="sm" variant="outline" onClick={() => useStore.getState().setMode("near")}><Navigation size={13} /> Find nearer analogs</Button>
         </div>
       </section>
