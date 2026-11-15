@@ -1,10 +1,8 @@
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import { Stage } from "@/components/map/Stage";
-import { LayersPanel } from "@/components/panels/LayersPanel";
-import { LocationPanel } from "@/components/panels/LocationPanel";
-import { MissionPanel } from "@/components/panels/MissionPanel";
+import { MobileSheetHandle, type SheetSnap } from "@/components/MobileSheetHandle";
 import { CaveatFooter, SkipLinks } from "@/components/AccessibilityChrome";
 import { KeyboardControls } from "@/components/KeyboardControls";
 import { TourBootstrap } from "@/components/TourBootstrap";
@@ -14,6 +12,9 @@ import { CompareTray } from "@/components/CompareTray";
 import { applyLink, startLinkSync } from "@/lib/deeplink";
 import { useStore } from "@/store";
 
+const LayersPanel = lazy(() => import("@/components/panels/LayersPanel").then(m => ({ default: m.LayersPanel })));
+const LocationPanel = lazy(() => import("@/components/panels/LocationPanel").then(m => ({ default: m.LocationPanel })));
+const MissionPanel = lazy(() => import("@/components/panels/MissionPanel").then(m => ({ default: m.MissionPanel })));
 const SavedView = lazy(() => import("@/components/saved/SavedView").then(m => ({ default: m.SavedView })));
 const TwinView = lazy(() => import("@/components/twin/TwinView").then((m) => ({ default: m.TwinView })));
 const NearView = lazy(() => import("@/components/near/NearView").then((m) => ({ default: m.NearView })));
@@ -28,20 +29,24 @@ const OfflineDemo = lazy(() => import("@/components/OfflineDemo"));
 function Side({ side, open, children, label }: { side: "left" | "right"; open: boolean; children: React.ReactNode; label: string }) {
   const setPanel = useStore((s) => s.setPanel);
   const left = side === "left";
+  const [snap, setSnap] = useState<SheetSnap>(60);
   return (
     <>
       <aside
         aria-label={label}
+        style={!left ? { "--location-sheet-height": `${snap}%` } as React.CSSProperties : undefined}
         data-tour={label === "Mission panel" ? "mission" : label === "Layers panel" ? "layers" : "location"}
         hidden={!open}
         className={cx(
           "surface scroll z-20 h-full shrink-0",
+          !left && "location-side",
           left ? "hair-r w-[var(--rail-w)]" : "hair-l w-[var(--panel-w)]",
           // on narrow screens panels float over the map instead of squeezing it
           "max-lg:absolute max-lg:top-0 max-lg:bottom-0 max-lg:shadow-[var(--shadow-float)]",
           left ? "max-lg:left-0 max-sm:w-[min(var(--rail-w),88vw)]" : "max-lg:right-0 max-sm:top-auto max-sm:h-[58%] max-sm:w-full max-sm:border-t max-sm:border-[var(--hair-strong)]",
         )}
       >
+        {!left && <MobileSheetHandle snap={snap} onSnap={setSnap} />}
         {children}
       </aside>
       <div className={cx("pointer-events-none absolute top-3 z-30", left ? (open ? "left-[calc(var(--rail-w)+12px)] max-sm:left-[calc(min(var(--rail-w),88vw)+8px)]" : "left-3") : open ? "right-[calc(var(--panel-w)+56px)] max-sm:right-14" : "right-14")}>
@@ -117,11 +122,11 @@ export default function App() {
         ) : (
           <>
             <Side side="left" open={leftOpen} label={mode === "mission" ? "Mission panel" : "Layers panel"}>
-              {mode === "mission" ? <MissionPanel /> : <LayersPanel />}
+              <Suspense fallback={<div className="p-4"><Spinner label="Opening controls" /></div>}>{mode === "mission" ? <MissionPanel /> : <LayersPanel />}</Suspense>
             </Side>
             <Stage />
             <Side side="right" open={rightOpen} label="Location panel">
-              <LocationPanel />
+              <Suspense fallback={<div className="p-4"><Spinner label="Opening the location panel" /></div>}><LocationPanel /></Suspense>
             </Side>
           </>
         )}
