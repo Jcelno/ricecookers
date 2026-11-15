@@ -1,0 +1,41 @@
+{
+  "chunks": [
+    {
+      "path": "/assets/index-BQmKO_zd.js",
+      "bytes": 111304,
+      "gzip": 36114
+    },
+    {
+      "path": "/assets/rolldown-runtime-pP25SEvz.js",
+      "bytes": 989,
+      "gzip": 568
+    },
+    {
+      "path": "/assets/react-CEqTg746.js",
+      "bytes": 220126,
+      "gzip": 68080
+    },
+    {
+      "path": "/assets/x-dF-SMN2h.js",
+      "bytes": 3261,
+      "gzip": 1582
+    },
+    {
+      "path": "/assets/events-K4KFOlDG.js",
+      "bytes": 139,
+      "gzip": 131
+    },
+    {
+      "path": "/assets/store-DoHsDufD.js",
+      "bytes": 22939,
+      "gzip": 7622
+    },
+    {
+      "path": "/assets/cesium-BDqxO893.js",
+      "bytes": 4177550,
+      "gzip": 1111564
+    }
+  ],
+  "initialBytes": 4536308,
+  "initialGzipBytes": 1225661
+}
