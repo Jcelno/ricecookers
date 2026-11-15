@@ -196,7 +196,16 @@ export function Sheet({ title, subtitle, onClose, children }: { title: ReactNode
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     ref.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      if (e.key === "Tab" && ref.current) {
+        const nodes = [...ref.current.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea,[tabindex="0"],summary')].filter(el => el.getClientRects().length);
+        const first = nodes[0], last = nodes[nodes.length - 1];
+        if (!first) { e.preventDefault(); return; }
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && (document.activeElement === last || document.activeElement === ref.current)) { e.preventDefault(); first.focus(); }
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);

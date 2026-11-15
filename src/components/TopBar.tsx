@@ -161,6 +161,7 @@ function Search() {
     window.addEventListener("radium:focus-search", focus);
     return () => window.removeEventListener("radium:focus-search", focus);
   }, []);
+  useEffect(() => { if (expanded) box.current?.querySelector("input")?.focus(); }, [expanded]);
   // In Earth Analogs and Near Me the search box looks for places on Earth.
   const target: Body = mode === "twin" || mode === "near" ? "earth" : body;
   const saved = useStore((s) => s.saved.sites);
@@ -428,6 +429,7 @@ export function TopBar() {
             <small>NASA Space Apps Challenge</small>
           </span>
         </button>
+        <span className="independent-badge">Independent research tool</span>
         <nav aria-label="Primary navigation" className="primary-nav">
           {(
             [

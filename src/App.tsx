@@ -5,6 +5,7 @@ import { Stage } from "@/components/map/Stage";
 import { LayersPanel } from "@/components/panels/LayersPanel";
 import { LocationPanel } from "@/components/panels/LocationPanel";
 import { MissionPanel } from "@/components/panels/MissionPanel";
+import { CaveatFooter, SkipLinks } from "@/components/AccessibilityChrome";
 import { KeyboardControls } from "@/components/KeyboardControls";
 import { TourBootstrap } from "@/components/TourBootstrap";
 import { TopBar } from "@/components/TopBar";
@@ -101,6 +102,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
+      <SkipLinks />
       <TopBar />
       <TourBootstrap />
       <KeyboardControls />
@@ -124,6 +126,7 @@ export default function App() {
           </>
         )}
       </main>
+      <CaveatFooter />
       <Suspense fallback={null}>
         {sheet === "methodology" && <Methodology onClose={() => setSheet(null)} />}
         {sheet === "sources" && <Sources onClose={() => setSheet(null)} />}
