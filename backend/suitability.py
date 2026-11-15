@@ -362,9 +362,16 @@ class Engine:
             inputs = []
             for vid in c["inputs"]:
                 if vid in g.vars:
-                    inputs.append({"id": vid, "label": g.vars[vid]["label"], "unit": g.vars[vid]["unit"],
-                                   "dec": g.vars[vid]["dec"], "fmt": g.vars[vid].get("fmt"), "value": g.value(vid, i, j),
-                                   "evidence": g.vars[vid]["evidence"]})
+                    m = g.vars[vid]
+                    item = {"id": vid, "label": m["label"], "unit": m["unit"], "dec": m["dec"],
+                            "fmt": m.get("fmt"), "value": g.value(vid, i, j), "evidence": m["evidence"],
+                            "source": m["source"], "res": m["res"]}
+                    if m.get("src_var") and item["value"] is not None:
+                        code = g.value(m["src_var"], i, j)
+                        alt = m.get("src_map", {}).get(int(code)) if code is not None else None
+                        if alt:
+                            item.update(evidence=alt["evidence"], source=alt["source"], res=alt["res"])
+                    inputs.append(item)
             factors.append({"id": cid, "label": c["label"], "short": c["short"], "question": c["question"],
                             "weight": wi, "value": v if np.isfinite(v) else None, "grade": grade_of(v),
                             "contribution": wi * v if np.isfinite(v) else None,
@@ -375,7 +382,8 @@ class Engine:
         return {
             "mission": mission, "score": s if np.isfinite(s) else None, "grade": grade_of(s),
             "meaning": GRADE_MEANING.get(grade_of(s) or "", None),
-            "coverage": float(cov[i, j]), "excluded": bool(excluded[i, j]), "failed_limits": failed,
+            "coverage": float(cov[i, j]), "min_coverage": MIN_COVERAGE,
+            "excluded": bool(excluded[i, j]), "failed_limits": failed,
             "factors": factors,
         }
 

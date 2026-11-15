@@ -162,6 +162,7 @@ def _meta():
     return clean({
         "bodies": {b: {**v, "gravity": {"moon": 1.62, "mars": 3.71, "earth": 9.81}[b]} for b, v in catalog.BODIES.items()},
         "evidence": catalog.EVIDENCE,
+        "coverage_thresholds": {"suitability": MIN_COVERAGE, "similarity": SIM_MIN_COVERAGE},
         "categories": [{"id": c, "label": l} for c, l in catalog.CATEGORIES],
         "grades": grades,
         "missions": missions,
@@ -308,9 +309,9 @@ def site_card(g, i, j, mission, weights, limits):
     return {
         "id": f"{g.id}:{i}:{j}", "grid": g.id, "lat": lat, "lon": lon, "coords": fmt_latlon(lat, lon),
         "place": pnames[g.body].context(lat, lon)["label"], "score": c["score"], "grade": c["grade"],
-        "coverage": c["coverage"], "cell_km": g.size_km(i),
+        "coverage": c["coverage"], "min_coverage": MIN_COVERAGE, "cell_km": g.size_km(i),
         "factors": [{"id": f["id"], "short": f["short"], "label": f["label"], "value": f["value"], "grade": f["grade"],
-                     "weight": f["weight"]} for f in c["factors"]],
+                     "weight": f["weight"], "contribution": f["contribution"], "inputs": f["inputs"]} for f in c["factors"]],
     }
 
 
