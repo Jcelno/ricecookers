@@ -91,7 +91,7 @@ function Side({ cell, title, world }: { cell: CellInfo; title: string; world: "m
           <span className="rounded-xs bg-basalt-700 px-1.5 py-0.5 text-regolith-200" title="How the grid was built">{world === "earth" ? "0.25° grid, ETOPO 2022 terrain" : world === "mars" ? "0.5° grid, MOLA terrain" : cell.cell.kind === "polar" ? "2.4 km polar grid, LOLA terrain" : "0.5° grid, LOLA terrain"}</span>
         </p>
       </div>
-      <details className="mx-4 mt-3 text-xs"><summary className="cursor-pointer py-2 text-regolith-200">Site evidence and measurement sources</summary>{record&&<SiteEvidence site={record}/>}<ul className="my-3 space-y-1">{sources.map(s=><li key={s.url}><a className="link" href={s.url} target="_blank" rel="noreferrer">{s.name}</a></li>)}</ul></details>
+      <details className="mx-4 mt-3 text-xs"><summary className="cursor-pointer py-2 text-regolith-200">Site evidence and measurement sources</summary>{record&&<SiteEvidence site={record}/>}<ul className="my-3 space-y-1">{sources.map(s=><li key={`${s.url}:${s.name}`}><a className="link" href={s.url} target="_blank" rel="noreferrer">{s.name}</a></li>)}</ul></details>
       <div className="pt-2"><Photos compact id={`cmp-${photoKey(cell)}`} load={() => photosFor(cell)} /></div>
     </section>
   );
