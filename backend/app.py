@@ -163,6 +163,13 @@ def _meta():
         "bodies": {b: {**v, "gravity": {"moon": 1.62, "mars": 3.71, "earth": 9.81}[b]} for b, v in catalog.BODIES.items()},
         "evidence": catalog.EVIDENCE,
         "coverage_thresholds": {"suitability": MIN_COVERAGE, "similarity": SIM_MIN_COVERAGE},
+        "overlay_rendering": {
+            "continuous_ramp": render.CONTINUOUS_RAMP,
+            "direction": "Low to high physical value; colour is not a suitability grade",
+            "alpha": f"235 × ({render.ALPHA_LOW} + {1 - render.ALPHA_LOW:.2f} × t^{render.ALPHA_EXPONENT}) / 255, multiplied by the layer opacity control",
+            "legend": "RGBA stops use the same colour lookup table and alpha transfer as rendered pixels",
+            "exceptions": "Albedo remains greyscale reflectance; categorical suitability and similarity grades retain their A–F colours",
+        },
         "categories": [{"id": c, "label": l} for c, l in catalog.CATEGORIES],
         "grades": grades,
         "missions": missions,

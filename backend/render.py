@@ -11,20 +11,14 @@ from PIL import Image
 from .geo import polar_xy
 from .suitability import GRADE_EDGES
 
-CMAPS = {
-    "heat": ["#0b0724", "#3b0f70", "#8c2981", "#de4968", "#fe9f6d", "#fcfdbf"],
-    "ice": ["#081d3a", "#0f4c81", "#2a8fbd", "#7fd0e0", "#e6f7fb"],
-    "lume": ["#14180f", "#3d4a1c", "#7c8f2a", "#c9d65a", "#f6f3c2"],
-    "topo": ["#12283a", "#2f5d62", "#6a8f6b", "#b9b487", "#e8dcc0", "#ffffff"],
-    "slope": ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"],
-    "ember": ["#1a0f0a", "#5a2410", "#a8431a", "#e08a3c", "#f7dc9b"],
-    "dust": ["#1c1a17", "#5b4630", "#a67c4a", "#d9b77e", "#f5e9cf"],
-    "air": ["#0d0b2b", "#3a3a8c", "#6f7fd0", "#b3c2ee", "#f1f4fd"],
-    "grey": ["#0a0a0a", "#f5f5f5"],
-    "veg": ["#efe6c8", "#b7c46a", "#5e9e3e", "#1f6b2f", "#0b3d1e"],
-    "sand": ["#1b1a18", "#6b5a43", "#bfa36f", "#f1e2b8"],
-}
-CMAPS["ice_r"] = CMAPS["ice"][::-1]
+# One low→high instrument ramp for continuous measurements. The existing layer
+# names remain valid, including ice_r; colour now consistently means magnitude,
+# never "better" suitability. Albedo retains its meaningful reflectance scale.
+CONTINUOUS_RAMP = ["#35204f", "#247f87", "#a6bd64", "#f2c477"]
+CMAPS = {name: CONTINUOUS_RAMP for name in ("heat", "ice", "ice_r", "lume", "topo", "slope", "ember", "dust", "air", "veg", "sand")}
+CMAPS["grey"] = ["#0a0a0a", "#f5f5f5"]
+ALPHA_LOW = 0.18
+ALPHA_EXPONENT = 1.35
 
 GRADE_COLORS = {"A": "#56c8f5", "B": "#86d6b9", "C": "#ecdf9a", "D": "#f0a55a", "F": "#de5d57"}
 EXCLUDED_RGBA = (18, 20, 24, 150)
@@ -46,10 +40,18 @@ def lut(name: str, n: int = 256) -> np.ndarray:
 _LUTS = {k: lut(k) for k in CMAPS}
 
 
+def continuous_alpha(name: str, t, alpha: int = 235):
+    """The same alpha transfer is used for overlay pixels and legend samples."""
+    t = np.clip(np.nan_to_num(t, nan=0.0), 0.0, 1.0)
+    return np.rint(np.full_like(t, alpha) if name == "grey" else alpha * (ALPHA_LOW + (1 - ALPHA_LOW) * t ** ALPHA_EXPONENT)).astype(np.uint8)
+
+
 def legend_stops(name: str, n: int = 9):
     l = _LUTS[name]
-    idx = np.linspace(0, 255, n).astype(int)
-    return ["#%02x%02x%02x" % tuple(int(c) for c in l[i]) for i in idx]
+    t = np.linspace(0, 1, n)
+    idx = np.rint(t * 255).astype(int)
+    alpha = continuous_alpha(name, t)
+    return ["#%02x%02x%02x%02x" % (*tuple(int(c) for c in l[i]), int(a)) for i, a in zip(idx, alpha)]
 
 
 def colorize(a: np.ndarray, cmap: str, vmin: float, vmax: float, log: bool = False, alpha: int = 235) -> np.ndarray:
@@ -63,7 +65,7 @@ def colorize(a: np.ndarray, cmap: str, vmin: float, vmax: float, log: bool = Fal
     idx = np.clip(np.rint(np.nan_to_num(t, nan=0.0) * 255), 0, 255).astype(np.uint8)
     out = np.zeros(a.shape + (4,), np.uint8)
     out[..., :3] = _LUTS[cmap][idx]
-    out[..., 3] = np.where(ok, alpha, 0)
+    out[..., 3] = np.where(ok, continuous_alpha(cmap, t, alpha), 0)
     return out
 
 
