@@ -121,11 +121,12 @@ export default function TourProvider() {
       if (required.every((name) => heard.some((item) => item.type === name))) complete(heard);
     });
   }, [running, minimized, topics, doneId, step, complete]);
+  const successReady = step.widget !== "slider-hint" || (current.rankStatus === "ready" && Object.entries(current.rawWeights[current.missionId] ?? {}).every(([id, value]) => current.lastRanked?.weights[id] === value));
   useEffect(() => {
-    if (!running || minimized || topics || doneId !== step.id || step.autoAdvance === false) return;
+    if (!running || minimized || topics || doneId !== step.id || step.autoAdvance === false || !successReady) return;
     advanceTimer.current = setTimeout(() => advance(), 950);
     return () => clearTimeout(advanceTimer.current);
-  }, [doneId, running, minimized, topics, step.id, step.autoAdvance, advance]);
+  }, [doneId, running, minimized, topics, step.id, step.autoAdvance, successReady, advance]);
   useEffect(() => {
     if (!running || step.id !== "analogy-breaks" || current.compare || current.compareStatus === "loading") return;
     const candidate = current.twin?.candidates[0];
