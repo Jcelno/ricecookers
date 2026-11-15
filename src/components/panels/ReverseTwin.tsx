@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, EvidenceTag, GradeTile, Segmented, Spinner } from "@/components/ui/primitives";
+import { Button, EvidenceTag, Segmented, Spinner } from "@/components/ui/primitives";
+import { AssessmentChips, AssessmentGrade } from "@/components/ui/Assessment";
 import type { Evidence, Grade, Planet } from "@/lib/types";
 import { useStore } from "@/store";
 
@@ -68,8 +69,9 @@ export default function ReverseTwin({ lat, lon }: { lat: number; lon: number }) 
         <h5 className="text-sm font-semibold text-regolith-100">{group.body === "moon" ? "Moon" : "Mars"}</h5>
         {group.note && <p className="text-xs text-regolith-400">{group.note}</p>}
         {group[kind].map(match => <article key={`${match.id}:${match.site_id ?? "cell"}`} className="rounded border border-[var(--hair)] p-2 text-xs leading-relaxed">
-          <div className="flex items-start gap-2"><GradeTile grade={match.coverage >= result.min_coverage ? match.grade : null} size="md" title="Purpose-weighted similarity" /><div className="min-w-0 flex-1"><h6 className="font-semibold text-regolith-100">{match.name}</h6><p className="text-regolith-400">{match.coords}</p></div></div>
-          <p className="mt-2 text-regolith-300"><EvidenceTag kind="computed" /> Similarity {(match.score * 100).toFixed(0)}/100 · coverage {(match.coverage * 100).toFixed(0)}%</p>
+          <div className="flex items-start gap-2"><AssessmentGrade grade={match.grade} coverage={match.coverage} minCoverage={result.min_coverage} model="similarity" size="md" /><div className="min-w-0 flex-1"><h6 className="font-semibold text-regolith-100">{match.name}</h6><p className="text-regolith-400">{match.coords}</p></div></div>
+          <p className="mt-2 text-regolith-300"><EvidenceTag kind="computed" /> Similarity {(match.score * 100).toFixed(0)}/100</p>
+          <div className="my-1"><AssessmentChips coverage={match.coverage} /></div>
           <p className="text-regolith-400">{match.grid} analysis cell · {match.cell_km.map(v => v.toFixed(1)).join(" × ")} km</p>
           {match.curated_comparison && <p className="mt-1 text-regolith-300">For this target, this Earth cell outscores {match.curated_comparison.outscored} of {match.curated_comparison.scored} assessed, documented Earth analogs.</p>}
           <details className="mt-2"><summary className="row-ctl cursor-pointer rounded-sm py-1 text-regolith-300">Evidence and limits</summary>
