@@ -3,6 +3,7 @@ export default async function prepare(page) {
   await page.waitForFunction(() => window.__radium?.getState().meta, { timeout: 60000 });
   const scenario = new URL(page.url()).searchParams.get("qa");
   if (!scenario || scenario === "tour") return;
+  if (scenario === "shortcuts") { await page.evaluate(() => window.dispatchEvent(new Event("radium:shortcuts"))); return; }
   await page.evaluate(async scenario => {
     const st = window.__radium.getState();
     const body = scenario === "earth" || scenario === "context" || scenario === "reverse" ? "earth" : scenario === "mission" ? "moon" : "mars";

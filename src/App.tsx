@@ -5,6 +5,7 @@ import { Stage } from "@/components/map/Stage";
 import { LayersPanel } from "@/components/panels/LayersPanel";
 import { LocationPanel } from "@/components/panels/LocationPanel";
 import { MissionPanel } from "@/components/panels/MissionPanel";
+import { KeyboardControls } from "@/components/KeyboardControls";
 import { TourBootstrap } from "@/components/TourBootstrap";
 import { TopBar } from "@/components/TopBar";
 import { Button, cx, IconButton, Notice, Spinner } from "@/components/ui/primitives";
@@ -102,6 +103,7 @@ export default function App() {
     <div className="flex h-full flex-col">
       <TopBar />
       <TourBootstrap />
+      <KeyboardControls />
       <main className="relative flex min-h-0 flex-1">
         <CompareTray />
         {mode === "saved" ? (<Suspense fallback={<Spinner label="Opening saved research" />}><SavedView /></Suspense>) : mode === "twin" ? (

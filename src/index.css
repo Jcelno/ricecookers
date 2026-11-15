@@ -1101,3 +1101,9 @@ a:focus-visible {
 .mission-status time { margin-left:auto; font-variant-numeric:tabular-nums; }
 @media(max-width:1100px) { .mission-status>span:nth-child(2) {display:none;} }
 @media(max-width:639px) { .mission-status {display:none;} }
+
+.search-keycap {position:absolute;right:9px;top:6px;pointer-events:none;color:var(--color-regolith-500);border:1px solid var(--hair);border-radius:3px;padding:0 4px;font-size:11px;}
+.shortcut-list {max-width:760px;padding:16px 24px;}
+.shortcut-list>div {display:grid;grid-template-columns:120px 1fr;gap:18px;padding:13px 0;border-bottom:1px solid var(--hair);font-size:13px;color:var(--color-regolith-300);}
+.shortcut-list kbd {display:inline-block;padding:3px 7px;border:1px solid var(--hair-strong);border-radius:4px;background:var(--color-basalt-800);font-family:var(--font-sans);color:var(--color-regolith-50);font-size:12px;}
+@media(max-width:760px) {.workspace-context:has([data-search-open="true"]) {display:flex;}.shortcut-list>div {grid-template-columns:85px 1fr;gap:12px;}}

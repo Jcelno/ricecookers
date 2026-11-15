@@ -80,6 +80,7 @@ function Menu() {
               {label}
             </button>
           ))}
+          <button role="menuitem" className="ctl flex w-full items-center gap-2 rounded-md p-3 text-left" onClick={() => { window.dispatchEvent(new Event("radium:shortcuts")); setOpen(false); }}>Keyboard shortcuts <kbd className="ml-auto">?</kbd></button>
           <button role="menuitemcheckbox" aria-checked={telemetry} className="ctl flex w-full items-center gap-2 rounded-md p-3 text-left" onClick={() => { setPreference(TELEMETRY_KEY, !telemetry); setOpen(false); }}>{telemetry ? "Hide" : "Show"} mission status</button>
         </div>
       )}
@@ -150,10 +151,16 @@ function Search() {
   const select = useStore((s) => s.select);
   const pickEarth = useStore((s) => s.pickEarth);
   const [q, setQ] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const focus = () => { setExpanded(true); requestAnimationFrame(() => box.current?.querySelector("input")?.focus()); };
+    window.addEventListener("radium:focus-search", focus);
+    return () => window.removeEventListener("radium:focus-search", focus);
+  }, []);
   // In Earth Analogs and Near Me the search box looks for places on Earth.
   const target: Body = mode === "twin" || mode === "near" ? "earth" : body;
   const saved = useStore((s) => s.saved.sites);
@@ -270,6 +277,7 @@ function Search() {
   return (
     <div
       ref={box}
+      data-search-open={expanded}
       className="relative w-[min(310px,30vw)] min-w-[160px] max-sm:w-full"
     >
       <SearchIcon
@@ -293,7 +301,7 @@ function Search() {
             setActive((a) => Math.max(0, a - 1));
           }
           if (e.key === "Enter" && hits[active]) go(hits[active]);
-          if (e.key === "Escape") setOpen(false);
+          if (e.key === "Escape") { setQ(""); setOpen(false); setExpanded(false); e.currentTarget.blur(); }
         }}
         role="combobox"
         aria-expanded={open && hits.length > 0}
@@ -308,6 +316,7 @@ function Search() {
         }
         className="focusable h-8 w-full rounded-sm bg-basalt-950/70 pr-7 pl-8 text-sm text-regolith-50 ring-1 ring-[var(--hair)] placeholder:text-regolith-500"
       />
+      {!q && <kbd className="search-keycap" aria-hidden="true">/</kbd>}
       {q && (
         <button
           type="button"
