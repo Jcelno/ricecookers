@@ -35,6 +35,7 @@ try {
   await page.click(handle);
   await check(25);
   await page.setViewport({ width: 1440, height: 900 });
+  await page.waitForSelector(handle);
   assert.equal(await page.$eval(handle, el => getComputedStyle(el).display), "none");
   assert.deepEqual(errors, []);
   console.log("PASS mobile sheet keyboard and pointer snap points, geometry, viewport fit and desktop exclusion");

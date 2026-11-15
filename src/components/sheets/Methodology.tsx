@@ -74,6 +74,9 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
           <p>Primary strength is the highest weighted contribution; limiting factor is the lowest available positive-weight criterion score. Both describe existing criteria and add no new score. Select Decision evidence and resolution to inspect their sources.</p>
           <h3>Earth has limits as an analog</h3>
           <p>Earth cannot reproduce lunar or Martian gravity, atmospheric pressure or radiation. Lunar temperatures are also excluded from similarity. Geology or rover tests may still be useful, provided the experiment accounts for those differences.</p>
+          <h3>Start from Earth, or add local context</h3>
+          <p>What does this resemble? searches Moon and Mars using the existing similarity model for a selected research purpose. It returns research sites and grid matches with coverage, sources and limitations. An Earth-wide analog suitability envelope is Not assessed; no third score is introduced.</p>
+          <p>Earth context is optional and never scored. SoilGrids predicts 0–5 cm topsoil at 250 m; failed or missing predictions stay Unavailable. The nearest Smithsonian GVP volcano is a catalog location, with a computed distance. Proximity is not evidence of lava tubes, caves or current hazard.</p>
           {level === "intermediate" && <>
             <h3>Read the model and the evidence together</h3>
             <p>Both models use a weighted mean over available criteria: <code>score = Σ(w × criterion score) / Σ(available weights)</code>. Weights are normalized. Suitability hard limits can reject a cell independently of its score; similarity compares only dimensions that are physically meaningful for the chosen purpose.</p>
@@ -85,6 +88,8 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
             <p>Terrain comparisons use a common kilometre baseline across worlds. Coarser chemistry, lithology and climate fields remain coarse even when repeated over smaller analysis cells. Mars climate represents a typical model year, excluding global dust storms. A source uncertainty, when available, is different from model uncertainty or unresolved local variation.</p>
             <h3>Distance and documentation do not change similarity</h3>
             <p>Near Me reports great-circle distance separately from similarity. The curated registry supports names, coordinates, historical context and documented research purposes. It never awards a scoring bonus. Review-needed records remain distinguishable from verified evidence.</p>
+            <p>For example, start at Atacama and search for rover mobility matches. Reverse search uses default purpose weights and the same 80% coverage threshold as forward Earth Twin; ocean cells and inapplicable purposes are not assessed. An “outscores” count refers only to the returned target and assessed, verified, compatible Earth catalog sites.</p>
+            <p>Continuous map colors run violet → teal → lime → amber, with increasing opacity. They show low to high measurements, not good to bad terrain. Albedo remains grayscale and grade colors remain categorical. The legend follows the same scale and opacity as the overlay.</p>
           </>}
           <p><Button variant="outline" onClick={() => setLevel(level === "simple" ? "intermediate" : "advanced")}>{level === "simple" ? "See model details and uncertainty" : "Inspect formulas, weights and validation tables"}</Button></p>
         </div>}
@@ -182,6 +187,8 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
             </div>
 
             <h3>Earth analog similarity</h3>
+            <p>Reverse Earth Twin evaluates one fixed Earth cell across the planetary grids with the same dimensions, purpose weights, transfer functions and coverage threshold. Returned scores reuse the forward pair explanation; tests check equality. It distinguishes catalog sites from spaced grid matches, preserves missing data and does not assess an Earth-wide suitability envelope. Each “outscores” denominator includes only assessed, verified Earth analogs compatible with that returned target.</p>
+            <p>Optional Earth context is excluded from every score and evidence-confidence mixture. SoilGrids 2.0 means use the 0–5 cm interval and published unit conversions, without averaging unequal depth intervals. Smithsonian GVP's official snapshot retains source provenance and unknown eruption years; haversine distance uses a 6371 km Earth radius. Source records are observed; soil predictions are modelled; distance is computed. Neither source establishes local subsurface access or safety.</p>
             <p>
               For one planetary cell and every Earth land cell, each dimension below yields a similarity between 0 and 1. The overall match is their weighted mean over the dimensions that have data on both sides. Weights depend on the purpose you choose,
               because a site can be an excellent analog for rover mobility and a poor one for ice drilling.

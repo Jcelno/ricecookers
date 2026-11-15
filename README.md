@@ -15,7 +15,7 @@ native resolution and limits. Where a dataset has no value, the interface says s
 ## Run it
 
 Requirements: Node.js 22.18 or newer (including native TypeScript persistence tests), Python 3.9 or newer, and an internet connection (map imagery streams from
-NASA, EOX and OpenFreeMap).
+NASA, EOX, Esri and OpenFreeMap).
 
 ```bash
 git clone https://github.com/Jcelno/ricecookers.git
@@ -44,6 +44,8 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
 | `npm run dev` | Data service with auto-reload plus the Vite dev server on port 3000 |
 | `npm test` | Scientific, API and curated-catalog regression checks |
 | `npm run test:browser` | Browser workflow regression checks against the running local services |
+| `npm run test:upgrade` | Interactive tour, field guide, maps, gallery, context, demo and mobile regression checks |
+| `npm run test:evidence` | Confidence, coverage and Earth context unit checks |
 | `npm run build` | Type-check and build the web app into `dist/` |
 | `npm run pipeline` | Download the source data and rebuild every grid |
 | `node screenshot.mjs http://localhost:3000 label` | Save a screenshot to `temporary screenshots/` |
@@ -65,7 +67,7 @@ get a non-blocking tour invitation. Use [the forced tour](http://localhost:3000/
 ## What you can do
 
 - **Explore.** Spin 3D globes of the Moon and Mars drawn from real orbital mosaics (LROC WAC, Kaguya
-  Terrain Camera, Viking MDIM 2.1) and a 2D map of Earth (Sentinel-2 cloudless, Blue Marble). Click anywhere
+  Terrain Camera, Viking MDIM 2.1) and a 2D map of Earth (Sentinel-2 cloudless, Blue Marble, Esri World Imagery). Click anywhere
   to read the measurements for that analysis cell. Turn on data layers: elevation, slope, roughness,
   temperature, sunlight, hydrogen, permanent shadow, dust, precipitation, vegetation and more.
 - **Mission Planner.** A five-step guided workflow (destination, mission type, priorities, candidates, save or
@@ -113,8 +115,34 @@ get a non-blocking tour invitation. Use [the forced tour](http://localhost:3000/
 - **Offline example.** If the data service cannot be reached, the app opens one saved, real result (the worked
   Gale crater example) labelled as saved, never as live. Rebuild it with `npm run snapshot`.
 - **Share links.** A dedicated Copy View Link button confirms actual clipboard success and offers a selectable-link fallback. Versioned links restore targets, purposes, custom weights, comparison type, layers and filters. The Near Me starting location and browser-local saved library are never included.
-- **Help.** An optional interactive field guide offers quick and detailed paths across 32 topics, contextual highlights, real controls, topic selection, resume and restart. Keyboard and touch guidance is included.
+- **Help.** The first visit opens a seven-task Quick tour after the first map frame. Its coach marks respond to real actions, show actual results and remember progress by stable topic ID. The 32-topic Full field guide has six chapters, evidence quizzes, a ranking sandbox, chapter restart and contextual workspace hints. Help resumes progress. Shared links show an invitation; `?tour=0`, automated browsers and offline examples suppress automatic opening, while `?tour=1` forces a demo. Dismissal or completion marks the welcome seen; merely showing it does not. Blocked storage safely suppresses automatic opening.
 - **Methodology and Data sources.** Both pages are generated from the running code and the dataset registry.
+
+### Sibling-build upgrade
+
+The TV-inspired assessment cards identify the primary strength and limiting factor from existing mission criteria. Coverage and evidence-based confidence sit beside grades; insufficient coverage keeps the grade grey under RADIUM's existing thresholds. Optional desktop telemetry, keyboard shortcuts, skip links, source-failure chips and a dismissible research caveat make the workspace easier to operate. Coordinates copy the exact selected point; the containing analysis cell stays separately labelled.
+
+Earth Site Cards offer on-demand **Context (not scored)**: ISRIC SoilGrids topsoil predictions and the nearest Smithsonian GVP Holocene volcano center. External failures show Unavailable. **What does this resemble?** searches real lunar and Martian cells and catalog sites using the existing similarity model; each result can open the normal forward comparison. Earth analog-envelope suitability is Not assessed because no calibrated envelope rubric exists.
+
+NR-inspired features include a full-screen orbital/photograph gallery with attribution, keyboard and touch controls, external Google Street View/Maps links, fanned globe pins with ground-point leaders, and **Documented / New leads / Both** filters with visible target context. In-map layer controls support opacity, independent boundaries and Esri imagery. Continuous data overlays share a violet–teal–lime–amber ramp; categorical/diverging layers keep their scientific distinctions.
+
+Empty Site Cards offer catalog-based Shackleton, Gale and Atacama starters with live assessment previews or explicit Not assessed states. On phones, the location sheet snaps to 25%, 60% or 100% with its drag handle or arrow keys. Gallery, tour and reverse-twin UI load on demand. See [the validation and porting record](docs/validation/upgrade.md) for checks, screenshots, bundle measurements and deliberate omissions.
+
+### Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `/` | Focus search; `Esc` clears and blurs it |
+| `1` / `2` / `3` | Moon / Mars / Earth |
+| `L` | Toggle Layers |
+| `T` | Find Earth twins for the selected planetary location |
+| `S` | Save the selection |
+| `C` | Add the selection to compare |
+| `?` | Open the shortcuts sheet |
+| `Alt` + `→` / `←` | Next / previous tour topic |
+| `Esc` during a tour | Minimize; press again to exit |
+
+Single-key actions pause while typing or while a modal is open. In the gallery, `←`/`→` change frames and `Esc` closes it; focus returns to the opener.
 
 ### API additions
 
@@ -146,6 +174,10 @@ curl -s 'localhost:8000/api/profile?body=mars&lat=-4.59&lon=137.44&axis=ns'
 # Rank a mission and also grade chosen places under the same weights (used by scenario comparison)
 curl -s localhost:8000/api/rank -H 'content-type: application/json' \
   -d '{"mission": "mars_human", "probe": [{"lat": 70, "lon": 0}]}'
+
+# Search planetary cells and catalog sites resembling an Earth cell
+curl -s localhost:8000/api/twin/reverse -H 'content-type: application/json' \
+  -d '{"lat": -24.5, "lon": -69.25, "purpose": "mobility", "n": 5}'
 ```
 
 
@@ -252,7 +284,7 @@ the product in detail before any code was written:
 We also set the visual direction, including real orbital imagery on the Moon and Mars globes, and directed
 the build.
 
-The original implementation used Claude Code (Anthropic's AI coding assistant). The redesign, shared catalog integration, persistence and interaction improvements were developed with OpenAI Codex. Working from our
+The original implementation used Claude Code (Anthropic's AI coding assistant). The redesign, shared catalog integration, persistence and interaction improvements were developed with OpenAI Codex. This sibling-build upgrade also used Codex to implement the interactive tutorial and selected NR/TV interface ideas, reverse similarity search, context integrations, regression tests and screenshot review while preserving the team's scientific rules. Working from our
 specification and under our direction, it wrote the code for the data pipeline, the scoring service, the web
 app and the automated tests, and drafted the documentation. It also proposed which public datasets to use,
 the default scoring weights and thresholds, and the reference list of published analog sites. The datasets,

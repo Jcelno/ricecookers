@@ -107,8 +107,8 @@ Design choices:
 - **Glacier ice hides the ground** as vegetation does, so ice-sheet interiors do not count as bare ground.
 - **Purposes.** The same pair of places is graded once per purpose. A purpose that is irrelevant to the planetary
   site (ice drilling where there is no ice evidence) is reported as not applicable.
-- **Discovery.** All Earth land cells are ranked from data alone. The reference list of 36 documented analog
-  sites (`backend/reference.py`) labels results and shows how known sites score. A test confirms that emptying
+- **Discovery.** All Earth land cells are ranked from data alone. The verified subset of the curated Earth site
+  registry (`backend/site_registry.json`) labels results and shows how known sites score. A test confirms that emptying
   the list changes no score.
 
 ## 7. Planning tools built on the two scores
@@ -120,7 +120,7 @@ similarity (how closely an Earth cell matches a Moon or Mars cell for a purpose)
 are always shown separately. They are never averaged into one number.
 
 **Near Me** (`POST /api/analogs/nearby`). Two rankings, chosen explicitly:
-- *Distance*: RADIUM's 36 documented analog sites, sorted by great-circle distance from the user's point on a
+- *Distance*: RADIUM's verified Earth catalog sites, sorted by great-circle distance from the user's point on a
   sphere of radius 6371.0088 km (`geo.gc_km`), ties broken by name. This says nothing about how good an analog a
   site is, and nothing about roads, borders, permits or access.
 - *Similarity*: needs a Moon or Mars target and purpose. Earth cells and documented sites inside the radius are
@@ -166,9 +166,11 @@ domain), so no query is sent to an outside geocoding service.
 the responses unchanged in `public/demo/snapshot.json`, with the time and build. The app shows it only when the
 data service is unreachable and labels it as a saved example.
 
-**Reference list.** The 36 documented analog sites cite either a peer-reviewed paper or a named field programme.
-22 journal and book citations were checked against Crossref on 2026-11-14 (authors, year, journal, volume and
-pages) and carry their DOI; programme-only entries (for example HI-SEAS, AMASE, Desert RATS) cite the programme.
+**Reference list.** The curated registry preserves coordinates, source links, verification status and research
+limitations for every site. Verified Earth entries can label documented analog results. Review-needed entries
+remain discoverable in the catalog and are visibly distinguished; they receive no documentation bonus or
+assumption of equivalence. Published research and official field programmes support the stated research purpose,
+while the grid measurements alone determine model similarity.
 
 **Lunar polar overlays.** Within 305 km of each pole the 2.4 km polar grids replace the 15 km global grid. Map
 images are drawn so the two never overlap or leave gaps: the global image stops at 75.5°, and the polar cap image
@@ -184,6 +186,52 @@ seasonal means of surface temperature and solar flux (12 seasons). Earth: NASA P
 **Custom similarity weights.** Earth Analogs, compare, briefs, Near Me and the twin overlay accept user weights for
 the purpose's own dimensions (0–100 each, at least one positive). Sending the documented weights reproduces the
 default results exactly (tested). The fitness-by-purpose table always uses the documented weights.
+
+**Reverse Earth Twin** (`POST /api/twin/reverse`). From an Earth analysis cell, ask which Moon and Mars cells
+match a selected research purpose. `backend/reverse.py` screens each planetary grid against that fixed Earth
+cell using the same dimensions, default purpose weights, transfer functions and 80% weighted coverage threshold
+as forward Earth Twin. Returned matches are explained through the existing pairwise comparison code. Tests
+compare vectorized screening against forward calculations, and returned pair scores against `/api/twin/compare`.
+There is no Earth-by-planet matrix or new score. Ocean cells, missing inputs and inapplicable purposes are
+reported as not assessed; they do not become zeros or interpolated values. Lunar polar cells replace overlapping
+global cells, as in forward suitability. Results distinguish catalog research sites from distinct grid matches.
+Each match carries sources, evidence classes, native resolutions, coverage and differences Earth cannot reproduce.
+
+For example, select Atacama, open **What does this resemble?**, choose rover mobility and run the search. The
+result answers a terrain-testing question, not whether the Earth location is suitable for a mission. Changing the
+purpose changes the match. A statement that an Earth cell outscores N documented analogs is evaluated for that
+specific returned planetary target and purpose; its denominator includes only assessed, verified, compatible
+Earth catalog sites. It is not a claim that the cell is better than all field sites in general. The optional
+Earth-wide analog suitability envelope is **Not assessed**: no calibrated envelope or independently validated
+third rubric has been introduced.
+
+**Earth context, not scored.** The location card loads two optional sources independently of either scoring
+model. ISRIC SoilGrids 2.0 supplies modelled soil means at 250 m for the **0–5 cm** interval on explicit request.
+Published conversion factors produce percentages, kg/dm³ and pH; unequal depth intervals are not averaged.
+Missing predictions, timeouts and service failures show **Unavailable**. ISRIC's REST service can be offline;
+the app does not substitute a fabricated soil profile. Surface soil is neither a bedrock analysis nor a field
+sample. See [ISRIC's units and uncertainty documentation](https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_01.html).
+
+The nearest Holocene volcanic center is calculated from the official Smithsonian GVP WFS snapshot in
+`public/data/gvp-volcanoes.json`. `scripts/update_volcanoes.py` trims official records and preserves the retrieval
+time, upstream URL, source SHA-256 and [GVP database citation](https://doi.org/10.5479/si.GVP.VOTW5-2026.5.4).
+Catalog coordinates and eruption histories are observed reference records; nearest-center distance is computed
+with haversine geometry (Earth radius 6371 km). Unknown eruption years remain unknown. Coordinate precision
+varies and catalog completeness is limited. Proximity establishes neither lava tubes, caves, subsurface access
+nor present hazard. Neither the volcano distance nor SoilGrids enters suitability, similarity or confidence.
+
+**Continuous map colors.** Instrument overlays share violet → teal → lime → amber from low to high measured
+value. High means a larger measurement, not necessarily a better site. Grayscale albedo and categorical grade
+colors retain their own meanings. For the normalized linear or logarithmic position `t` in the displayed scale,
+continuous opacity is `235 / 255 × (0.18 + 0.82 × t^1.35)`, then multiplied by the layer opacity control.
+Missing pixels are transparent. Legend stops are generated by the same color and opacity function as the image;
+units, bounds and any logarithmic scale remain explicit. Changing a ramp changes no measurement or score.
+
+**Starter places.** Empty-state shortcuts resolve records from the site catalog. Moon and Mars preview the
+actual cell response for the applicable current mission settings; hard-limit exclusions remain exclusions.
+Earth mission suitability is **Not assessed**, because that model is not defined. Shackleton's catalog coordinate
+is the crater center, not a verified rim landing point; the shortcut says so. Atacama's Yungay reference retains
+its review-needed coordinate status. Clicking a starter opens its original catalog coordinate and full evidence.
 
 **Site assessment.** The label in the Site Analysis Card follows fixed rules: "Limited data" when fewer than half
 of the headline measurements exist; "Potential terrain concerns" when typical or steep-ground slope exceeds the
