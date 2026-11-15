@@ -15,6 +15,7 @@ const ACCESS: Record<string, string> = {
 };
 const GROUPS: [string, string][] = [["moon", "Moon"], ["mars", "Mars"], ["earth", "Earth"], ["all", "Names and imagery"]];
 const EVIDENCE = new Set(["observed", "inferred", "modelled", "computed", "interpreted"]);
+const CONTEXT_SOURCES = new Set(["soilgrids", "gvp_holocene"]);
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
   return (
@@ -43,23 +44,24 @@ export default function Sources({ onClose }: { onClose: () => void }) {
       onClose={onClose}
     >
       <div className="px-6 py-5" data-tour="sources">
-        <div className="mb-5 flex flex-wrap gap-2"><input className="field min-w-48 flex-1" aria-label="Search sources" placeholder="Search datasets, sites, agencies or research" value={query} onChange={e=>setQuery(e.target.value)}/><select className="field w-auto" aria-label="Source world" value={world} onChange={e=>setWorld(e.target.value)}><option value="all">All worlds</option><option value="moon">Moon</option><option value="mars">Mars</option><option value="earth">Earth</option></select><select className="field w-auto" aria-label="Source role" value={role} onChange={e=>setRole(e.target.value)}><option value="all">All source roles</option><option value="model">Measurements and calculations</option><option value="imagery">Imagery</option><option value="sites">Site history and analog research</option><option value="excluded">Evaluated, excluded</option></select></div>
-        <p className="mb-6 text-sm leading-relaxed text-regolith-300">Numerical datasets support the calculations below. Site references establish location identity, history and documented research use; they do not supply a similarity grade. Imagery is visual context unless a listed dataset explicitly says otherwise.</p>
+        <div className="mb-5 flex flex-wrap gap-2"><input className="field min-w-48 flex-1" aria-label="Search sources" placeholder="Search datasets, sites, agencies or research" value={query} onChange={e=>setQuery(e.target.value)}/><select className="field w-auto" aria-label="Source world" value={world} onChange={e=>setWorld(e.target.value)}><option value="all">All worlds</option><option value="moon">Moon</option><option value="mars">Mars</option><option value="earth">Earth</option></select><select className="field w-auto max-w-full" aria-label="Source role" value={role} onChange={e=>setRole(e.target.value)}><option value="all">All source roles</option><option value="model">Measurements and calculations</option><option value="context">Context only · not scored</option><option value="imagery">Imagery</option><option value="sites">Site history and analog research</option><option value="excluded">Evaluated, excluded</option></select></div>
+        <p className="mb-6 text-sm leading-relaxed text-regolith-300">Numerical datasets support the calculations below. Site references establish location identity, history and documented research use; they do not supply a similarity grade. SoilGrids and Smithsonian GVP provide optional context only and never enter a score. Imagery is visual context unless a listed dataset explicitly says otherwise.</p>
         {error && <Notice tone="error" title="The registry could not be loaded">{error}</Notice>}
         {!data && !error && <Spinner label="Loading the registry" />}
         {data &&
           GROUPS.map(([id, label]) => {
-            const list = data.sources.filter(s => matches(s) && (world === "all" || s.body === world || s.body === "all") && role !== "sites" && role !== "excluded" && (role !== "imagery" || s.access === "imagery") && (role !== "model" || s.access !== "imagery")).filter((s) => (id === "all" ? s.body === "all" || s.id === "earth_basemaps" || s.id === "natural_earth" : s.body === id && s.id !== "earth_basemaps" && s.id !== "natural_earth"));
+            const list = data.sources.filter(s => matches(s) && (world === "all" || s.body === world || s.body === "all") && role !== "sites" && role !== "excluded" && (role !== "imagery" || s.access === "imagery") && (role !== "model" || (s.access !== "imagery" && !CONTEXT_SOURCES.has(s.id))) && (role !== "context" || CONTEXT_SOURCES.has(s.id))).filter((s) => (id === "all" ? s.body === "all" || s.id === "earth_basemaps" || s.id === "natural_earth" : s.body === id && s.id !== "earth_basemaps" && s.id !== "natural_earth"));
             if (!list.length) return null;
             return (
               <section key={id} className="mb-8">
                 <h3 className="mb-3 font-serif text-[1.375rem] font-medium tracking-[-0.02em] text-regolith-50">{label}</h3>
                 <div className="grid gap-3 lg:grid-cols-2">
                   {list.map((s) => (
-                    <article key={s.id} className="rounded-md bg-basalt-800 p-4 ring-1 ring-[var(--hair)]">
+                    <article key={s.id} data-source={s.id} className="rounded-md bg-basalt-800 p-4 ring-1 ring-[var(--hair)]">
                       <h4 className="text-sm leading-snug font-semibold text-regolith-50">{s.name}</h4>
                       <p className="mt-1 text-xs leading-relaxed text-regolith-300">{s.purpose}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-regolith-300">
+                        {CONTEXT_SOURCES.has(s.id) && <span className="rounded-sm border border-[var(--hair-strong)] px-1.5 py-0.5 text-2xs text-regolith-100">Context only · Not scored</span>}
                         {EVIDENCE.has(s.evidence) && <EvidenceTag kind={s.evidence as Evidence} />}
                         <span>{ACCESS[s.access] ?? s.access}</span>
                         <a className="link inline-flex items-center gap-1" href={s.url} target="_blank" rel="noreferrer">Open source <ExternalLink size={11} /></a>
