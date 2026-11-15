@@ -34,6 +34,8 @@ export interface Photo {
   licenseUrl?: string;
   page: string;
   archive: "NASA Image and Video Library" | "Wikimedia Commons";
+  /** Image type is interpreted from archive metadata; unknown viewpoints stay unclassified. */
+  kind?: "ground" | "orbital" | "photograph";
 }
 export interface PhotoSet {
   photos: Photo[];
@@ -104,6 +106,7 @@ async function nasaSearch(term: string, world: "Moon" | "Mars"): Promise<Photo[]
       licenseUrl: "https://www.nasa.gov/nasa-brand-center/images-and-media/",
       page: `https://images.nasa.gov/details/${encodeURIComponent(d.nasa_id)}`,
       archive: "NASA Image and Video Library",
+      kind: /orbiter|HiRISE|CTX|LRO|from orbit|orbital/i.test(text) ? "orbital" : /Mastcam|Navcam|Pancam|surface panorama|rover.+(?:took|captured|view)|(?:took|captured).+rover/i.test(text) ? "ground" : "photograph",
     });
     if (out.length >= 7) break;
   }
@@ -199,6 +202,7 @@ async function commons(params: Record<string, string>): Promise<Photo[]> {
       licenseUrl: m.LicenseUrl?.value,
       page: ii.descriptionurl,
       archive: "Wikimedia Commons",
+      kind: /satellite|orbital/i.test(`${cats} ${desc}`) ? "orbital" : /aerial|aircraft|drone/i.test(`${cats} ${desc}`) ? "photograph" : /ground.level|from the ground|landscape photography/i.test(`${cats} ${desc}`) ? "ground" : "photograph",
     });
   }
   return out;

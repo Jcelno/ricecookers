@@ -15,6 +15,7 @@ import { emitTour } from "@/lib/tour/events";
 import { api } from "@/lib/api";
 import { formatKm, formatValue, GRADE_HEX, GRADE_MEANING, inUnit } from "@/lib/format";
 import { photoKey, photosFor } from "@/lib/photos";
+import { openPhotoGallery } from "@/lib/gallery";
 import type { Body, CellInfo, Measure, Planet, Suitability, TwinResult } from "@/lib/types";
 import { type SiteRef, useStore } from "@/store";
 
@@ -242,6 +243,7 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
           <IconButton label="Clear the selection" onClick={st.clearSelection} className="-mt-1 -mr-2"><X size={16} /></IconButton>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-1.5">
+          <Button size="sm" variant="outline" className="col-span-2 justify-center" data-gallery-open onClick={() => { setTab("overview"); openPhotoGallery(photoKey(cell)); }}>Street View · photo gallery</Button>
           {cell.body !== "earth" && <Button size="sm" variant="solid" className="justify-center" data-tour="find-twin" onClick={() => st.startTwin({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon })}><ArrowLeftRight size={13} /> Find Earth twins</Button>}
           {cell.body !== "earth" && <Button size="sm" variant="outline" className="justify-center" onClick={() => { st.setTarget({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon }); st.setMode("near"); }}><Navigation size={13} /> Similar near me</Button>}
           <Button size="sm" variant="outline" className="justify-center" aria-pressed={inCompare} onClick={() => { st.addCompare(ref); st.setMode("compare"); }}><Columns2 size={13} /> {inCompare ? "In Compare" : "Compare"}</Button>
@@ -290,7 +292,7 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
           </section>
           <section className="pt-3">
             <h3 className="mb-1.5 px-4 text-xs font-semibold text-regolith-100">Photographs</h3>
-            <Photos id={photoKey(cell)} load={() => photosFor(cell)} compact />
+            <Photos id={photoKey(cell)} load={() => photosFor(cell)} orbital={{ body: cell.body, lat: cell.cell.lat, lon: cell.cell.lon, layer: baseLayer }} compact />
           </section>
         </div>
       )}

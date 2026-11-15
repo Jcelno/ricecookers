@@ -1,14 +1,15 @@
-import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
-import { cx, IconButton } from "@/components/ui/primitives";
+import { cx } from "@/components/ui/primitives";
 import type { Photo, PhotoSet } from "@/lib/photos";
+import { consumeGalleryRequest, type OrbitalContext } from "@/lib/gallery";
+import { orbitalFrame } from "@/components/panels/OrbitalTile";
+const GalleryViewer = lazy(() => import("./GalleryViewer"));
 
 type State = { status: "loading" } | { status: "ready"; set: PhotoSet } | { status: "error"; message: string };
 
 /** Loads a set of real photographs and shows them as captioned plates. `load` must be stable for a given `id`. */
-export function Photos({ id, load, compact = false, hideEmpty = false }: { id: string; load: () => Promise<PhotoSet>; compact?: boolean; hideEmpty?: boolean }) {
+export function Photos({ id, load, compact = false, hideEmpty = false, orbital }: { id: string; load: () => Promise<PhotoSet>; compact?: boolean; hideEmpty?: boolean; orbital?: OrbitalContext }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [open, setOpen] = useState<number | null>(null);
   const [broken, setBroken] = useState<ReadonlySet<string>>(new Set());
@@ -28,6 +29,15 @@ export function Photos({ id, load, compact = false, hideEmpty = false }: { id: s
     return () => { live = false; };
   }, [id]);
 
+  useEffect(() => {
+    const requested = () => { if (consumeGalleryRequest(id)) setOpen(0); };
+    window.addEventListener("radium:gallery", requested); requested();
+    return () => window.removeEventListener("radium:gallery", requested);
+  }, [id]);
+  const first = orbital ? orbitalFrame(orbital) : null;
+  const availablePhotos = state.status === "ready" ? state.set.photos.filter((photo) => !broken.has(photo.id)) : [];
+  const frames = [...(first ? [first] : []), ...availablePhotos];
+  const renderPlates = () => {
   if (state.status === "loading") {
     return (
       <div className="px-4 pb-4" aria-busy="true">
@@ -51,7 +61,7 @@ export function Photos({ id, load, compact = false, hideEmpty = false }: { id: s
   return (
     <div className="px-4 pb-4">
       <figure>
-        <button type="button" onClick={() => setOpen(0)} className="plate group block w-full overflow-hidden rounded-sm" aria-label={`Open photograph: ${lead.title}`}>
+        <button type="button" onClick={() => setOpen(first ? 1 : 0)} className="plate group block w-full overflow-hidden rounded-sm" aria-label={`Open photograph: ${lead.title}`}>
           <img src={lead.thumb} alt={lead.title} loading="lazy" onError={() => drop(lead.id)} referrerPolicy="no-referrer" className={cx("plate-img w-full object-cover", compact ? "aspect-[16/9]" : "aspect-[3/2]")} />
         </button>
         <figcaption className="mt-1.5">
@@ -63,7 +73,7 @@ export function Photos({ id, load, compact = false, hideEmpty = false }: { id: s
         <ul className="mt-2.5 grid grid-cols-3 gap-1.5">
           {rest.slice(0, compact ? 3 : 6).map((p, k) => (
             <li key={p.id}>
-              <button type="button" onClick={() => setOpen(k + 1)} className="plate block w-full overflow-hidden rounded-sm" aria-label={`Open photograph: ${p.title}`}>
+              <button type="button" onClick={() => setOpen(k + 1 + (first ? 1 : 0))} className="plate block w-full overflow-hidden rounded-sm" aria-label={`Open photograph: ${p.title}`}>
                 <img src={p.thumb} alt={p.title} loading="lazy" onError={() => drop(p.id)} referrerPolicy="no-referrer" className="plate-img aspect-square w-full object-cover" />
               </button>
             </li>
@@ -71,9 +81,10 @@ export function Photos({ id, load, compact = false, hideEmpty = false }: { id: s
         </ul>
       )}
       <p className="mt-2 text-2xs leading-snug text-regolith-500">{basis} Real photographs only; illustrations and AI-generated images are left out.</p>
-      {open !== null && <Viewer photos={photos} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
     </div>
   );
+  };
+  return <>{renderPlates()}{open !== null && frames.length > 0 && <Suspense fallback={<div role="status" className="fixed inset-0 z-[120] grid place-items-center bg-basalt-950/95 text-regolith-200">Opening the image gallery</div>}><GalleryViewer frames={frames} initialIndex={open} orbital={orbital} onClose={() => setOpen(null)} /></Suspense>}</>;
 }
 
 function Credit({ p }: { p: Photo }) {
@@ -85,45 +96,3 @@ function Credit({ p }: { p: Photo }) {
   );
 }
 
-function Viewer({ photos, index, onIndex, onClose }: { photos: Photo[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
-  const p = photos[index];
-  const box = useRef<HTMLDivElement>(null);
-  const step = useCallback((d: number) => onIndex((index + d + photos.length) % photos.length), [index, onIndex, photos.length]);
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    box.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") step(1);
-      if (e.key === "ArrowLeft") step(-1);
-    };
-    window.addEventListener("keydown", key);
-    return () => { window.removeEventListener("keydown", key); prev?.focus?.(); };
-  }, [onClose, step]);
-
-  return createPortal(
-    <div ref={box} role="dialog" aria-modal="true" aria-label={p.title} className="anim-fade fixed inset-0 z-[80] flex flex-col bg-[rgb(3_4_6/0.94)]" onClick={onClose}>
-      <div className="flex items-center justify-end gap-1 p-3" onClick={(e) => e.stopPropagation()}>
-        <span className="tnum mr-auto pl-2 text-xs text-regolith-400">{index + 1} of {photos.length}</span>
-        <IconButton label="Close the photograph" onClick={onClose}><X size={18} /></IconButton>
-      </div>
-      <div className="relative flex min-h-0 flex-1 items-center justify-center px-14 max-sm:px-2" onClick={(e) => e.stopPropagation()}>
-        {photos.length > 1 && (
-          <IconButton label="Previous photograph" className="absolute left-3 max-sm:hidden" onClick={() => step(-1)}><ChevronLeft size={22} /></IconButton>
-        )}
-        <img key={p.id} src={p.full} alt={p.title} referrerPolicy="no-referrer" className="anim-fade max-h-full max-w-full rounded-sm object-contain shadow-[var(--shadow-float)]" />
-        {photos.length > 1 && (
-          <IconButton label="Next photograph" className="absolute right-3 max-sm:hidden" onClick={() => step(1)}><ChevronRight size={22} /></IconButton>
-        )}
-      </div>
-      <div className="mx-auto w-full max-w-3xl px-5 pt-3 pb-5" onClick={(e) => e.stopPropagation()}>
-        <div className="placename text-lg leading-snug text-regolith-50">{p.title}</div>
-        <Credit p={p} />
-        <a className="link mt-2 inline-flex items-center gap-1 text-xs" href={p.page} target="_blank" rel="noreferrer">
-          Open the original and its full licence <ExternalLink size={11} />
-        </a>
-      </div>
-    </div>,
-    document.body,
-  );
-}
