@@ -14,7 +14,7 @@ native resolution and limits. Where a dataset has no value, the interface says s
 
 ## Run it
 
-Requirements: Node.js 20 or newer, Python 3.9 or newer, and an internet connection (map imagery streams from
+Requirements: Node.js 22.18 or newer (including native TypeScript persistence tests), Python 3.9 or newer, and an internet connection (map imagery streams from
 NASA, EOX and OpenFreeMap).
 
 ```bash
@@ -42,7 +42,8 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Data service with auto-reload plus the Vite dev server on port 3000 |
-| `npm test` | 90 checks: science (`tests/test_science.py`) and API rules (`tests/test_api.py`) |
+| `npm test` | Scientific, API and curated-catalog regression checks |
+| `npm run test:browser` | Browser workflow regression checks against the running local services |
 | `npm run build` | Type-check and build the web app into `dist/` |
 | `npm run pipeline` | Download the source data and rebuild every grid |
 | `node screenshot.mjs http://localhost:3000 label` | Save a screenshot to `temporary screenshots/` |
@@ -57,7 +58,7 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
   export as CSV or a printable report). Pick lunar permanent base, Mars robotic landing or Mars human exploration. Move the
   priority sliders; every cell is regraded A to F, the globe is recoloured and the list of best sites is
   re-ranked, with a sentence explaining what changed. Hard limits can be switched on and off.
-- **Earth Analogs.** Lettered markers (A, B, C …) shared by the map and the list, adjustable matching weights,
+- **Earth Analogs.** Circular markers display actual model grades (A, B, C, D or F), with neutral markers for unscored sites and counts for clusters. Adjustable matching weights,
   use cases and a terrain thumbnail for each match. Choose a Moon or Mars site and a purpose (rover mobility, ice and drilling, geology,
   dust, habitability). RADIUM compares the site with all 341,042 land cells on Earth, lists the closest
   matches, marks which are documented analog sites and which are new leads, and opens a side-by-side
@@ -87,7 +88,7 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
 - **Compare workspace.** Up to four places from any world with Landing, Rover, Habitat and Science presets, bars,
   "why this site / why not" statements drawn only from measured differences, CSV export, and the Earth-twin pair view.
   The list follows you across views (compare tray) and is kept in share links.
-- **Saved.** Places and mission plans saved in this browser.
+- **Saved.** A dedicated browser-persistent workspace for places, comparisons and mission plans, including source references and available assessment context. Reopen, rename, organize into collections, delete with undo, and export a JSON backup. Existing v1 saves migrate to v2; storage failures are visible.
 - **Compare.** The chosen Moon or Mars site and Earth place side by side: maps, photographs, cell sizes, a
   purpose selector that recomputes live, a radar and bars of the normalised similarity dimensions with the
   measured values in their units, and separate lists of strengths, mismatches and what Earth cannot reproduce.
@@ -97,8 +98,8 @@ download). To rebuild them from the original sources, run `npm run pipeline` (se
   print to PDF or save as JSON.
 - **Offline example.** If the data service cannot be reached, the app opens one saved, real result (the worked
   Gale crater example) labelled as saved, never as live. Rebuild it with `npm run snapshot`.
-- **Share links.** The address bar always reopens the current view. The Near Me location is never included.
-- **Help.** A five-step guide is available from Help at any time; it does not open by itself.
+- **Share links.** A dedicated Copy View Link button confirms actual clipboard success and offers a selectable-link fallback. Versioned links restore targets, purposes, custom weights, comparison type, layers and filters. The Near Me starting location and browser-local saved library are never included.
+- **Help.** An optional interactive field guide offers quick and detailed paths across 32 topics, contextual highlights, real controls, topic selection, resume and restart. Keyboard and touch guidance is included.
 - **Methodology and Data sources.** Both pages are generated from the running code and the dataset registry.
 
 ### API additions
@@ -132,6 +133,15 @@ curl -s 'localhost:8000/api/profile?body=mars&lat=-4.59&lon=137.44&axis=ns'
 curl -s localhost:8000/api/rank -H 'content-type: application/json' \
   -d '{"mission": "mars_human", "probe": [{"lat": 70, "lon": 0}]}'
 ```
+
+
+## Research workbench redesign
+
+Primary navigation is **Explore | Mission Planner | Earth Analogs | Saved**. Earth Analogs shares a planetary target and research purpose across **Discover | Compare | Near Me**. Research Sites exposes the shared catalog in every workspace, with search, world/classification/environment/grade/data filters, source records and contextual actions.
+
+The revised expansion limit is **up to 100 additional curated sites beyond the original 93**, not 100 total. Evidence quality takes precedence over filling the allowance. Existing entries that need further source or coordinate review remain explicitly labeled; a catalog entry is not automatically a verified analog. See [the catalog audit](docs/site-catalog.md) for evidence, corrections, additions and counts.
+
+Scientific grades are independent of inclusion in the catalog. Site identity, documented research use, dataset coverage and a calculated score are separate concepts. Comparisons preserve column alignment when one site's request fails, aborted requests stay canceled, and saved places preserve selected site coordinates rather than silently substituting cell centers.
 
 ## How it is built
 
@@ -209,8 +219,7 @@ npm run pipeline                               # fetch (resumable) + build, abou
   class per 55 km.
 - Mars ice evidence would improve with the SWIM ice-consistency maps and lunar evidence with M3, LAMP and LEND
   detections; neither is integrated yet.
-- The interface is designed for desktop. On a phone, Earth Twin's site picker is hidden; choose a site in
-  Explore and use "Find its Earth twins".
+- On smaller screens, panels become sheets over the map. Shared target and purpose selectors remain available; Target settings opens additional analog controls.
 - Grades are RADIUM's own scale for comparing options. They are not a NASA rating.
 
 ## Use of AI tools
@@ -229,7 +238,7 @@ the product in detail before any code was written:
 We also set the visual direction, including real orbital imagery on the Moon and Mars globes, and directed
 the build.
 
-We used Claude Code (Anthropic's AI coding assistant) as our implementation tool. Working from our
+The original implementation used Claude Code (Anthropic's AI coding assistant). The redesign, shared catalog integration, persistence and interaction improvements were developed with OpenAI Codex. Working from our
 specification and under our direction, it wrote the code for the data pipeline, the scoring service, the web
 app and the automated tests, and drafted the documentation. It also proposed which public datasets to use,
 the default scoring weights and thresholds, and the reference list of published analog sites. The datasets,

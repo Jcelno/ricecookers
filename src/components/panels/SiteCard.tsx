@@ -3,6 +3,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
+import { SiteEvidence } from "@/components/catalog/SiteCatalog";
 import { CellDetails, SuitabilityBlock } from "@/components/panels/LocationPanel";
 import { OrbitalTile } from "@/components/panels/OrbitalTile";
 import { ProfileChart } from "@/components/panels/ProfileChart";
@@ -10,8 +11,7 @@ import { TimelineChart } from "@/components/panels/TimelineChart";
 import { Photos } from "@/components/ui/Photos";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Notice, Segmented, Spinner } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
-import { formatKm, formatValue, GRADE_MEANING, inUnit } from "@/lib/format";
-import { letterFor } from "@/lib/labels";
+import { formatKm, formatValue, GRADE_HEX, GRADE_MEANING, inUnit } from "@/lib/format";
 import { photoKey, photosFor } from "@/lib/photos";
 import type { Body, CellInfo, Measure, Planet, Suitability, TwinResult } from "@/lib/types";
 import { type SiteRef, useStore } from "@/store";
@@ -36,7 +36,7 @@ function interpret(id: string, v: number, body: Body): string {
     case "slope_med": return v < 2 ? "Gentle at this regional scale." : v < (body === "moon" ? 8 : 4) ? "Moderate regional slopes; local terrain may vary." : "Steep at regional scale; terrain likely constrains operations.";
     case "slope_p90": return v < (body === "moon" ? 10 : 6) ? "Even the steeper tenth of the cell is fairly gentle." : v < STEEP[body].p90 ? "The steeper parts of the cell need closer study." : "A tenth of the cell is steeper than the model's terrain limit.";
     case "rough_iqr": return "Spread of small-scale relief; higher means bumpier ground at about 2 km scale.";
-    case "elev_mean": return body === "mars" ? (v < -2000 ? "Low-lying: more atmosphere above for landing." : v > 1000 ? "High ground: thin air makes landing harder." : "Mid elevation.") : "Height relative to the reference sphere.";
+    case "elev_mean": return body === "mars" ? (v < -2000 ? "Low-lying: more atmosphere above for landing." : v > 1000 ? "High ground: thin air makes landing harder." : "Mid elevation.") : body === "earth" ? "Height above mean sea level." : "Height relative to the reference sphere.";
     case "flat_frac": return pct >= 40 ? `${pct}% of the cell is gentle (10° or less) at 480 m scale.` : `Only ${pct}% of the cell is gentle at 480 m scale.`;
     case "illum_frac": return pct >= 70 ? "Sunlit most of the time." : pct <= 30 ? "Dark much of the time." : "Sunlit part of the time.";
     case "earth_vis": return pct >= 90 ? "Earth is almost always above the horizon." : pct <= 20 ? "Earth is rarely in view: relay needed." : "Earth is in view part of the time.";
@@ -147,13 +147,13 @@ function TwinTeaser({ cell }: { cell: CellInfo }) {
   const origin = { body, lat: cell.cell.lat, lon: cell.cell.lon };
   return (
     <div className="px-4 pt-3 pb-4">
-      <p className="text-xs leading-snug text-regolith-300">The Earth places most like this cell overall (general analog purpose), compared with all {res ? res.distribution.cells.toLocaleString("en-US") : "341,042"} land cells. Letters match the markers in Earth Analogs.</p>
+      <p className="text-xs leading-snug text-regolith-300">The Earth places most like this cell overall (general analog purpose), compared with all {res ? res.distribution.cells.toLocaleString("en-US") : "341,042"} land cells. Letters are calculated similarity grades, using the same scale as the map.</p>
       {err ? <Notice tone="error">{err}</Notice> : !res ? <div className="mt-3"><Spinner label="Comparing with Earth" /></div> : (
         <ol className="mt-2 divide-y divide-[var(--hair)]">
           {res.candidates.map((c, k) => (
             <li key={c.id}>
               <button type="button" className="row-ctl flex w-full items-center gap-2.5 py-2 text-left" onClick={() => { startTwin(origin); void pickEarth(c.lat, c.lon, true); }}>
-                <span className="grid size-6 shrink-0 place-items-center rounded-full border-2 border-basalt-950 text-[11px] font-bold text-basalt-950" style={{ background: "var(--color-regolith-100)" }}>{letterFor(k)}</span>
+                <span className="grid size-6 shrink-0 place-items-center rounded-full border-2 border-basalt-950 text-[11px] font-bold text-basalt-950" style={{ background: c.grade ? GRADE_HEX[c.grade] : "#7b8fa1" }}>{c.grade ?? "·"}</span>
                 <span className="min-w-0 flex-1"><span className="placename block truncate text-md text-regolith-50">{c.place.label}</span><span className="block truncate text-2xs text-regolith-400">{c.why}</span></span>
                 <GradeTile grade={c.grade} size="sm" />
               </button>
@@ -212,7 +212,9 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
   }, [cell]);
   const key = KEY[cell.body].map((k) => all.get(k)).filter((x): x is Measure => !!x).slice(0, 8);
   const a = assess(cell);
-  const ref: SiteRef = { body: cell.body, lat: cell.cell.lat, lon: cell.cell.lon, label: cell.place.label };
+  const selected = st.selection?.body === cell.body ? st.selection : null;
+  const catalogSite = selected ? st.pins[cell.body].find(p => Math.abs(p.lat-selected.lat)<0.001 && Math.abs(p.lon-selected.lon)<0.001) : undefined;
+  const ref: SiteRef = { body: cell.body, lat: selected?.lat ?? cell.cell.lat, lon: selected?.lon ?? cell.cell.lon, label: catalogSite?.name ?? cell.place.label };
   const saved = st.saved.sites.some((x) => x.body === ref.body && Math.abs(x.lat - ref.lat) < 1e-4 && Math.abs(x.lon - ref.lon) < 1e-4);
   const inCompare = st.compareList.some((x) => x.body === ref.body && Math.abs(x.lat - ref.lat) < 1e-4 && Math.abs(x.lon - ref.lon) < 1e-4);
   const layers = st.layers[cell.body];
@@ -232,14 +234,14 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <div className="text-2xs text-regolith-400">{world}{cell.cell.kind === "polar" ? ", polar grid" : ""}</div>
-            <h2 className="placename placename-lg text-regolith-50 [overflow-wrap:anywhere]">{cell.place.label}</h2>
+            <h2 className="placename placename-lg text-regolith-50 [overflow-wrap:anywhere]">{catalogSite?.name ?? cell.place.label}</h2>
             <div className="tnum mt-0.5 text-sm text-regolith-300">{cell.coords} <span className="text-regolith-500">· cell {Math.abs(ns - ew) < 0.3 ? formatKm(ns) : `${formatKm(ns)} × ${formatKm(ew)}`}</span></div>
           </div>
           <IconButton label="Clear the selection" onClick={st.clearSelection} className="-mt-1 -mr-2"><X size={16} /></IconButton>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-1.5">
-          {cell.body !== "earth" && <Button size="sm" variant="solid" className="justify-center" onClick={() => st.startTwin({ body: cell.body as Planet, lat: cell.cell.lat, lon: cell.cell.lon })}><ArrowLeftRight size={13} /> Find Earth twins</Button>}
-          {cell.body !== "earth" && <Button size="sm" variant="outline" className="justify-center" onClick={() => { st.setTarget({ body: cell.body as Planet, lat: cell.cell.lat, lon: cell.cell.lon }); st.setMode("near"); }}><Navigation size={13} /> Similar near me</Button>}
+          {cell.body !== "earth" && <Button size="sm" variant="solid" className="justify-center" onClick={() => st.startTwin({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon })}><ArrowLeftRight size={13} /> Find Earth twins</Button>}
+          {cell.body !== "earth" && <Button size="sm" variant="outline" className="justify-center" onClick={() => { st.setTarget({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon }); st.setMode("near"); }}><Navigation size={13} /> Similar near me</Button>}
           <Button size="sm" variant="outline" className="justify-center" aria-pressed={inCompare} onClick={() => { st.addCompare(ref); st.setMode("compare"); }}><Columns2 size={13} /> {inCompare ? "In Compare" : "Compare"}</Button>
           <Button size="sm" variant="outline" className="justify-center" aria-pressed={saved} onClick={() => st.saveSite(ref)} disabled={saved}>{saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />} {saved ? "Saved" : "Save"}</Button>
           {cell.body !== "earth" && <Button size="sm" variant="outline" className="col-span-2 justify-center" onClick={() => setTab("mission")}><Rocket size={13} /> Plan mission</Button>}
@@ -254,6 +256,7 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
 
       {tab === "overview" && (
         <div className="anim-fade">
+          {catalogSite && <section className="m-4 rounded-lg bg-basalt-800 p-3 ring-1 ring-[var(--hair)]"><SiteEvidence site={catalogSite} /></section>}
           <section className="px-4 pt-3">
             <div className={cx("rounded-md px-3 py-2.5 ring-1", a.tone === "good" ? "bg-[color-mix(in_srgb,var(--color-grade-b)_14%,transparent)] ring-[var(--color-grade-b)]/40" : a.tone === "warn" ? "bg-[color-mix(in_srgb,var(--color-grade-d)_14%,transparent)] ring-[var(--color-grade-d)]/40" : "bg-basalt-800 ring-[var(--hair)]")}>
               <div className="text-2xs text-regolith-400">Site assessment</div>

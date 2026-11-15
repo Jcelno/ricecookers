@@ -10,8 +10,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, init);
-  } catch {
-    throw new ApiError("The RADIUM data service is not responding. Start it with `npm run dev` and reload.");
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    throw new ApiError("The RADIUM data service is not responding. Please retry in a moment.");
   }
   if (!res.ok) {
     let detail = "";

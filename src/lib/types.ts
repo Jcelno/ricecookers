@@ -67,9 +67,24 @@ export interface Pin {
   link?: string; year?: number; country?: string; bodies?: Planet[]; theme?: string; feature_type?: string; diam_km?: number;
   distance_km?: number;
   tags?: SiteTags;
+  body?: Body;
+  classification?: string;
+  coordinate_reference?: string;
+  coordinate_note?: string;
+  verification_note?: string;
+  dataset_note?: string;
+  comparison_limitations?: string;
+  description?: string;
+  programs?: string[];
+  sources?: { title: string; url: string; role?: string }[];
+  verification_status?: string;
+  verified_on?: string;
+  analog_purpose?: string;
+  supported_dimensions?: string[];
+  dataset_availability?: string[];
   /** Earth Twin only: how closely this analog site matches the selected Moon or Mars site. */
   grade?: Grade | null;
-  /** Earth Analogs atlas: a text badge (grade letter or category code) drawn instead of the plain diamond. */
+  /** Earth Analogs atlas: a circular badge carrying a computed grade or an explicit category code. */
   badge?: { text: string; color: string; ink: string; title: string };
 }
 

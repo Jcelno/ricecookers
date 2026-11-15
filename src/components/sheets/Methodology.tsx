@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { EvidenceGlyph, GradeTile, Notice, Sheet, Spinner } from "@/components/ui/primitives";
+import { Button, EvidenceGlyph, GradeTile, Notice, Sheet, Spinner } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
 import { pct } from "@/lib/format";
 import type { Evidence, Grade } from "@/lib/types";
@@ -33,6 +33,7 @@ function Table({ head, rows }: { head: string[]; rows: (string | React.ReactNode
 
 export default function Methodology({ onClose }: { onClose: () => void }) {
   const meta = useStore((s) => s.meta)!;
+  const [level, setLevel] = useState<"simple" | "intermediate" | "advanced">("simple");
   const [m, setM] = useState<M | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -50,9 +51,42 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
       onClose={onClose}
     >
       <div className="px-6 py-5">
+        <nav aria-label="Methodology detail level" className="mb-5 flex flex-wrap gap-2">
+          {(["simple", "intermediate", "advanced"] as const).map(l => <Button key={l} variant={level === l ? "solid" : "outline"} aria-pressed={level === l} onClick={() => setLevel(l)}>{l[0].toUpperCase() + l.slice(1)}</Button>)}
+        </nav>
+        {level !== "advanced" && <div className="prose-radium">
+          <h3 style={{ marginTop: 0 }}>From public data to a research decision</h3>
+          <p>RADIUM was built for the NASA Space Apps Challenge. Choose a place, inspect the available evidence, and ask one of two questions: <strong>How well does this region suit my mission?</strong> or <strong>Which Earth environments help test a particular part of it?</strong> These are different models, with separate grades.</p>
+          <div className="my-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-[var(--hair)] bg-basalt-800/50 p-4"><strong>Mission suitability</strong><p className="!mb-0">Measurements become criterion scores. Your priorities set their relative importance. Hard limits exclude unsuitable cells; a successful historical mission does not change the formula.</p></div>
+            <div className="rounded-lg border border-[var(--hair)] bg-basalt-800/50 p-4"><strong>Analog similarity</strong><p className="!mb-0">A purpose such as rover mobility weights comparable dimensions. A site studied as an analog is not automatically similar to your target. The research record and calculated similarity remain separate.</p></div>
+          </div>
+          <h3>Understand the map at a glance</h3>
+          <p>Colored letters are actual model grades: A excellent, B good, C moderate, D poor, F very poor. Neutral circles are unscored places or insufficient data. Double-ring circles with numbers count clustered sites. A verified location describes the source evidence; it is not a NASA rating.</p>
+          <div className="my-3 flex flex-wrap gap-3">{(["A", "B", "C", "D", "F"] as Grade[]).map(g => <GradeTile key={g} grade={g}/>)}</div>
+          <h3>A map click represents an area</h3>
+          <p>Analysis cells are about 15 km on the Moon, 30 km on Mars and 28 km on Earth at the equator, with separate 2.4 km lunar polar cells. A precise site coordinate sits within a cell. Source measurements can be coarser than the cell, so zooming does not improve their scientific resolution.</p>
+          <h3>Unknown is never zero</h3>
+          <p>Missing criteria are excluded from the weighted calculation and the available coverage is reported. Below the model's coverage threshold, no grade is assigned. A high grade with partial coverage must be read alongside the unknowns. Regional averages cannot certify a landing ellipse.</p>
+          <h3>Earth has limits as an analog</h3>
+          <p>Earth cannot reproduce lunar or Martian gravity, atmospheric pressure or radiation. Lunar temperatures are also excluded from similarity. Geology or rover tests may still be useful, provided the experiment accounts for those differences.</p>
+          {level === "intermediate" && <>
+            <h3>Read the model and the evidence together</h3>
+            <p>Both models use a weighted mean over available criteria: <code>score = Σ(w × criterion score) / Σ(available weights)</code>. Weights are normalized. Suitability hard limits can reject a cell independently of its score; similarity compares only dimensions that are physically meaningful for the chosen purpose.</p>
+            {m && <Table head={["Model", "Minimum weighted coverage", "How priorities are chosen"]} rows={[["Mission suitability", pct(suit.min_coverage), "Mission defaults and user-adjusted sliders"], ["Analog similarity", pct(sim.min_coverage), "Research purpose and user-adjusted dimensions"]]}/>}
+            <p>Grade boundaries are A ≥ 0.80, B ≥ 0.65, C ≥ 0.50, D ≥ 0.35 and F below 0.35. A grade describes the model and settings shown, not universal quality. Changing a purpose, weight or hard limit can change it.</p>
+            <h3>Five kinds of evidence</h3>
+            <ul>{Object.entries(meta.evidence).map(([id, e]) => <li key={id}><strong>{e.label}:</strong> {e.desc}</li>)}</ul>
+            <h3>Resolution and uncertainty</h3>
+            <p>Terrain comparisons use a common kilometre baseline across worlds. Coarser chemistry, lithology and climate fields remain coarse even when repeated over smaller analysis cells. Mars climate represents a typical model year, excluding global dust storms. A source uncertainty, when available, is different from model uncertainty or unresolved local variation.</p>
+            <h3>Distance and documentation do not change similarity</h3>
+            <p>Near Me reports great-circle distance separately from similarity. The curated registry supports names, coordinates, historical context and documented research purposes. It never awards a scoring bonus. Review-needed records remain distinguishable from verified evidence.</p>
+          </>}
+          <p><Button variant="outline" onClick={() => setLevel(level === "simple" ? "intermediate" : "advanced")}>{level === "simple" ? "See model details and uncertainty" : "Inspect formulas, weights and validation tables"}</Button></p>
+        </div>}
         {error && <Notice tone="error" title="The methodology tables could not be loaded">{error}</Notice>}
         {!m && !error && <Spinner label="Loading" />}
-        {m && (
+        {m && level === "advanced" && (
           <div className="prose-radium">
             <h3 style={{ marginTop: 0 }}>Two questions, two models</h3>
             <p>

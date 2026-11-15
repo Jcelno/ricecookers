@@ -9,30 +9,14 @@ import { formatKm, formatMeasure, formatValue, GRADE_MEANING, inUnit, pct } from
 import type { Body, CellInfo, Evidence, Factor, Measure, Planet, Suitability } from "@/lib/types";
 import { useStore } from "@/store";
 
-const QUICK: Record<Body, { name: string; lat: number; lon: number; span: number; why: string }[]> = {
-  moon: [
-    { name: "Ridge beside Shackleton", lat: -89.45, lon: -137.31, span: 220, why: "The most continuously sunlit ground near the south pole" },
-    { name: "Mons Mouton", lat: -84.6, lon: 31.0, span: 420, why: "Flat-topped mountain with Earth almost always in view" },
-    { name: "Apollo 11 site", lat: 0.67, lon: 23.47, span: 900, why: "Titanium-rich mare basalt in Mare Tranquillitatis" },
-  ],
-  mars: [
-    { name: "Jezero crater", lat: 18.44, lon: 77.45, span: 700, why: "Perseverance landing site on an ancient river delta" },
-    { name: "Gale crater", lat: -4.59, lon: 137.44, span: 800, why: "Curiosity landing site at the foot of a layered mound" },
-    { name: "Phoenix landing site", lat: 68.22, lon: -125.75, span: 1200, why: "Northern plains where the lander dug into ground ice" },
-  ],
-  earth: [
-    { name: "Atacama, Yungay", lat: -24.08, lon: -69.92, span: 900, why: "Hyperarid soil near the dry limit of life" },
-    { name: "McMurdo Dry Valleys", lat: -77.6, lon: 161.5, span: 900, why: "Cold desert with ice-cemented ground" },
-    { name: "Tibesti Mountains", lat: 20.4, lon: 18.1, span: 1400, why: "Hyperarid basaltic massif that RADIUM's search keeps finding" },
-  ],
-};
-
 const EVIDENCE_ORDER: Evidence[] = ["observed", "inferred", "modelled", "computed", "interpreted"];
 
 /** One click: Gale crater, rover mobility, compared with its best Earth match. Real API results, nothing canned. */
 export function runWorkedExample() {
   const st = useStore.getState();
-  st.startTwin({ body: "mars", lat: -4.59, lon: 137.44 });
+  const target=st.pins.mars.find(p=>p.name.includes("Curiosity")) ?? st.pins.mars.find(p=>p.name === "Gale");
+  if(!target)return;
+  st.startTwin({ body: "mars", lat: target.lat, lon: target.lon });
   st.setPurpose("mobility");
   const unsub = useStore.subscribe((s) => {
     if (s.twin && s.twin.purpose === "mobility" && s.twin.candidates.length && !s.picked) {
@@ -44,70 +28,20 @@ export function runWorkedExample() {
 }
 
 function Empty({ body }: { body: Body }) {
-  const select = useStore((s) => s.select);
-  const meta = useStore((s) => s.meta);
-  const mode = useStore((s) => s.mode);
-  const name = body === "earth" ? "map" : "globe";
-  return (
-    <div className="anim-rise p-5">
-      {mode === "explore" ? (
-        <>
-          <h2 className="font-serif text-[1.9rem] leading-[1.08] font-medium tracking-[-0.03em] text-regolith-50" style={{ fontVariationSettings: '"opsz" 48' }}>Use Earth to prepare for other worlds.</h2>
-          <p className="mt-2.5 text-sm leading-[1.65] text-regolith-300">Compare NASA planetary observations with Earth environments, plan field tests, and understand where each analog works, and where it doesn't.</p>
-          <div className="mt-3.5 flex flex-col gap-1.5">
-            <Button variant="solid" className="justify-center" onClick={() => { const q = QUICK[body === "earth" ? "mars" : body][0]; if (body === "earth") useStore.getState().setBody("mars"); void select(body === "earth" ? "mars" : body, q.lat, q.lon, { fly: true, spanKm: q.span }); }}>
-              <MapPin size={14} /> Explore planetary sites
-            </Button>
-            <Button variant="outline" className="justify-center" onClick={() => useStore.getState().setMode("near")}><Navigation size={14} /> Find an Earth analog near me</Button>
-          </div>
-          <button type="button" onClick={runWorkedExample} className="row-ctl -mx-2 mt-3 block w-[calc(100%+16px)] rounded-sm px-2 py-2 text-left">
-            <span className="block text-sm font-medium text-regolith-50">Try a worked example</span>
-            <span className="block text-xs leading-snug text-regolith-400">Gale crater on Mars, rover mobility: see its closest Earth match, why it matches and where it fails. Computed live.</span>
-          </button>
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
-            {[
-              { t: "Lunar south pole", d: "Sunlit ridges and cold traps", go: () => { const st = useStore.getState(); st.setBody("moon"); void st.select("moon", -89.45, -137.31, { fly: true, spanKm: 300 }); } },
-              { t: "Explore Mars", d: "Jezero crater's delta", go: () => { const st = useStore.getState(); st.setBody("mars"); void st.select("mars", 18.44, 77.45, { fly: true, spanKm: 700 }); } },
-              { t: "Find Earth analogs", d: "For a Moon or Mars site", go: () => useStore.getState().startTwin({ body: "mars", lat: 18.44, lon: 77.45 }) },
-              { t: "Compare two places", d: "Shackleton ridge and Mons Mouton", go: () => { const st = useStore.getState(); st.addCompare({ body: "moon", lat: -89.45, lon: -137.31, label: "Ridge beside Shackleton" }); st.addCompare({ body: "moon", lat: -84.6, lon: 31.0, label: "Mons Mouton" }); st.setMode("compare"); } },
-              { t: "Plan a mission", d: "Guided, five steps", go: () => useStore.getState().setMode("mission") },
-            ].map((j) => (
-              <button key={j.t} type="button" onClick={j.go} className="row-ctl rounded-md px-2.5 py-2 text-left ring-1 ring-[var(--hair)]">
-                <span className="block text-sm font-medium text-regolith-50">{j.t}</span>
-                <span className="block text-2xs leading-snug text-regolith-400">{j.d}</span>
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 border-t border-[var(--hair)] pt-3 text-xs leading-relaxed text-regolith-400">Or click anywhere on the {name}. RADIUM shows what has been measured there, where each number comes from and how far to trust it.</p>
-        </>
-      ) : (
-        <>
-          <h2 className="placename placename-lg text-regolith-50">Pick a place</h2>
-          <p className="mt-2 text-sm leading-relaxed text-regolith-300">
-            Click anywhere on the {name}, or choose a pin. RADIUM shows how well that place suits the mission, factor by factor.
-          </p>
-        </>
-      )}
-      <div className="-mx-4 mt-4">
-        <Photos compact hideEmpty id={`featured-${body}`} load={() => featuredPhotos(body)} />
-      </div>
-      <div className="mt-1 text-xs font-medium text-regolith-400">Places worth a first look</div>
-      <ul className="mt-1.5">
-        {QUICK[body].map((q) => (
-          <li key={q.name}>
-            <button type="button" onClick={() => void select(body, q.lat, q.lon, { fly: true, spanKm: q.span })} className="row-ctl -mx-2 flex w-[calc(100%+16px)] items-start gap-2.5 rounded-sm px-2 py-2 text-left">
-              <MapPin size={15} className="mt-1 shrink-0 text-world" />
-              <span className="min-w-0">
-                <span className="placename block text-md text-regolith-50">{q.name}</span>
-                <span className="block text-xs leading-snug text-regolith-400">{q.why}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-5 border-t border-[var(--hair)] pt-4 text-xs leading-relaxed text-regolith-400">{meta?.bodies[body].cell_note}</p>
-    </div>
-  );
+  const st = useStore();
+  const sites = st.pins[body];
+  const mission = st.mode === "mission";
+  return <div className="explore-intro anim-fade">
+    <div className="flex items-center gap-2 text-xs text-regolith-400"><span className={`planet-dot ${body}`} />{body === "moon" ? "Our nearest frontier" : body === "mars" ? "A world of possibilities" : "Fieldwork starts here"}</div>
+    <h2>{mission ? <>Choose the ground<br/>for your mission.</> : <>Explore a world.<br/>Understand a place.</>}</h2>
+    <p className="intro-copy">{mission ? "Choose a documented destination or inspect a model candidate. Evaluate its terrain, resources and limits against the priorities you set." : "Read the terrain, trace the evidence, and find the places on Earth that help us prepare for the Moon and Mars."}</p>
+    <div className="intro-actions"><Button variant="solid" disabled={mission && !st.rank?.sites.length} onClick={() => {if(mission){const site=st.rank?.sites[0];if(site)void st.select(body,site.lat,site.lon,{fly:true,spanKm:500});}else st.setSheet("intro");}}>{mission ? "Inspect top candidate" : "Take the interactive tour"}</Button><Button variant="outline" onClick={()=>mission ? document.querySelector<HTMLButtonElement>('[data-mission-step="3"]')?.click() : runWorkedExample()}>{mission ? "See candidate ranking" : "Try a live Mars example"}</Button></div>
+    <div className="intro-note"><MapPin size={17} /><p>Choose a research site below, or select anywhere on the {body === "earth" ? "map" : "globe"}. Each measurement includes its source and resolution.</p></div>
+    <div className="flex items-center justify-between pt-5"><h3 className="text-sm font-semibold">Start with a research site</h3><span className="text-xs text-regolith-400">{sites.length} on {body === "moon" ? "the Moon" : body === "mars" ? "Mars" : "Earth"}</span></div>
+    <ul className="mt-2 divide-y divide-[var(--hair)]">{sites.slice(0,5).map(p=><li key={p.id}><button className="row-ctl w-full rounded-md px-1 py-3 text-left" onClick={()=>void st.select(body,p.lat,p.lon,{fly:true,spanKm:body === "earth" ? 900 : 700})}><span className="block font-serif text-lg text-regolith-50">{p.name}</span><span className="mt-1 block text-xs leading-relaxed text-regolith-400">{p.note}</span></button></li>)}</ul>
+    <p className="mt-5 border-t border-[var(--hair)] pt-4 text-xs leading-relaxed text-regolith-400">{st.meta?.bodies[body].cell_note}</p>
+    <p className="mt-3 text-2xs leading-relaxed text-regolith-500">Built for the NASA Space Apps Challenge. RADIUM grades are exploratory model outputs, not NASA ratings.</p>
+  </div>;
 }
 
 function MeasureRow({ m: raw, body }: { m: Measure; body: Body }) {
@@ -284,7 +218,7 @@ export function CellDetails({ cell }: { cell: CellInfo }) {
             <div key={p.id} className="rounded-sm bg-basalt-800 px-3 py-2 text-xs leading-snug text-regolith-300">
               <span className="font-semibold text-regolith-50">{p.name}</span>
               {p.year ? `, ${p.year}` : ""} is {p.distance_km! < 1 ? "here" : `${formatKm(p.distance_km!)} away`}. {p.note}
-              <span className="mt-0.5 block text-regolith-500">{p.kind === "analog" ? `Documented analog site. ${p.source}` : p.source}</span>
+              <span className="mt-0.5 block text-regolith-500">{p.kind === "analog" ? `${p.verification_status === "review_needed" ? "Research candidate; evidence needs review." : "Documented analog site."} ${p.source}` : p.source}</span>
             </div>
           ))}
         </div>
@@ -298,7 +232,7 @@ export function CellDetails({ cell }: { cell: CellInfo }) {
         );
       })}
       <footer className="hair-t px-4 py-3">
-        <div className="mb-1.5 text-xs font-medium text-regolith-300">How to read the markers</div>
+        <div className="mb-1.5 text-xs font-medium text-regolith-300">How to read evidence labels</div>
         <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-regolith-400">
           {EVIDENCE_ORDER.filter((e) => used.has(e)).map((e) => (
             <li key={e} className="flex items-center gap-1.5 text-regolith-300"><EvidenceTag kind={e} /></li>

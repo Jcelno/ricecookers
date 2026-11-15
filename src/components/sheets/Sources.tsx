@@ -2,8 +2,10 @@ import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EvidenceTag, Notice, Sheet, Spinner } from "@/components/ui/primitives";
+import { SiteEvidence } from "@/components/catalog/SiteCatalog";
+import { useStore } from "@/store";
 import { api } from "@/lib/api";
-import type { Evidence, Source } from "@/lib/types";
+import type { Body, Evidence, Source } from "@/lib/types";
 
 const ACCESS: Record<string, string> = {
   file: "Data file download",
@@ -24,6 +26,10 @@ function Row({ k, children }: { k: string; children: React.ReactNode }) {
 }
 
 export default function Sources({ onClose }: { onClose: () => void }) {
+  const pins = useStore(s => s.pins);
+  const [query,setQuery] = useState(""); const [world,setWorld] = useState("all"); const [role,setRole] = useState("all");
+  const matches = (v: unknown) => JSON.stringify(v).toLowerCase().includes(query.toLowerCase());
+  const sites=Object.entries(pins).flatMap(([body,list])=>list.map(p=>({...p,body:body as Body})));
   const [data, setData] = useState<{ sources: Source[]; not_used: { name: string; reason: string }[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -36,12 +42,14 @@ export default function Sources({ onClose }: { onClose: () => void }) {
       subtitle="Every dataset behind a number in RADIUM, as the pipeline uses it. Each entry states what the data can and cannot support."
       onClose={onClose}
     >
-      <div className="px-6 py-5">
+      <div className="px-6 py-5" data-tour="sources">
+        <div className="mb-5 flex flex-wrap gap-2"><input className="field min-w-48 flex-1" aria-label="Search sources" placeholder="Search datasets, sites, agencies or research" value={query} onChange={e=>setQuery(e.target.value)}/><select className="field w-auto" aria-label="Source world" value={world} onChange={e=>setWorld(e.target.value)}><option value="all">All worlds</option><option value="moon">Moon</option><option value="mars">Mars</option><option value="earth">Earth</option></select><select className="field w-auto" aria-label="Source role" value={role} onChange={e=>setRole(e.target.value)}><option value="all">All source roles</option><option value="model">Measurements and calculations</option><option value="imagery">Imagery</option><option value="sites">Site history and analog research</option><option value="excluded">Evaluated, excluded</option></select></div>
+        <p className="mb-6 text-sm leading-relaxed text-regolith-300">Numerical datasets support the calculations below. Site references establish location identity, history and documented research use; they do not supply a similarity grade. Imagery is visual context unless a listed dataset explicitly says otherwise.</p>
         {error && <Notice tone="error" title="The registry could not be loaded">{error}</Notice>}
         {!data && !error && <Spinner label="Loading the registry" />}
         {data &&
           GROUPS.map(([id, label]) => {
-            const list = data.sources.filter((s) => (id === "all" ? s.body === "all" || s.id === "earth_basemaps" || s.id === "natural_earth" : s.body === id && s.id !== "earth_basemaps" && s.id !== "natural_earth"));
+            const list = data.sources.filter(s => matches(s) && (world === "all" || s.body === world || s.body === "all") && role !== "sites" && role !== "excluded" && (role !== "imagery" || s.access === "imagery") && (role !== "model" || s.access !== "imagery")).filter((s) => (id === "all" ? s.body === "all" || s.id === "earth_basemaps" || s.id === "natural_earth" : s.body === id && s.id !== "earth_basemaps" && s.id !== "natural_earth"));
             if (!list.length) return null;
             return (
               <section key={id} className="mb-8">
@@ -75,12 +83,12 @@ export default function Sources({ onClose }: { onClose: () => void }) {
               </section>
             );
           })}
-        {data && (
+        {data && (role === "all" || role === "excluded") && (
           <section className="mb-4">
             <h3 className="mb-1 font-serif text-[1.375rem] font-medium tracking-[-0.02em] text-regolith-50">Audited and not used</h3>
             <p className="mb-3 max-w-[70ch] text-sm leading-relaxed text-regolith-300">Sources that were checked and left out, with the reason. Several would improve RADIUM and are the obvious next additions.</p>
             <ul className="grid gap-2 lg:grid-cols-2">
-              {data.not_used.map((n) => (
+              {data.not_used.filter(matches).map((n) => (
                 <li key={n.name} className="rounded-md px-4 py-3 text-xs leading-relaxed ring-1 ring-[var(--hair)]">
                   <span className="block font-semibold text-regolith-100">{n.name}</span>
                   <span className="text-regolith-300">{n.reason}</span>
@@ -89,6 +97,7 @@ export default function Sources({ onClose }: { onClose: () => void }) {
             </ul>
           </section>
         )}
+        {(role === "all" || role === "sites") && <section className="mt-8"><h3 className="mb-2 font-serif text-xl">Site history and analog research</h3><p className="mb-4 text-xs text-regolith-400">Every curated site's evidence record, including coordinate conventions and the limits of its documented purpose.</p><div className="grid gap-3 lg:grid-cols-2">{sites.filter(p=>(world === "all" || p.body === world)&&matches(p)).map(p=><article key={`${p.body}:${p.id}`} className="catalog-card"><h4 className="mb-2 font-serif text-lg text-regolith-50">{p.name} <span className="font-sans text-xs text-regolith-400">({p.body})</span></h4><SiteEvidence site={p}/></article>)}</div></section>}
       </div>
     </Sheet>
   );

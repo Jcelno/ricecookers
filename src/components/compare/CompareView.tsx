@@ -1,4 +1,5 @@
-import { ArrowLeft, BookOpen, FileText, Navigation } from "lucide-react";
+import { RegistrySelect, SiteEvidence } from "@/components/catalog/SiteCatalog";
+import { ArrowLeft, Bookmark, BookOpen, FileText, Navigation } from "lucide-react";
 import { SitesCompare } from "@/components/compare/SitesCompare";
 import { useMemo, useState } from "react";
 
@@ -66,6 +67,10 @@ function Side({ cell, title, world }: { cell: CellInfo; title: string; world: "m
   const focus = useMemo(() => ({ body: world, lat: cell.cell.lat, lon: cell.cell.lon, spanKm: world === "earth" ? 900 : 700, nonce: 2e6 + Math.round((cell.cell.lat + 90) * 1000 + cell.cell.lon) }), [cell, world]);
   const sel = { lat: cell.cell.lat, lon: cell.cell.lon, outline: cell.cell.outline };
   const [ns, ew] = cell.cell.size_km;
+  const pins=useStore(s=>s.pins[world]);
+  const position=useStore(s=>world === "earth" ? s.picked : s.twinOrigin);
+  const record=position?pins.find(p=>Math.abs(p.lat-position.lat)<0.001&&Math.abs(p.lon-position.lon)<0.001):undefined;
+  const sources=[...new Set(cell.groups.flatMap(g=>g.items.map(m=>m.source)).filter((id):id is string=>!!id))].map(id=>meta.sources_index[id]).filter(Boolean);
   return (
     <section className="min-w-0 rounded-md bg-basalt-900/60 ring-1 ring-[var(--hair)]">
       <div className="relative h-[230px] overflow-hidden rounded-t-md bg-void">
@@ -77,13 +82,14 @@ function Side({ cell, title, world }: { cell: CellInfo; title: string; world: "m
       </div>
       <div className="px-4 pt-3 pb-1">
         <div className="text-2xs text-regolith-400">{title}</div>
-        <h2 className="placename mt-0.5 text-xl leading-tight text-regolith-50 [overflow-wrap:anywhere]">{cell.place.label}</h2>
+        <h2 className="placename mt-0.5 text-xl leading-tight text-regolith-50 [overflow-wrap:anywhere]">{record?.name ?? cell.place.label}</h2>
         <p className="tnum mt-1 text-xs text-regolith-300">{cell.coords}</p>
         <p className="mt-1 flex flex-wrap gap-1.5 text-2xs">
           <span className="rounded-xs bg-basalt-700 px-1.5 py-0.5 text-regolith-200" title="Values describe this whole analysis cell, not a point">Cell {Math.abs(ns - ew) < 0.3 ? `${Math.round(ns)} km` : `${Math.round(ns)} × ${Math.round(ew)} km`}</span>
           <span className="rounded-xs bg-basalt-700 px-1.5 py-0.5 text-regolith-200" title="How the grid was built">{world === "earth" ? "0.25° grid, ETOPO 2022 terrain" : world === "mars" ? "0.5° grid, MOLA terrain" : cell.cell.kind === "polar" ? "2.4 km polar grid, LOLA terrain" : "0.5° grid, LOLA terrain"}</span>
         </p>
       </div>
+      <details className="mx-4 mt-3 text-xs"><summary className="cursor-pointer py-2 text-regolith-200">Site evidence and measurement sources</summary>{record&&<SiteEvidence site={record}/>}<ul className="my-3 space-y-1">{sources.map(s=><li key={s.url}><a className="link" href={s.url} target="_blank" rel="noreferrer">{s.name}</a></li>)}</ul></details>
       <div className="pt-2"><Photos compact id={`cmp-${photoKey(cell)}`} load={() => photosFor(cell)} /></div>
     </section>
   );
@@ -132,6 +138,7 @@ function PairView() {
         </div>
         {status === "error" && <div className="mt-3"><Notice tone="error" title="The comparison could not be refreshed" action={<Button size="sm" variant="outline" onClick={() => void pickEarth(c.earth.cell.lat, c.earth.cell.lon)}>Try again</Button>}>{err}</Notice></div>}
 
+        <p className="mt-4 text-xs leading-relaxed text-regolith-400">Published analog research documents a specific scientific use. The similarity grade below is independently calculated for your selected pair and purpose; it does not establish a historical research relationship between these exact places.</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Side cell={c.planet} title={`${world} target`} world={body} />
           <Side cell={c.earth} title={c.documented ? `Earth place, ${Math.round(c.documented.distance_km)} km from ${c.documented.name}` : "Earth place, not in RADIUM's reference list"} world="earth" />
@@ -175,7 +182,7 @@ function PairView() {
             </ul>
             <p className="mt-1 text-2xs text-regolith-500">Bars are 0–100 similarity per dimension; the percentage is that dimension's share of this purpose's comparison. Missing data is shown as not compared, never as a low score.</p>
           </div>
-          <aside className="max-lg:hidden">
+          <aside>
             <h3 className="text-sm font-semibold text-regolith-50">Shape of the match</h3>
             <p className="mt-0.5 mb-2 text-2xs leading-snug text-regolith-400">Each axis is one similarity dimension on the same 0–1 scale. Rings mark the grade boundaries.</p>
             <Radar dims={m.dimensions} />
@@ -216,9 +223,15 @@ function PairView() {
 export function CompareView() {
   const list = useStore((s) => s.compareList);
   const pair = useStore((s) => !!s.compare);
-  const [tab, setTab] = useState<"sites" | "pair">(list.length === 0 && pair ? "pair" : "sites");
+  const tab = useStore(s=>s.compareTab);
+  const status = useStore(s=>s.compareStatus);
+  const setTab = (compareTab: "sites" | "pair")=>useStore.setState({compareTab});
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex h-full w-full flex-col" data-tour="comparison">
+      <div className="comparison-tools">
+        <RegistrySelect label={tab === "pair" ? "Earth comparison site" : "Add a comparison site"} worlds={tab === "pair" ? ["earth"] : ["moon","mars","earth"]} onSelect={(p,b)=>{const s=useStore.getState();if(tab === "pair")void s.pickEarth(p.lat,p.lon);else s.addCompare({body:b,lat:p.lat,lon:p.lon,label:p.name});}} />
+        <Button data-tour="save-comparison" variant="outline" disabled={tab === "pair" ? !pair || status !== "ready" : list.length < 2} onClick={()=>useStore.getState().saveComparison(undefined,tab)}><Bookmark size={14}/>Save comparison</Button>
+      </div>
       <div role="tablist" aria-label="Comparison type" className="hair-b flex shrink-0 gap-1 px-4 py-2">
         <button type="button" role="tab" aria-selected={tab === "sites"} onClick={() => setTab("sites")} className="ctl h-8 rounded-sm px-3 text-sm font-medium text-regolith-200">Sites ({list.length})</button>
         <button type="button" role="tab" aria-selected={tab === "pair"} onClick={() => setTab("pair")} className="ctl h-8 rounded-sm px-3 text-sm font-medium text-regolith-200">Earth twin pair{pair ? "" : " (none)"}</button>

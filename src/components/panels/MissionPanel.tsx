@@ -5,6 +5,7 @@ import { Button, cx, GradeTile, Notice, Section, Segmented, Spinner, Switch } fr
 import { downloadCsv } from "@/lib/csv";
 import { GRADE_MEANING, pct, plural } from "@/lib/format";
 import type { Grade, Mission, SiteCard } from "@/lib/types";
+import { RegistrySelect } from "@/components/catalog/SiteCatalog";
 import { shares, useStore } from "@/store";
 
 function MissionPicker({ missions, value, onChange }: { missions: Mission[]; value: string; onChange: (id: string) => void }) {
@@ -99,7 +100,7 @@ export function MissionPanel() {
         <ol className="mt-3 grid grid-cols-5 gap-1" aria-label="Steps">
           {STEPS.map((t, k) => (
             <li key={t}>
-              <button type="button" onClick={() => setStep(k)} aria-current={step === k ? "step" : undefined}
+              <button data-mission-step={k} type="button" onClick={() => setStep(k)} aria-current={step === k ? "step" : undefined}
                 className={cx("ctl flex w-full flex-col items-center gap-1 rounded-sm px-0.5 py-1 text-[10px] leading-tight", step === k ? "text-regolith-50" : "text-regolith-400")}>
                 <span className={cx("grid size-5 place-items-center rounded-full text-[10px] font-bold ring-1", step === k ? "bg-world text-world-ink ring-transparent" : k < step ? "ring-[var(--world)] text-world" : "ring-[var(--hair-strong)]")}>{k < step ? <Check size={11} /> : k + 1}</span>
                 {t}
@@ -111,6 +112,7 @@ export function MissionPanel() {
 
       {step === 0 && (
         <Section title="1. Choose a destination">
+          <div className="px-4 pb-3"><RegistrySelect label="Curated destination" worlds={[mission.body]} onSelect={(p,b)=>void select(b,p.lat,p.lon,{fly:true,spanKm:600})}/></div>
           <div className="px-4 pb-3">
             <Segmented label="World" value={mission.body} onChange={(b) => { const m = meta.missions.find((x) => x.body === b); if (m) setMission(m.id); }} options={[{ value: "moon", label: "Moon" }, { value: "mars", label: "Mars" }]} />
             <div className="mt-3 rounded-md bg-basalt-800 px-3 py-2.5 text-sm">

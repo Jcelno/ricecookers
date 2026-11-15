@@ -11,27 +11,13 @@ import { overlay } from "@/lib/api";
 import { badgeFor, categoriesFor, pinCategories } from "@/lib/atlas";
 import { downloadCsv } from "@/lib/csv";
 import { earthTile } from "@/components/panels/OrbitalTile";
-import { letterFor } from "@/lib/labels";
 import { photoKey, photosFor } from "@/lib/photos";
 import { formatCoord, formatKm, GRADE_HEX, formatMeasure, formatValue, GRADE_MEANING, pct } from "@/lib/format";
 import type { Candidate, CellInfo, CompareResult, DimDetail, DocumentedSite, Measure, Planet } from "@/lib/types";
 import { useStore } from "@/store";
 
-const START: Record<Planet, { name: string; lat: number; lon: number; why: string }[]> = {
-  moon: [
-    { name: "Ridge beside Shackleton", lat: -89.45, lon: -137.31, why: "Cold, rugged, ice-bearing ground at the south pole" },
-    { name: "Apollo 11 site", lat: 0.67, lon: 23.47, why: "Smooth basalt plain of Mare Tranquillitatis" },
-    { name: "Apollo 16 site", lat: -8.97, lon: 15.5, why: "Feldspathic highlands near Descartes" },
-  ],
-  mars: [
-    { name: "Jezero crater", lat: 18.44, lon: 77.45, why: "Basaltic terrain around an ancient delta" },
-    { name: "Phoenix landing site", lat: 68.22, lon: -125.75, why: "Flat, frozen northern plains over ground ice" },
-    { name: "Arcadia Planitia", lat: 45.0, lon: -170.0, why: "Mid-latitude plain with shallow ice" },
-  ],
-};
-
 /* ---------------------------------------------------------------- left column */
-function Origin() {
+function Origin({ mobileOpen = false }: { mobileOpen?: boolean }) {
   const meta = useStore((s) => s.meta)!;
   const body = useStore((s) => s.body) as Planet;
   const origin = useStore((s) => s.twinOrigin);
@@ -45,7 +31,7 @@ function Origin() {
 
   const tiles = meta.layers[body].tiles;
   const base = tiles.find((t) => t.group === "imagery") ?? tiles[0];
-  const pins = useMemo(() => allPins.filter((p) => p.kind === "landing"), [allPins]);
+  const pins = useMemo(() => allPins, [allPins]);
   const sel = useMemo(() => {
     if (!origin || origin.body !== body) return null;
     if (cell && cell.body === body) return { lat: cell.cell.lat, lon: cell.cell.lon, outline: cell.cell.outline };
@@ -60,11 +46,12 @@ function Origin() {
     flights.current += 1;
     return { body, lat: origin.lat, lon: origin.lon, spanKm: body === "moon" ? 2200 : 4200, nonce: 1e6 + flights.current };
   }, [origin, body, focus]);
+  const chosenSite = origin ? allPins.find(p => Math.abs(p.lat-origin.lat)<0.0001 && Math.abs(p.lon-origin.lon)<0.0001) : undefined;
   const purposes = meta.purposes[body];
   const status = twin?.purposes ?? [];
 
   return (
-    <aside className="surface hair-r scroll z-20 flex h-full w-[340px] shrink-0 flex-col max-lg:w-[280px] max-md:hidden" aria-label="Planetary site">
+    <aside className={cx("surface hair-r scroll z-20 flex h-full w-[340px] shrink-0 flex-col max-lg:w-[280px]",mobileOpen ? "max-md:absolute max-md:inset-0 max-md:z-30 max-md:w-full max-md:pt-12" : "max-md:hidden")} aria-label="Planetary site" data-tour="target-settings">
       <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
         <h2 className="text-md font-semibold text-regolith-50">Earth Analogs</h2>
         <div role="tablist" aria-label="World to match" className="inline-flex rounded-md bg-basalt-950/70 p-0.5 ring-1 ring-[var(--hair)]">
@@ -94,11 +81,11 @@ function Origin() {
           </p>
           <div className="mt-4 text-xs font-medium text-regolith-400">Or start from one of these</div>
           <ul className="mt-1">
-            {START[body].map((q) => (
+            {pins.slice(0, 6).map((q) => (
               <li key={q.name}>
                 <button type="button" onClick={() => { startTwin({ body, lat: q.lat, lon: q.lon }); useStore.getState().flyTo(body, q.lat, q.lon, 900); }} className="row-ctl -mx-2 block w-[calc(100%+16px)] rounded-sm px-2 py-1.5 text-left">
                   <span className="placename block text-md text-regolith-50">{q.name}</span>
-                  <span className="block text-xs leading-snug text-regolith-400">{q.why}</span>
+                  <span className="block text-xs leading-snug text-regolith-400">{q.note}</span>
                 </button>
               </li>
             ))}
@@ -108,7 +95,7 @@ function Origin() {
         <>
           <div className="px-4 pt-3 pb-3">
             <div className="text-xs text-regolith-400">Matching against</div>
-            <div className="placename mt-0.5 text-lg leading-tight text-regolith-50 [overflow-wrap:anywhere]">{twin?.planet.place.label ?? (cell?.body === body ? cell.place.label : "…")}</div>
+            <div className="placename mt-0.5 text-lg leading-tight text-regolith-50 [overflow-wrap:anywhere]">{chosenSite?.name ?? twin?.planet.place.label ?? (cell?.body === body ? cell.place.label : "…")}</div>
             <div className="tnum mt-0.5 text-xs text-regolith-300">
               {twin ? twin.planet.coords : formatCoord(origin.lat, origin.lon)}
               {twin ? `, one ${formatKm(twin.planet.cell_km[0])} cell` : ""}
@@ -164,7 +151,7 @@ function CandidateRow({ c, active, onClick }: { c: Candidate; active: boolean; o
   return (
     <li className="border-t border-[var(--hair)]">
       <button type="button" aria-current={active} onClick={onClick} className={cx("row-ctl grid w-full grid-cols-[24px_32px_1fr_52px] items-start gap-x-2.5 px-4 py-2.5 text-left", active && "bg-basalt-800")}>
-        <span className="mt-1 grid size-6 place-items-center rounded-full border-2 text-[11px] font-bold text-regolith-50" style={{ background: "#08111f", borderColor: c.grade ? GRADE_HEX[c.grade] : "#7b8fa1" }} aria-label={`Marker ${letterFor(c.rank - 1)}`}>{letterFor(c.rank - 1)}</span>
+        <span className="tnum pt-1.5 text-xs text-regolith-400" aria-label={`Rank ${c.rank}`}>#{c.rank}</span>
         <GradeTile grade={c.grade} />
         <span className="min-w-0">
           <span className="placename block text-md leading-tight text-regolith-50 [overflow-wrap:anywhere]">{c.place.label}</span>
@@ -414,7 +401,7 @@ function Comparison({ c }: { c: CompareResult }) {
           {c.documented ? (
             <><span className="font-semibold text-regolith-50">{c.documented.name}</span> is {formatKm(c.documented.distance_km)} away, a documented analog site ({c.documented.theme.toLowerCase()}). <span className="text-regolith-500">{c.documented.source}</span></>
           ) : (
-            <><span className="font-semibold text-regolith-50">Not in RADIUM's reference list.</span> None of its {useStore.getState().pins.earth.length} documented analog sites lies within 150 km. That does not mean the area has never been studied; this match comes from the data alone and would need fieldwork and a literature check to confirm.</>
+            <><span className="font-semibold text-regolith-50">Not in RADIUM's reference list.</span> None of its {useStore.getState().pins.earth.filter(p=>p.verification_status !== "review_needed").length} documented analog sites lies within 150 km. That does not mean the area has never been studied; this match comes from the data alone and would need fieldwork and a literature check to confirm.</>
           )}
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -478,6 +465,7 @@ function Comparison({ c }: { c: CompareResult }) {
 
 /* -------------------------------------------------------------------- view */
 export function TwinView() {
+  const [mobileSettings, setMobileSettings] = useState(false);
   const meta = useStore((s) => s.meta)!;
   const origin = useStore((s) => s.twinOrigin);
   const twin = useStore((s) => s.twin);
@@ -505,7 +493,7 @@ export function TwinView() {
   const markers: SiteMarker[] = useMemo(
     () => (showModelled ? twin?.candidates ?? [] : [])
       .filter((c) => gradeFilter.includes(c.grade ?? "none"))
-      .map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, text: letterFor(c.rank - 1), grade: c.grade, active: !!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13 })),
+      .map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, text: (c.grade ?? "·"), grade: c.grade, active: !!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13 })),
     [twin, picked, showModelled, gradeFilter],
   );
   // Atlas: documented sites become text badges coloured by grade, environment or study theme, then filtered.
@@ -518,6 +506,7 @@ export function TwinView() {
     if (!showDocumented) return [];
     const g = new Map((twin?.documented ?? []).map((d) => [d.name, d.analysed ? d.grade : null]));
     return earthPins
+      .filter(p => p.verification_status !== "review_needed")
       .map((p) => {
         const grade = twin ? (g.get(p.name) ?? null) : undefined;
         return { ...p, grade, badge: twin || colorBy !== "grade" ? badgeFor(p, colorBy, grade, ctx) : undefined };
@@ -537,7 +526,8 @@ export function TwinView() {
 
   return (
     <>
-      <Origin />
+      <Button className="surface-float absolute top-3 left-3 z-40 md:hidden" aria-expanded={mobileSettings} onClick={()=>setMobileSettings(!mobileSettings)}>{mobileSettings ? "Close target settings" : "Target settings"}</Button>
+      <Origin mobileOpen={mobileSettings} />
       <div className="relative h-full min-w-0 flex-1 overflow-hidden bg-void">
         <EarthMap ref={handle} basemap={basemap} labels={earthLayers.labels} overlayUrl={url} opacity={0.8} dimBase={!!url} pins={gradedPins} markers={markers} selection={sel} focus={focus} onPick={onPick} onView={onView}
           onMarker={(id) => { const c = twin?.candidates.find((x) => x.id === id); if (c) void pickEarth(c.lat, c.lon, true); }} />
@@ -580,7 +570,7 @@ function AtlasPanel({ twin, shownDocs, shownModel, context, body }: { twin: Retu
     s.setAtlas({ catFilter: next.length === cats.length ? null : next });
   };
   const reset = () => s.setAtlas({ colorBy: "grade", gradeFilter: ["A", "B", "C", "D", "F", "none"], showDocumented: true, showModelled: true, catFilter: null });
-  const totalDocs = s.pins.earth.length;
+  const totalDocs = s.pins.earth.filter(p=>p.verification_status !== "review_needed").length;
   const totalModel = twin?.candidates.length ?? 0;
   return (
     <div className="pointer-events-none absolute bottom-11 left-[72px] z-20 max-sm:right-3 max-sm:left-3">
@@ -594,7 +584,7 @@ function AtlasPanel({ twin, shownDocs, shownModel, context, body }: { twin: Retu
             <div className="mt-2"><Segmented size="sm" label="Colour documented sites by" value={s.colorBy} onChange={(v) => s.setAtlas({ colorBy: v, catFilter: null })}
               options={[{ value: "grade", label: "Grade" }, { value: "environment", label: "Environment" }, { value: "application", label: "Study theme" }]} /></div>
             <p className="mt-1.5 text-2xs leading-snug text-regolith-400">
-              {s.colorBy === "grade" ? `Lettered circles are the model's best matches (A is best; ring colour is the grade). Squares are documented sites and show their own grade letter. Both are graded for ${context || `${body === "moon" ? "Moon" : "Mars"} similarity`} on RADIUM's own A–F scale, not a NASA rating.`
+              {s.colorBy === "grade" ? `Circular markers show calculated grades. Neutral circles have no score; clusters show a count. Both documented sites and model matches are graded for ${context || `${body === "moon" ? "Moon" : "Mars"} similarity`} on RADIUM's own A–F scale, not a NASA rating.`
                 : s.colorBy === "environment" ? "Environment of each documented site, from its published study theme. Model matches keep their grade colour: their environment type is not catalogued."
                   : "What each documented site has been studied for, from the reference list. A study theme, not a measurement."}
             </p>

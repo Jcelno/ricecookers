@@ -172,7 +172,7 @@ export function Stage() {
   const markers: SiteMarker[] = useMemo(() => {
     if (!inMission || !rank || rank.mission !== missionId) return [];
     return rank.sites.map((s) => ({
-      id: s.id, lat: s.lat, lon: s.lon, text: String(s.rank), grade: s.grade,
+      id: s.id, lat: s.lat, lon: s.lon, text: s.grade ?? "·", grade: s.grade,
       active: !!cell && cell.body === body && Math.abs(cell.cell.lat - s.lat) < 1e-6 && Math.abs(cell.cell.lon - s.lon) < 1e-6,
     }));
   }, [inMission, rank, missionId, cell, body]);
@@ -223,7 +223,7 @@ export function Stage() {
       )}
 
       {/* map controls */}
-      <div className="surface-float absolute top-3 right-3 z-20 flex flex-col rounded-md ring-1 ring-[var(--hair)]">
+      <div data-tour="map-controls" className="surface-float absolute top-3 right-3 z-20 flex flex-col rounded-md ring-1 ring-[var(--hair)]">
         <IconButton label="Zoom in" onClick={() => handle.current?.zoom(0.5)}><Plus size={16} /></IconButton>
         <IconButton label="Zoom out" onClick={() => handle.current?.zoom(2)}><Minus size={16} /></IconButton>
         <IconButton label="Reset the view" onClick={() => handle.current?.home()}><Home size={15} /></IconButton>
@@ -233,6 +233,7 @@ export function Stage() {
         <IconButton label={full ? "Leave full screen" : "Full-screen map"} onClick={toggleFull}>{full ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</IconButton>
       </div>
 
+      {!inMission && !gridOverlay && !tileOverlay && <div className="map-key surface-float" data-tour="legend"><span className="neutral-marker">·</span><span>Curated site · not scored</span><span className="cluster-key">2+</span><span>Cluster · zoom to expand</span></div>}
       {/* legend for whatever data layer is drawn */}
       <div className="pointer-events-none absolute bottom-11 left-[72px] z-20 flex flex-col gap-2 max-sm:left-3">
         {outsidePolar && gridOverlay && (

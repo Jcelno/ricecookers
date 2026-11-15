@@ -1,164 +1,161 @@
-// Share links: the visible state is written to the address hash, and a pasted link restores it.
-// Everything read from a link is untrusted and validated. The Near Me starting location is never written.
-
-import { useStore, type ColorBy, type Mode } from "@/store";
+// Versioned share state. User/device Near Me positions are deliberately never encoded.
+import { ALL_GRADES, useStore, type ColorBy, type Mode, type SiteRef } from "@/store";
 import type { Body, Planet } from "./types";
+import { validSite } from "./persistence";
 
-const MODES: Mode[] = ["explore", "mission", "twin", "near", "compare"];
+const MODES: Mode[] = ["explore", "mission", "twin", "near", "compare", "saved"];
 const BODIES: Body[] = ["moon", "mars", "earth"];
 const COLORS: ColorBy[] = ["grade", "environment", "application"];
-const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
-
-function latlon(v: string | null): { lat: number; lon: number } | null {
+const position = (v: string | null): { lat: number; lon: number } | null => {
   if (!v) return null;
-  const [a, b] = v.split(",").map(Number);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a < -90 || a > 90 || b < -180 || b > 180) return null;
-  return { lat: a, lon: b };
-}
-function weights(v: string | null, allowed: string[]): Record<string, number> | null {
+  const parts = v.split(",");
+  if (parts.length !== 2 || parts.some((x) => !x.trim())) return null;
+  const [lat, lon] = parts.map(Number);
+  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? { lat, lon } : null;
+};
+const weights = (v: string | null, allowed: string[]): Record<string, number> | null => {
   if (!v) return null;
   const out: Record<string, number> = {};
   for (const part of v.split(";")) {
-    const [k, raw] = part.split(":");
+    const pieces = part.split(":");
+    if (pieces.length !== 2 || !pieces[1].trim()) continue;
+    const [k, raw] = pieces;
     const n = Number(raw);
-    if (allowed.includes(k) && Number.isFinite(n) && n >= 0 && n <= 100) out[k] = Math.round(n);
+    if (allowed.includes(k) && Number.isFinite(n) && n >= 0 && n <= 100) out[k] = n;
   }
   return Object.keys(out).length ? out : null;
-}
-const encW = (w: Record<string, number>) => Object.entries(w).map(([k, v]) => `${k}:${Math.round(v)}`).join(";");
+};
+const encWeights = (w: Record<string, number>) => Object.entries(w).map(([k, v]) => `${k}:${v}`).join(";");
+const coords = (p: { lat: number; lon: number }) => `${p.lat},${p.lon}`;
 
-/** Apply a link's state. Unknown or malformed parts are ignored. */
+/** Accept historical hashes as well as v2 links; ignore malformed input rather than requesting invalid coordinates. */
 export function applyLink(hash: string) {
+  if (hash.length > 16000) return;
   const q = new URLSearchParams(hash.replace(/^#/, ""));
   if (!q.toString()) return;
   const st = useStore.getState();
   const meta = st.meta;
   if (!meta) return;
-  const mode = MODES.includes(q.get("m") as Mode) ? (q.get("m") as Mode) : "explore";
-  const body = BODIES.includes(q.get("b") as Body) ? (q.get("b") as Body) : st.body;
-
-  // Places queued for comparison: "body,lat,lon,label;…" (validated; at most four).
-  const cl = q.get("cl");
-  if (cl) {
-    const list = cl.split(";").map((part) => {
+  const mode = MODES.includes(q.get("m") as Mode) ? q.get("m") as Mode : "explore";
+  const body = BODIES.includes(q.get("b") as Body) ? q.get("b") as Body : "moon";
+  const rawTarget = q.get("t")?.split(",") ?? [];
+  const targetBody = rawTarget[0] as Planet;
+  const targetPos = position(rawTarget.slice(1).join(","));
+  const target = (targetBody === "moon" || targetBody === "mars") && targetPos ? { body: targetBody, ...targetPos } : null;
+  const purpose = target && meta.purposes[target.body].some((p) => p.id === q.get("p")) ? q.get("p")! : "general";
+  const twinWeights = weights(q.get("tw"), Object.keys(meta.dimensions));
+  const selection = position(q.get("s"));
+  const earth = position(q.get("e"));
+  let list: SiteRef[] = [];
+  if (q.has("cl2")) {
+    try {
+      const v = JSON.parse(q.get("cl2")!);
+      if (Array.isArray(v)) list = v.filter(validSite).slice(0, 4).map(({ body, lat, lon, label }) => ({ body, lat, lon, label: label.slice(0, 160) }));
+    } catch { /* damaged comparison list */ }
+  } else if (q.get("cl")) {
+    list = q.get("cl")!.split(";").flatMap((part) => {
       const [b, la, lo, ...rest] = part.split(",");
-      const pos = latlon(`${la},${lo}`);
-      return BODIES.includes(b as Body) && pos ? { body: b as Body, ...pos, label: rest.join(",").slice(0, 80) || `${b} ${la}, ${lo}` } : null;
-    }).filter((x): x is NonNullable<typeof x> => !!x).slice(0, 4);
-    if (list.length) useStore.setState({ compareList: list });
+      const p = position(`${la},${lo}`);
+      return BODIES.includes(b as Body) && p ? [{ body: b as Body, ...p, label: rest.join(",").slice(0, 160) || `${b} ${la}, ${lo}` }] : [];
+    }).slice(0, 4);
   }
-
-  const c = q.get("c") as ColorBy;
-  if (COLORS.includes(c)) st.setAtlas({ colorBy: c });
-
-  // Moon or Mars target shared by Earth Analogs, Near Me and the test brief.
-  const tRaw = q.get("t")?.split(",") ?? [];
-  const tBody = tRaw[0] as Planet;
-  const tPos = latlon(tRaw.slice(1).join(","));
-  const target = (tBody === "moon" || tBody === "mars") && tPos ? { body: tBody, ...tPos } : null;
-  const p = q.get("p");
-  if (target && p && meta.purposes[target.body].some((x) => x.id === p)) useStore.setState({ purpose: p });
-
-  const mission = meta.missions.find((x) => x.id === q.get("mi"));
+  list = list.filter((x, i, all) => all.findIndex((a) => a.body === x.body && a.lat === x.lat && a.lon === x.lon) === i);
+  const mission = meta.missions.find((m) => m.id === q.get("mi")) ?? (mode === "mission" ? meta.missions.find((m) => m.body === (body === "earth" ? "moon" : body)) : undefined);
+  st.clearSelection(); st.clearPick();
+  useStore.setState({ mode: "explore", body, twinOrigin: target, purpose, twinWeights, twin: null, twinStatus: "idle", sheet: null, scenarioB: null,
+    compareList: list, compareTab: q.get("ct") === "sites" ? "sites" : q.get("ct") === "pair" || target && earth && !list.length ? "pair" : "sites",
+    colorBy: COLORS.includes(q.get("c") as ColorBy) ? q.get("c") as ColorBy : "grade", gradeFilter: q.has("gf") ? ALL_GRADES.filter((g) => q.get("gf")!.split(",").includes(g)) : [...ALL_GRADES],
+    showDocumented: q.get("doc") !== "0", showModelled: q.get("mod") !== "0", catFilter: q.get("cat") ? q.get("cat")!.split(",").slice(0, 12) : null,
+    advanced: q.get("adv") === "1", units: q.get("u") === "km" ? "km" : q.get("u") === "mi" ? "mi" : st.units,
+    tempUnit: q.get("temp") === "C" ? "C" : "K" });
+  // Only accept a layer that exists for this body; never interpret a link as an arbitrary tile URL.
+  const base = q.get("base");
+  const overlayId = q.get("ov");
+  const kind = q.get("ok");
+  const available = meta.layers[body];
+  const validOverlay = kind === "grid" ? available.grid.some((l) => l.id === overlayId) : kind === "tiles" && available.tiles.some((l) => l.id === overlayId);
+  const opacity = Number(q.get("op"));
+  st.setLayer(body, { ...(base && available.tiles.some((l) => l.id === base) ? { base } : {}), overlay: validOverlay && overlayId ? { id: overlayId, kind: kind as "tiles" | "grid" } : null,
+    ...(q.has("op") && Number.isFinite(opacity) && opacity >= 0 && opacity <= 1 ? { opacity } : {}), labels: q.get("labels") !== "0",
+    ...(q.has("pins") ? { pins: { landing: q.get("pins")!.includes("l"), feature: q.get("pins")!.includes("f"), analog: q.get("pins")!.includes("a") } } : {}) });
   if (mission) {
-    const w = weights(q.get("w"), mission.criteria.map((x) => x.id));
-    const lim = q.get("l");
-    const allowedLimits = mission.limits.map((x) => x.id);
-    useStore.setState((s) => ({
-      missionId: mission.id,
-      rawWeights: w ? { ...s.rawWeights, [mission.id]: { ...s.rawWeights[mission.id], ...w } } : s.rawWeights,
-      limitsOn: lim !== null ? { ...s.limitsOn, [mission.id]: lim === "-" ? [] : lim.split(",").filter((x) => allowedLimits.includes(x)) } : s.limitsOn,
-    }));
-    const wb = weights(q.get("wb"), mission.criteria.map((x) => x.id));
-    const lb = q.get("lb");
-    if (wb || lb !== null) {
-      useStore.setState({ scenarioB: {
-        mission: mission.id,
-        weights: { ...useStore.getState().rawWeights[mission.id], ...(wb ?? {}) },
-        limits: lb === null ? [...allowedLimits] : lb === "-" ? [] : lb.split(",").filter((x) => allowedLimits.includes(x)),
-      } });
-    }
+    const allowed = mission.criteria.map((c) => c.id);
+    const defaultWeights = Object.fromEntries(mission.criteria.map((c) => [c.id, Math.round(c.weight * 100)]));
+    const allowedLimits = mission.limits.map((l) => l.id);
+    const selectedWeights = { ...defaultWeights, ...weights(q.get("w"), allowed) };
+    const selectedLimits = q.has("l") ? q.get("l")!.split(",").filter((l) => allowedLimits.includes(l)) : allowedLimits;
+    useStore.setState((s) => ({ missionId: mission.id, rawWeights: { ...s.rawWeights, [mission.id]: selectedWeights }, limitsOn: { ...s.limitsOn, [mission.id]: selectedLimits },
+      ...(mode === "mission" ? { body: mission.body } : {}) }));
+    if (q.has("wb") || q.has("lb")) useStore.setState({ scenarioB: { mission: mission.id, weights: { ...selectedWeights, ...weights(q.get("wb"), allowed) }, limits: q.has("lb") ? q.get("lb")!.split(",").filter((l) => allowedLimits.includes(l)) : allowedLimits } });
   }
-
-  const sel = latlon(q.get("s"));
-  const earth = latlon(q.get("e"));
   if ((mode === "twin" || mode === "compare") && target) {
     st.startTwin(target);
     if (earth) void useStore.getState().pickEarth(earth.lat, earth.lon, true);
     if (mode === "compare") useStore.getState().setMode("compare");
-  } else if (mode === "compare") {
-    st.setMode("compare");
+    if (q.get("ct") === "sites") useStore.setState({ compareTab: "sites" });
   } else if (mode === "near") {
-    const nr = Number(q.get("nr"));
-    useStore.setState({
-      twinOrigin: target, nearMode: q.get("nm") === "best" && target ? "best" : "nearest", nearDocOnly: q.get("nd") === "1",
-      ...(Number.isFinite(nr) && nr >= 10 && nr <= 20015 ? { nearRadius: nr } : {}),
-    });
+    const radius = Number(q.get("nr"));
+    useStore.setState({ nearMode: q.get("nm") === "best" && target ? "best" : "nearest", nearDocOnly: q.get("nd") === "1",
+      ...(Number.isFinite(radius) && radius >= 10 && radius <= 20015 ? { nearRadius: radius } : {}) });
     st.setMode("near");
-  } else if (mode === "mission") {
-    if (mission && mission.body !== st.body) st.setBody(mission.body);
-    st.setMode("mission");
-    if (sel) void useStore.getState().select(useStore.getState().body, sel.lat, sel.lon, { fly: true, spanKm: 600 });
   } else {
-    st.setBody(body);
-    if (target) useStore.setState({ twinOrigin: target });
-    if (sel) void useStore.getState().select(body, sel.lat, sel.lon, { fly: true, spanKm: body === "earth" ? 1200 : 600 });
+    st.setMode(mode);
+    if ((mode === "explore" || mode === "mission") && selection) void useStore.getState().select(useStore.getState().body, selection.lat, selection.lon, { fly: true, spanKm: body === "earth" ? 1200 : 600 });
   }
   const sheet = q.get("sh");
-  if (sheet === "brief" && target && earth) {
-    useStore.setState({ twinOrigin: target });
-    useStore.getState().openBrief(earth);
-  } else if (sheet === "scenarios" && mission) st.setSheet("scenarios");
+  if (sheet === "brief" && target && earth) useStore.getState().openBrief(earth);
+  else if ((sheet === "scenarios" || sheet === "report") && mission) st.setSheet(sheet);
   else if (sheet === "methodology" || sheet === "sources") st.setSheet(sheet);
 }
 
-/** The link for the current view. */
+/** Full precision preserves the requested site, separate from its coarser scientific analysis cell. */
 export function currentLink(): string {
   const s = useStore.getState();
-  const q = new URLSearchParams();
-  q.set("m", s.mode);
-  q.set("b", s.body);
+  const q = new URLSearchParams({ v: "2", m: s.mode, b: s.body });
   if (s.colorBy !== "grade") q.set("c", s.colorBy);
-  if (s.twinOrigin && (s.mode === "twin" || s.mode === "near" || s.mode === "compare" || s.sheet === "brief")) {
-    q.set("t", `${s.twinOrigin.body},${r4(s.twinOrigin.lat)},${r4(s.twinOrigin.lon)}`);
-    q.set("p", s.purpose);
-  }
-  if ((s.mode === "twin" || s.mode === "compare") && s.picked) q.set("e", `${r4(s.picked.lat)},${r4(s.picked.lon)}`);
-  if (s.sheet === "brief" && s.brief) {
-    q.set("t", `${s.brief.body},${r4(s.brief.lat)},${r4(s.brief.lon)}`);
-    q.set("p", s.brief.purpose);
-    q.set("e", `${r4(s.brief.earth_lat)},${r4(s.brief.earth_lon)}`);
-  }
-  if ((s.mode === "explore" || s.mode === "mission") && s.selection && s.selection.body === s.body) q.set("s", `${r4(s.selection.lat)},${r4(s.selection.lon)}`);
-  if (s.mode === "mission" || s.sheet === "scenarios") {
+  if (s.gradeFilter.length !== ALL_GRADES.length) q.set("gf", s.gradeFilter.join(","));
+  if (!s.showDocumented) q.set("doc", "0");
+  if (!s.showModelled) q.set("mod", "0");
+  if (s.catFilter?.length) q.set("cat", s.catFilter.join(","));
+  if (s.advanced) q.set("adv", "1");
+  q.set("u", s.units);
+  if (s.tempUnit === "C") q.set("temp", "C");
+  const layer = s.layers[s.body];
+  q.set("base", layer.base);
+  if (layer.overlay) { q.set("ov", layer.overlay.id); q.set("ok", layer.overlay.kind); }
+  q.set("op", String(layer.opacity));
+  if (!layer.labels) q.set("labels", "0");
+  q.set("pins", `${layer.pins.landing ? "l" : ""}${layer.pins.feature ? "f" : ""}${layer.pins.analog ? "a" : ""}`);
+  if (s.twinOrigin) { q.set("t", `${s.twinOrigin.body},${coords(s.twinOrigin)}`); q.set("p", s.purpose); }
+  if (s.twinWeights) q.set("tw", encWeights(s.twinWeights));
+  if ((s.mode === "twin" || s.mode === "compare") && s.picked) q.set("e", coords(s.picked));
+  if (s.mode === "compare") q.set("ct", s.compareTab);
+  if (s.sheet === "brief" && s.brief) { q.set("t", `${s.brief.body},${coords(s.brief)}`); q.set("p", s.brief.purpose); q.set("e", `${s.brief.earth_lat},${s.brief.earth_lon}`); }
+  if ((s.mode === "explore" || s.mode === "mission") && s.selection?.body === s.body) q.set("s", coords(s.selection));
+  if (s.mode === "mission" || s.sheet === "scenarios" || s.sheet === "report") {
     q.set("mi", s.missionId);
-    const w = s.rawWeights[s.missionId];
-    if (w) q.set("w", encW(w));
+    if (s.rawWeights[s.missionId]) q.set("w", encWeights(s.rawWeights[s.missionId]));
     q.set("l", (s.limitsOn[s.missionId] ?? []).join(",") || "-");
-    if (s.sheet === "scenarios" && s.scenarioB && s.scenarioB.mission === s.missionId) {
-      q.set("wb", encW(s.scenarioB.weights));
-      q.set("lb", s.scenarioB.limits.join(",") || "-");
-    }
+    if (s.sheet === "scenarios" && s.scenarioB?.mission === s.missionId) { q.set("wb", encWeights(s.scenarioB.weights)); q.set("lb", s.scenarioB.limits.join(",") || "-"); }
   }
-  if (s.mode === "near") {
-    q.set("nr", String(s.nearRadius));
-    q.set("nm", s.nearMode);
-    if (s.nearDocOnly) q.set("nd", "1");
-  }
-  if (s.compareList.length) q.set("cl", s.compareList.map((x) => `${x.body},${r4(x.lat)},${r4(x.lon)},${x.label.replace(/[;]/g, " ")}`).join(";"));
+  if (s.mode === "near") { q.set("nr", String(s.nearRadius)); q.set("nm", s.nearMode); if (s.nearDocOnly) q.set("nd", "1"); }
+  if (s.compareList.length) q.set("cl2", JSON.stringify(s.compareList.map(({ body, lat, lon, label }) => ({ body, lat, lon, label: label.slice(0, 160) }))));
   if (s.sheet && s.sheet !== "intro") q.set("sh", s.sheet);
-  return `${location.origin}${location.pathname}#${q.toString()}`;
+  return `${location.origin}${location.pathname}${location.search}#${q}`;
 }
 
-/** Keep the address bar in sync (replaceState: no history spam). Returns an unsubscribe function. */
 export function startLinkSync() {
-  let t = 0;
+  let timer = 0;
+  let restoring = false;
   const unsub = useStore.subscribe(() => {
-    clearTimeout(t);
-    t = window.setTimeout(() => {
-      const link = currentLink();
-      if (link !== location.href) history.replaceState(null, "", link);
+    if (restoring) return;
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      const url = currentLink();
+      if (url !== location.href) { try { history.replaceState(null, "", url); } catch { /* Copy View Link still works in restricted embeds. */ } }
     }, 350);
   });
-  return () => { clearTimeout(t); unsub(); };
+  const restore = () => { clearTimeout(timer); restoring = true; try { applyLink(location.hash); } finally { restoring = false; } };
+  window.addEventListener("hashchange", restore);
+  return () => { clearTimeout(timer); unsub(); window.removeEventListener("hashchange", restore); };
 }

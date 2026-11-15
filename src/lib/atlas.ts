@@ -38,10 +38,12 @@ export const pinCategories = (pin: Pin, by: ColorBy): string[] =>
 
 export interface Badge { text: string; color: string; ink: string; title: string }
 export function badgeFor(pin: Pin, by: ColorBy, grade: Grade | null | undefined, context: string): Badge {
+  const status = pin.verification_status === "review_needed" ? "research candidate; evidence review needed" : "documented analog site";
+  // A model may compare any selected cell, but a research candidate is never labeled documented.
   if (by === "grade") {
     return grade
-      ? { text: grade, color: GRADE_HEX[grade], ink: "#101216", title: `${pin.name}: documented analog site, grade ${grade} for ${context}` }
-      : { text: "–", color: "#4a5260", ink: "#e9eef3", title: `${pin.name}: documented analog site, not graded (too little comparable data)` };
+      ? { text: grade, color: GRADE_HEX[grade], ink: "#101216", title: `${pin.name}: ${status}; calculated analog similarity grade ${grade} for ${context}` }
+      : { text: "•", color: "#415166", ink: "#e9eef3", title: `${pin.name}: ${status}; not yet scored or insufficient comparable data` };
   }
   const c = primaryCategory(pin, by);
   const all = (by === "application" ? pin.tags?.applications : pin.tags?.environment)?.map((t) => t.label).join(", ") ?? c.label;

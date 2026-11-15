@@ -4,7 +4,6 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/LazyEarthMap";
 import type { GlobeHandle, SiteMarker, ViewState } from "@/components/map/GlobeView";
 import { Tapes, type TapesHandle } from "@/components/map/Tapes";
-import { letterFor } from "@/lib/labels";
 import { Button, cx, GradeTile, IconButton, Notice, Segmented, Spinner, Switch } from "@/components/ui/primitives";
 import { GRADE_HEX, GRADE_MEANING } from "@/lib/format";
 import { api } from "@/lib/api";
@@ -15,13 +14,6 @@ import { useStore } from "@/store";
 const KM_PER_MI = 1.609344;
 // Round numbers in whichever unit is shown; the request always carries kilometres.
 const RADII = { km: [250, 500, 1000, 1500, 3000, 6000, 20015], mi: [150, 300, 600, 1000, 2000, 4000].map((m) => Math.round(m * 1.609344)).concat(20015) };
-const TARGETS: { body: Planet; name: string; lat: number; lon: number }[] = [
-  { body: "mars", name: "Gale crater", lat: -4.59, lon: 137.44 },
-  { body: "mars", name: "Jezero crater", lat: 18.44, lon: 77.45 },
-  { body: "mars", name: "Phoenix landing site", lat: 68.22, lon: -125.75 },
-  { body: "moon", name: "Ridge beside Shackleton", lat: -89.45, lon: -137.31 },
-  { body: "moon", name: "Apollo 11 site", lat: 0.67, lon: 23.47 },
-];
 
 type Item = (NearbyDocumented | NearbyRegion) & { key: string; n: number };
 
@@ -152,7 +144,9 @@ function Target() {
   const target = useStore((s) => s.twinOrigin);
   const purpose = useStore((s) => s.purpose);
   const { setTarget, setPurpose } = useStore.getState();
-  const label = target ? TARGETS.find((t) => t.body === target.body && Math.abs(t.lat - target.lat) < 0.05 && Math.abs(t.lon - target.lon) < 0.05)?.name : null;
+  const pins = useStore(s=>s.pins);
+  const targets = (["moon","mars"] as Planet[]).flatMap(body=>pins[body].map(p=>({...p,body})));
+  const label = target ? targets.find((t) => t.body === target.body && Math.abs(t.lat - target.lat) < 0.05 && Math.abs(t.lon - target.lon) < 0.05)?.name : null;
   return (
     <section className="hair-t px-4 pt-3 pb-4">
       <h3 className="text-sm font-semibold text-regolith-50">Moon or Mars target</h3>
@@ -175,7 +169,7 @@ function Target() {
         </div>
       ) : (
         <ul className="mt-1.5">
-          {TARGETS.map((t) => (
+          {targets.slice(0,6).map((t) => (
             <li key={t.name}>
               <button type="button" onClick={() => setTarget({ body: t.body, lat: t.lat, lon: t.lon })} className="row-ctl -mx-2 flex w-[calc(100%+16px)] items-baseline justify-between gap-2 rounded-sm px-2 py-1.5 text-left">
                 <span className="placename text-md text-regolith-50">{t.name}</span>
@@ -264,7 +258,7 @@ function Scatter({ items, active, onPick, units }: { items: Item[]; active: stri
           );
         })}
       </svg>
-      <figcaption className="mt-1 text-2xs leading-snug text-regolith-500">Up is a closer match, left is nearer. Select a point to select that lettered result. Diamonds are documented sites, circles modelled regions. A decision aid only: distance never changes a grade.</figcaption>
+      <figcaption className="mt-1 text-2xs leading-snug text-regolith-500">Up is a closer match, left is nearer. Select a point to select that result. Documented sites and modelled regions are labelled separately. A decision aid only: distance never changes a grade.</figcaption>
     </figure>
   );
 }
@@ -278,7 +272,7 @@ function ResultRow({ it, active, units, hasTarget }: { it: Item; active: boolean
   return (
     <li id={`near-${it.key}`} className={cx("border-t border-[var(--hair)] first:border-t-0", active && "bg-basalt-800/70")}>
       <button type="button" onClick={open} aria-expanded={active} className="row-ctl grid w-full grid-cols-[22px_28px_1fr_auto] items-center gap-x-2.5 px-4 py-2.5 text-left">
-        <span className="grid size-6 place-items-center rounded-full border-2 text-[11px] font-bold text-regolith-50" style={{ background: "#08111f", borderColor: sim?.grade ? GRADE_HEX[sim.grade] : "#7b8fa1" }} aria-label={`Marker ${letterFor(it.n - 1)}`}>{letterFor(it.n - 1)}</span>
+        <span className="tnum text-xs text-regolith-400" aria-label={`Result ${it.n}`}>#{it.n}</span>
         {hasTarget ? <GradeTile grade={sim?.grade ?? null} size="sm" title={sim?.grade ? `${GRADE_MEANING[sim.grade]} match` : "Not graded: too little comparable data"} />
           : <span className="grid size-6 place-items-center"><span className="block size-2.5 rotate-45 rounded-[2px] border-[1.5px] border-regolith-100" /></span>}
         <span className="min-w-0">
@@ -397,7 +391,7 @@ export function NearView() {
     const docs = r.documented.map((d) => ({ key: `d:${d.name}`, ...d }));
     const regs = r.regions.map((g) => ({ key: `r:${g.lat},${g.lon}`, ...g }));
     const all = r.query.mode === "best" ? [...docs, ...regs].sort((a, b) => (b.similarity?.score ?? -1) - (a.similarity?.score ?? -1) || a.distance_km - b.distance_km) : docs;
-    return all.map((it, k) => ({ id: it.key, lat: it.lat, lon: it.lon, text: letterFor(k), grade: it.similarity?.grade ?? null, active: active === it.key }));
+    return all.map((it, k) => ({ id: it.key, lat: it.lat, lon: it.lon, text: it.similarity?.grade ?? "·", grade: it.similarity?.grade ?? null, active: active === it.key }));
   }, [r, active]);
   const onPick = useCallback((lat: number, lon: number) => {
     setNear({ nearLoc: { lat: +lat.toFixed(4), lon: +lon.toFixed(4), source: "map" } });
@@ -423,7 +417,7 @@ export function NearView() {
         <div className="pointer-events-none absolute bottom-11 left-[72px] z-20 max-sm:left-3">
           <div className="surface-float pointer-events-auto w-[248px] rounded-md p-3 text-2xs leading-snug text-regolith-300 ring-1 ring-[var(--hair)]">
             <div className="text-sm font-semibold text-regolith-50">Near Me</div>
-            <p className="mt-0.5">The white dot is your starting point; click the map to move it. Letters follow the list; ring colour is the grade{r?.target ? ", coloured by similarity grade (grey: not graded)" : ""}.</p>
+            <p className="mt-0.5">The white dot is your starting point; click the map to move it. Letters and their colours show calculated similarity grades; grey circles are not scored{r?.target ? ", coloured by similarity grade (grey: not graded)" : ""}.</p>
           </div>
         </div>
         <div className="pointer-events-none absolute right-3 bottom-9 z-20 max-w-[54%] text-right text-[10px] leading-tight text-regolith-400 [text-shadow:0_1px_2px_#000]">{basemap.attribution}. {LABEL_ATTRIBUTION}.</div>

@@ -10,6 +10,7 @@ from shapely.geometry import Point, shape
 from shapely.strtree import STRtree
 
 from .geo import RADIUS_KM, bearing_name, gc_km, unit_xyz
+from .sites import for_body
 
 NAMES = Path(__file__).resolve().parents[1] / "data" / "processed" / "names"
 
@@ -22,6 +23,13 @@ class Planetary:
     def __init__(self, body: str):
         self.body = body
         self.items = json.loads((NAMES / f"{body}.json").read_text())
+        # Reviewed IAU records supersede the bundled gazetteer snapshot, so a
+        # catalogue pin and its contextual place label use the same centre.
+        reviewed = {p["name"].casefold(): p for p in for_body(body) if p["kind"] == "feature"}
+        for item in self.items:
+            site = reviewed.get(item["name"].casefold())
+            if site:
+                item.update({key: site[key] for key in ("lat", "lon", "diam_km", "link")})
         self.lat = np.array([x["lat"] for x in self.items])
         self.lon = np.array([x["lon"] for x in self.items])
         self.diam = np.array([x["diam_km"] for x in self.items])

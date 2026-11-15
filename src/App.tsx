@@ -11,6 +11,7 @@ import { CompareTray } from "@/components/CompareTray";
 import { applyLink, startLinkSync } from "@/lib/deeplink";
 import { useStore } from "@/store";
 
+const SavedView = lazy(() => import("@/components/saved/SavedView").then(m => ({ default: m.SavedView })));
 const TwinView = lazy(() => import("@/components/twin/TwinView").then((m) => ({ default: m.TwinView })));
 const NearView = lazy(() => import("@/components/near/NearView").then((m) => ({ default: m.NearView })));
 const CompareView = lazy(() => import("@/components/compare/CompareView").then((m) => ({ default: m.CompareView })));
@@ -29,6 +30,7 @@ function Side({ side, open, children, label }: { side: "left" | "right"; open: b
     <>
       <aside
         aria-label={label}
+        data-tour={label === "Mission panel" ? "mission" : label === "Layers panel" ? "layers" : "location"}
         hidden={!open}
         className={cx(
           "surface scroll z-20 h-full shrink-0",
@@ -101,7 +103,7 @@ export default function App() {
       <TopBar />
       <main className="relative flex min-h-0 flex-1">
         <CompareTray />
-        {mode === "twin" ? (
+        {mode === "saved" ? (<Suspense fallback={<Spinner label="Opening saved research" />}><SavedView /></Suspense>) : mode === "twin" ? (
           <Suspense fallback={<div className="grid flex-1 place-items-center"><Spinner label="Opening Earth Analogs" /></div>}><TwinView /></Suspense>
         ) : mode === "near" ? (
           <Suspense fallback={<div className="grid flex-1 place-items-center"><Spinner label="Opening Near Me" /></div>}><NearView /></Suspense>

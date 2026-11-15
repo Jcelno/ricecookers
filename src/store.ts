@@ -1,22 +1,14 @@
 import { create } from "zustand";
 
 import { api, ApiError } from "@/lib/api";
+import { readSaved, writeSaved, sameSite, type SavedState, type SavedKind, type SavedSite, type SavedMission, type SavedComparison, type SavedContext, type SavedSource, type SiteRef } from "@/lib/persistence";
+export type { SiteRef, SavedMission } from "@/lib/persistence";
 import type { Body, CellInfo, CompareResult, Grade, Meta, NearbyResult, Pin, Planet, RankResult, TwinResult } from "@/lib/types";
 
-export type Mode = "explore" | "mission" | "twin" | "near" | "compare";
+export type Mode = "explore" | "mission" | "twin" | "near" | "compare" | "saved";
 export type ColorBy = "grade" | "environment" | "application";
 export type Units = "km" | "mi";
-/** A place on any world, as carried between views (Compare tray, saved list, mission destination). */
-export interface SiteRef { body: Body; lat: number; lon: number; label: string }
-export interface SavedMission { id: string; name: string; mission: string; weights: Record<string, number>; limits: string[]; site: SiteRef | null; created: string }
-interface SavedState { sites: SiteRef[]; missions: SavedMission[] }
-const SAVED_KEY = "radium.saved.v1";
-const loadSaved = (): SavedState => {
-  try { const v = JSON.parse(localStorage.getItem(SAVED_KEY) ?? "null"); if (v && Array.isArray(v.sites) && Array.isArray(v.missions)) return v; } catch { /* storage blocked */ }
-  return { sites: [], missions: [] };
-};
-const storeSaved = (v: SavedState) => { try { localStorage.setItem(SAVED_KEY, JSON.stringify(v)); } catch { /* storage blocked: kept for this tab only */ } };
-const sameSite = (a: SiteRef, b: SiteRef) => a.body === b.body && Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(a.lon - b.lon) < 1e-4;
+const initialSaved = readSaved();
 export const COMPARE_MAX = 4;
 
 export interface BriefRequest { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number }
@@ -101,6 +93,9 @@ interface State {
   brief: BriefRequest | null;
   compareList: SiteRef[];
   saved: SavedState;
+  persistenceError: string | null;
+  saveNotice: string | null;
+  compareTab: "pair" | "sites";
   tempUnit: "K" | "C";
   twinWeights: Record<string, number> | null;
   /** Layer panel detail: plain-language (false) or full technical (true). */
@@ -142,7 +137,12 @@ interface State {
   clearCompare: () => void;
   saveSite: (s: SiteRef) => void;
   saveMission: (name: string) => void;
-  removeSaved: (kind: "sites" | "missions", i: number) => void;
+  saveComparison: (name?: string, kind?: "pair" | "sites") => boolean;
+  removeSaved: (kind: SavedKind, i: number) => void;
+  renameSaved: (kind: SavedKind, i: number, name: string) => void;
+  organizeSaved: (kind: SavedKind, i: number, collection: string) => void;
+  openSaved: (kind: SavedKind, i: number) => Promise<void>;
+  retryPersistence: () => void;
   setTwinWeights: (w: Record<string, number> | null) => void;
   openBrief: (earth: { lat: number; lon: number }) => void;
 
@@ -161,6 +161,27 @@ let nonce = 0;
 
 const message = (e: unknown) => (e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Something went wrong.");
 const aborted = (e: unknown) => e instanceof DOMException && e.name === "AbortError";
+
+const makeId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const weightKey = (weights: Record<string, number> | null) => JSON.stringify(Object.entries(weights ?? {}).sort(([a], [b]) => a.localeCompare(b)));
+const comparisonKey = (c: SavedComparison) => `${c.kind}|${c.sites.map((x) => `${x.body}:${x.lat},${x.lon}`).join(";")}|${c.purpose}|${weightKey(c.weights)}`;
+const uniqueSources = (sources: SavedSource[]) => sources.filter((s, i, all) => !!s.url && all.findIndex((x) => x.url === s.url) === i);
+function cellSources(cell: CellInfo | null, s: State): SavedSource[] {
+  return uniqueSources((cell?.groups ?? []).flatMap((g) => g.items).flatMap((m) => {
+    const source = m.source ? s.meta?.sources_index[m.source] : null;
+    return source ? [{ title: source.name, url: source.url, role: "scientific measurements" }] : [];
+  }));
+}
+function enrichSite(site: SiteRef, s: State): SavedSite {
+  const pin = s.pins[site.body].find((p) => sameSite(site, { body: site.body, ...p, label: p.name }));
+  const selected = s.selection && sameSite(site, { ...s.selection, label: "" });
+  const cell = selected && s.cellStatus === "ready" && s.cell?.body === site.body ? s.cell : null;
+  const suitability = cell?.suitability;
+  const context: SavedContext | undefined = suitability ? { model: "mission suitability", modelVersion: "RADIUM 1.0", purpose: suitability.mission,
+    weights: Object.fromEntries(suitability.factors.map((f) => [f.id, f.weight * 100])), excluded: suitability.excluded, grade: suitability.excluded ? null : suitability.grade, score: suitability.score, coverage: suitability.coverage, assessedAt: new Date().toISOString() } : undefined;
+  return { ...site, label: pin?.name ?? site.label, id: makeId(), created: new Date().toISOString(), collection: "", registry: pin ? structuredClone(pin) : undefined,
+    sources: uniqueSources([...(pin?.sources ?? (pin?.link ? [{ title: pin.source || pin.name, url: pin.link, role: "site history" }] : [])), ...cellSources(cell, s)]), context };
+}
 
 export const useStore = create<State>((set, get) => ({
   meta: null,
@@ -216,7 +237,10 @@ export const useStore = create<State>((set, get) => ({
 
   brief: null,
   compareList: [],
-  saved: loadSaved(),
+  saved: initialSaved.saved,
+  persistenceError: initialSaved.error,
+  saveNotice: null,
+  compareTab: "sites",
   tempUnit: "K",
   twinWeights: null,
   advanced: false,
@@ -249,10 +273,10 @@ export const useStore = create<State>((set, get) => ({
 
   setBody: (b) => {
     const s = get();
-    if (s.body === b && s.mode !== "twin") return;
+    if (s.body === b && (s.mode === "explore" || s.mode === "mission")) return;
     let mode = s.mode;
     let missionId = s.missionId;
-    if (mode === "twin" || mode === "near" || mode === "compare") mode = "explore";
+    if (mode === "twin" || mode === "near" || mode === "compare" || mode === "saved") mode = "explore";
     if (mode === "mission") {
       if (b === "earth") mode = "explore";
       else if (s.meta) {
@@ -260,6 +284,8 @@ export const useStore = create<State>((set, get) => ({
         if (cur?.body !== b) missionId = s.meta.missions.find((m) => m.body === b)!.id;
       }
     }
+    cellAbort?.abort();
+    if (missionId !== s.missionId || b !== s.body) rankAbort?.abort();
     document.documentElement.dataset.world = b;
     set({ body: b, mode, missionId, selection: null, cell: null, cellStatus: "idle", cursor: null, rank: mode === "mission" && missionId !== s.missionId ? null : s.rank });
     if (mode === "mission") void get().runRank();
@@ -306,15 +332,17 @@ export const useStore = create<State>((set, get) => ({
   select: async (body, lat, lon, o = {}) => {
     cellAbort?.abort();
     cellAbort = new AbortController();
+    const signal = cellAbort.signal;
     const s = get();
     set({ selection: { body, lat, lon }, cellStatus: "loading", cellError: null, rightOpen: true });
     if (o.fly) get().flyTo(body, lat, lon, o.spanKm);
     try {
       const mission = s.mode === "mission" && body !== "earth" ? s.missionId : undefined;
-      const cell = await api.cell(body, lat, lon, mission ? { mission, weights: s.rawWeights[mission], limits: s.limitsOn[mission] } : {}, cellAbort.signal);
+      const cell = await api.cell(body, lat, lon, mission ? { mission, weights: s.rawWeights[mission], limits: s.limitsOn[mission] } : {}, signal);
+      if (signal.aborted) return;
       set({ cell, cellStatus: "ready" });
     } catch (e) {
-      if (aborted(e)) return;
+      if (signal.aborted || aborted(e)) return;
       set({ cellStatus: "error", cellError: message(e) });
     }
   },
@@ -372,13 +400,15 @@ export const useStore = create<State>((set, get) => ({
     if (!weights) return;
     rankAbort?.abort();
     rankAbort = new AbortController();
+    const signal = rankAbort.signal;
     set({ rankStatus: "loading", rankError: null });
     const prev = s.lastRanked && s.lastRanked.mission === mission ? s.lastRanked : null;
     try {
-      const rank = await api.rank({ mission, weights, limits, n: 12, ...(prev ? { prev_weights: prev.weights, prev_limits: prev.limits } : {}) }, rankAbort.signal);
+      const rank = await api.rank({ mission, weights, limits, n: 12, ...(prev ? { prev_weights: prev.weights, prev_limits: prev.limits } : {}) }, signal);
+      if (signal.aborted) return;
       set({ rank, rankStatus: "ready", lastRanked: { mission, weights: { ...weights }, limits: [...limits] } });
     } catch (e) {
-      if (aborted(e)) return;
+      if (signal.aborted || aborted(e)) return;
       set({ rankStatus: "error", rankError: message(e) });
     }
   },
@@ -386,12 +416,15 @@ export const useStore = create<State>((set, get) => ({
   startTwin: (origin) => {
     const s = get();
     const sel = s.selection && s.selection.body !== "earth" ? (s.selection as { body: Planet; lat: number; lon: number }) : null;
-    const o = origin ?? sel ?? s.twinOrigin;
+    const inAnalogs = s.mode === "twin" || s.mode === "near" || s.mode === "compare";
+    const o = origin ?? (inAnalogs ? s.twinOrigin ?? sel : sel ?? s.twinOrigin);
     const body: Body = o?.body ?? (s.body === "earth" ? (s.twinOrigin?.body ?? "mars") : s.body);
     const purposes = s.meta?.purposes[body as Planet] ?? [];
     const purpose = purposes.some((p) => p.id === s.purpose) ? s.purpose : "general";
+    const sameTarget = !!o && !!s.twinOrigin && sameSite({ ...o, label: "" }, { ...s.twinOrigin, label: "" });
+    if (!sameTarget) { twinAbort?.abort(); compareAbort?.abort(); }
     document.documentElement.dataset.world = body;
-    set({ mode: "twin", body, twinOrigin: o ?? null, purpose, twin: o && s.twinOrigin && o.lat === s.twinOrigin.lat && o.lon === s.twinOrigin.lon && o.body === s.twinOrigin.body ? s.twin : null, picked: null, compare: null, compareStatus: "idle", rightOpen: true });
+    set({ mode: "twin", body, twinOrigin: o ?? null, purpose, twinWeights: purpose !== s.purpose ? null : s.twinWeights, twin: o && s.twinOrigin && o.lat === s.twinOrigin.lat && o.lon === s.twinOrigin.lon && o.body === s.twinOrigin.body ? s.twin : null, picked: sameTarget ? s.picked : null, compare: sameTarget ? s.compare : null, compareStatus: sameTarget ? s.compareStatus : "idle", rightOpen: true });
     if (o) {
       if (!s.selection || s.selection.body !== o.body || s.selection.lat !== o.lat || s.selection.lon !== o.lon) void get().select(o.body, o.lat, o.lon);
       void get().runTwin();
@@ -399,7 +432,8 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setPurpose: (purpose) => {
-    set({ purpose, compare: null, twinWeights: null });
+    compareAbort?.abort();
+    set({ purpose, compare: null, compareStatus: "idle", twinWeights: null });
     if (get().mode === "near" && get().nearLoc) void get().runNearby();
     void get().runTwin().then(() => {
       const p = get().picked;
@@ -412,12 +446,14 @@ export const useStore = create<State>((set, get) => ({
     if (!s.twinOrigin) return;
     twinAbort?.abort();
     twinAbort = new AbortController();
+    const signal = twinAbort.signal;
     set({ twinStatus: "loading", twinError: null });
     try {
-      const twin = await api.twin({ ...s.twinOrigin, purpose: s.purpose, n: 10, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, twinAbort.signal);
+      const twin = await api.twin({ ...s.twinOrigin, purpose: s.purpose, n: 10, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, signal);
+      if (signal.aborted) return;
       set({ twin, twinStatus: "ready" });
     } catch (e) {
-      if (aborted(e)) return;
+      if (signal.aborted || aborted(e)) return;
       set({ twinStatus: "error", twinError: message(e), twin: null });
     }
   },
@@ -427,13 +463,15 @@ export const useStore = create<State>((set, get) => ({
     if (!s.twinOrigin) return;
     compareAbort?.abort();
     compareAbort = new AbortController();
-    set({ picked: { lat, lon }, compareStatus: "loading", compareError: null, rightOpen: true });
+    const signal = compareAbort.signal;
+    set({ picked: { lat, lon }, compareTab: "pair", compare: null, compareStatus: "loading", compareError: null, rightOpen: true });
     if (fly) get().flyTo("earth", lat, lon, 1400);
     try {
-      const compare = await api.compare({ ...s.twinOrigin, purpose: s.purpose, earth_lat: lat, earth_lon: lon, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, compareAbort.signal);
+      const compare = await api.compare({ ...s.twinOrigin, purpose: s.purpose, earth_lat: lat, earth_lon: lon, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, signal);
+      if (signal.aborted) return;
       set({ compare, compareStatus: "ready" });
     } catch (e) {
-      if (aborted(e)) return;
+      if (signal.aborted || aborted(e)) return;
       set({ compareStatus: "error", compareError: message(e) });
     }
   },
@@ -466,15 +504,17 @@ export const useStore = create<State>((set, get) => ({
     }
     nearAbort?.abort();
     nearAbort = new AbortController();
+    const signal = nearAbort.signal;
     set({ nearStatus: "loading", nearError: null });
     try {
       const nearResult = await api.nearby({
         lat: s.nearLoc.lat, lon: s.nearLoc.lon, radius_km: s.nearRadius, mode: s.nearMode, documented_only: s.nearDocOnly, limit: 20,
         ...(target ? { body: target.body, target_lat: target.lat, target_lon: target.lon, purpose: s.purpose, ...(s.twinWeights ? { weights: s.twinWeights } : {}) } : {}),
-      }, nearAbort.signal);
+      }, signal);
+      if (signal.aborted) return;
       set({ nearResult, nearStatus: "ready", nearActive: null });
     } catch (e) {
-      if (aborted(e)) return;
+      if (signal.aborted || aborted(e)) return;
       set({ nearStatus: "error", nearError: message(e), nearResult: null });
     }
   },
@@ -483,39 +523,123 @@ export const useStore = create<State>((set, get) => ({
     const s = get();
     const purposes = o ? s.meta?.purposes[o.body] ?? [] : [];
     const purpose = purposes.some((p) => p.id === s.purpose) ? s.purpose : "general";
-    set({ twinOrigin: o, purpose, twin: null, picked: null, compare: null, ...(o ? {} : { nearMode: "nearest" as const }) });
+    twinAbort?.abort(); compareAbort?.abort();
+    const picked = o && s.mode === "compare" ? s.picked : null;
+    set({ twinOrigin: o, purpose, twin: null, twinStatus: "idle", twinWeights: purpose !== s.purpose ? null : s.twinWeights,
+      picked, compare: null, compareStatus: "idle", ...(o ? { body: o.body } : { nearMode: "nearest" as const }) });
+    if (o) {
+      document.documentElement.dataset.world = s.mode === "near" ? "earth" : o.body;
+      if (s.mode === "twin" || s.mode === "compare") {
+        void get().select(o.body, o.lat, o.lon, { fly: true });
+        void get().runTwin();
+        if (picked) void get().pickEarth(picked.lat, picked.lon);
+      }
+    }
     if (s.nearLoc) void get().runNearby();
   },
 
   addCompare: (site) => set((s) => {
     if (s.compareList.some((x) => sameSite(x, site))) return {};
-    return { compareList: [...s.compareList, site].slice(-COMPARE_MAX) };
+    return { compareList: [...s.compareList, site].slice(-COMPARE_MAX), compareTab: "sites" };
   }),
   removeCompare: (i) => set((s) => ({ compareList: s.compareList.filter((_, k) => k !== i) })),
   clearCompare: () => set({ compareList: [] }),
   saveSite: (site) => {
     const s = get();
-    if (s.saved.sites.some((x) => sameSite(x, site))) return;
-    const saved = { ...s.saved, sites: [site, ...s.saved.sites].slice(0, 50) };
-    storeSaved(saved);
-    set({ saved });
+    if (s.saved.sites.some((x) => sameSite(x, site))) { set({ saveNotice: "This place is already saved." }); return; }
+    const saved = { ...s.saved, sites: [enrichSite(site, s), ...s.saved.sites] };
+    set({ saved, persistenceError: writeSaved(saved), saveNotice: "Place saved to your research workspace." });
   },
   saveMission: (name) => {
     const s = get();
-    const sel = s.cell && s.cell.body !== "earth" ? { body: s.cell.body, lat: s.cell.cell.lat, lon: s.cell.cell.lon, label: s.cell.place.label } : null;
-    const m: SavedMission = { id: `${Date.now()}`, name, mission: s.missionId, weights: { ...s.rawWeights[s.missionId] }, limits: [...(s.limitsOn[s.missionId] ?? [])], site: sel, created: new Date().toISOString().slice(0, 16).replace("T", " ") };
-    const saved = { ...s.saved, missions: [m, ...s.saved.missions].slice(0, 30) };
-    storeSaved(saved);
-    set({ saved });
+    const mission = s.meta?.missions.find((m) => m.id === s.missionId);
+    if (!mission) return;
+    const sel = s.selection?.body === mission.body ? enrichSite({ ...s.selection, label: s.cell?.place.label ?? `${mission.body} destination` }, s) : null;
+    const weights = { ...s.rawWeights[s.missionId] };
+    const limits = [...(s.limitsOn[s.missionId] ?? [])];
+    if (s.saved.missions.some((m) => m.mission === s.missionId && weightKey(m.weights) === weightKey(weights) && [...m.limits].sort().join() === [...limits].sort().join() && (m.site && sel ? sameSite(m.site, sel) : m.site === sel))) {
+      set({ saveNotice: "A mission with these settings and destination is already saved." }); return;
+    }
+    const m: SavedMission = { id: makeId(), name: name.trim().slice(0, 160) || mission.label, mission: s.missionId, weights, limits, site: sel,
+      created: new Date().toISOString(), collection: "", context: sel?.context, sources: sel?.sources ?? [] };
+    const saved = { ...s.saved, missions: [m, ...s.saved.missions] };
+    set({ saved, persistenceError: writeSaved(saved), saveNotice: "Mission and its settings saved." });
+  },
+  saveComparison: (name, kind = get().compareTab) => {
+    const s = get();
+    let comparison: SavedComparison;
+    if (kind === "pair") {
+      if (!s.twinOrigin || !s.picked || !s.compare || s.compareStatus !== "ready") { set({ saveNotice: "Wait for a complete comparison before saving." }); return false; }
+      const target = enrichSite({ ...s.twinOrigin, label: s.compare.planet.place.label }, s) as SavedSite & { body: Planet };
+      const earth = enrichSite({ body: "earth", ...s.picked, label: s.compare.earth.place.label }, s);
+      const weights = s.twinWeights ? { ...s.twinWeights } : null;
+      const match = s.compare.match;
+      comparison = { id: makeId(), name: name?.trim().slice(0, 160) || `${target.label} × ${earth.label}`, kind, sites: [target, earth], target, earth,
+        purpose: s.purpose, weights, created: new Date().toISOString(), collection: "", sources: uniqueSources([...target.sources ?? [], ...earth.sources ?? [], ...cellSources(s.compare.planet, s), ...cellSources(s.compare.earth, s)]),
+        context: { model: "analog similarity", modelVersion: "RADIUM 1.0", purpose: s.purpose, weights: weights ?? Object.fromEntries(match.dimensions.map((d) => [d.id, d.weight * 100])), grade: match.grade, score: match.score, coverage: match.coverage, assessedAt: new Date().toISOString() },
+        dimensions: match.dimensions.map(({ id, label, score, grade, weight }) => ({ id, label, score, grade, weight })) };
+    } else {
+      if (s.compareList.length < 2) { set({ saveNotice: "Add at least two places to save a comparison." }); return false; }
+      const sites = s.compareList.map((site) => enrichSite(site, s));
+      comparison = { id: makeId(), name: name?.trim().slice(0, 160) || sites.map((x) => x.label).join(" × "), kind, sites, purpose: "measured environments", weights: null, created: new Date().toISOString(), collection: "", sources: uniqueSources(sites.flatMap((x) => x.sources ?? [])) };
+    }
+    if (s.saved.comparisons.some((c) => comparisonKey(c) === comparisonKey(comparison))) { set({ saveNotice: "This comparison and its settings are already saved." }); return true; }
+    const saved = { ...s.saved, comparisons: [comparison, ...s.saved.comparisons] };
+    set({ saved, persistenceError: writeSaved(saved), saveNotice: "Comparison, sources and model context saved." });
+    return true;
   },
   removeSaved: (kind, i) => {
     const s = get();
-    const saved = { ...s.saved, [kind]: (s.saved[kind] as unknown[]).filter((_, k) => k !== i) } as SavedState;
-    storeSaved(saved);
-    set({ saved });
+    const saved = { ...s.saved, [kind]: s.saved[kind].filter((_, k) => k !== i) } as SavedState;
+    set({ saved, persistenceError: writeSaved(saved), saveNotice: "Removed from saved research." });
   },
+  renameSaved: (kind, i, name) => {
+    if (!name.trim()) return;
+    const s = get();
+    const saved = { ...s.saved, [kind]: s.saved[kind].map((item, k) => k === i ? { ...item, [kind === "sites" ? "label" : "name"]: name.trim().slice(0, 160) } : item) } as SavedState;
+    set({ saved, persistenceError: writeSaved(saved), saveNotice: "Research renamed." });
+  },
+  organizeSaved: (kind, i, collection) => {
+    const s = get();
+    const saved = { ...s.saved, [kind]: s.saved[kind].map((item, k) => k === i ? { ...item, collection: collection.trim().slice(0, 80) } : item) } as SavedState;
+    set({ saved, persistenceError: writeSaved(saved), saveNotice: "Collection updated." });
+  },
+  openSaved: async (kind, i) => {
+    const s = get();
+    if (kind === "sites") {
+      const site = s.saved.sites[i]; if (!site) return;
+      get().setBody(site.body); get().setMode("explore");
+      await get().select(site.body, site.lat, site.lon, { fly: true });
+    } else if (kind === "missions") {
+      const m = s.saved.missions[i]; if (!m) return;
+      const mission = s.meta?.missions.find((x) => x.id === m.mission);
+      if (!mission) { set({ saveNotice: "This saved mission type is no longer available." }); return; }
+      const weights = Object.fromEntries(mission.criteria.map((c) => [c.id, m.weights[c.id] ?? Math.round(c.weight * 100)]));
+      const limits = m.limits.filter((l) => mission.limits.some((x) => x.id === l));
+      cellAbort?.abort(); rankAbort?.abort();
+      set({ mode: "mission", body: mission.body, missionId: mission.id, rawWeights: { ...s.rawWeights, [mission.id]: weights },
+        limitsOn: { ...s.limitsOn, [mission.id]: limits }, selection: null, cell: null, cellStatus: "idle", rank: null, lastRanked: null, leftOpen: true, rightOpen: !!m.site });
+      document.documentElement.dataset.world = mission.body;
+      await Promise.all([get().runRank(), m.site ? get().select(m.site.body, m.site.lat, m.site.lon, { fly: true }) : Promise.resolve()]);
+    } else {
+      const c = s.saved.comparisons[i]; if (!c) return;
+      if (c.kind === "sites") {
+        set({ compareList: c.sites.map(({ body, lat, lon, label }) => ({ body, lat, lon, label })), compareTab: "sites" });
+        get().setMode("compare");
+      } else if (c.target && c.earth) {
+        const target = c.target;
+        const purpose = s.meta?.purposes[target.body].some((p) => p.id === c.purpose) ? c.purpose : "general";
+        twinAbort?.abort(); compareAbort?.abort();
+        set({ mode: "compare", body: target.body, twinOrigin: target, purpose, twinWeights: c.weights, picked: null, compare: null, compareStatus: "idle", twin: null, twinStatus: "idle", compareTab: "pair" });
+        document.documentElement.dataset.world = target.body;
+        await Promise.all([get().runTwin(), get().pickEarth(c.earth.lat, c.earth.lon, true)]);
+      }
+    }
+  },
+  retryPersistence: () => set({ persistenceError: writeSaved(get().saved) }),
   setTwinWeights: (w) => {
-    set({ twinWeights: w });
+    compareAbort?.abort();
+    set({ twinWeights: w, compare: null, compareStatus: "idle" });
     void get().runTwin().then(() => { const p = get().picked; if (p) void get().pickEarth(p.lat, p.lon); });
     if (get().mode === "near" && get().nearLoc) void get().runNearby();
   },

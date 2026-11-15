@@ -17,7 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from . import briefs, catalog, reference, registry, render
+from . import briefs, catalog, reference, registry, render, sites
 from .geo import RADIUS_KM, fmt_latlon, gc_km, pick_distinct
 from .naming import Earth as EarthNames
 from .naming import Planetary
@@ -37,6 +37,7 @@ twin = Twin(store)
 pnames = {"moon": Planetary("moon"), "mars": Planetary("mars")}
 enames = EarthNames()
 PINS = {"moon": reference.moon_pins(pnames["moon"]), "mars": reference.mars_pins(pnames["mars"]), "earth": reference.earth_pins()}
+DOCUMENTED_EARTH = [p for p in PINS["earth"] if sites.documented(p)]
 TREK = json.loads((DATA / "layers_trek.json").read_text())
 DOC_RADIUS_KM = 150.0
 
@@ -63,6 +64,13 @@ def need_body(body: str, planetary: bool = False):
     ok = ("moon", "mars") if planetary else ("moon", "mars", "earth")
     if body not in ok:
         raise HTTPException(400, f"body must be one of {ok}")
+
+
+def need_coordinates(lat: float, lon: float):
+    if not (math.isfinite(lat) and math.isfinite(lon)):
+        raise HTTPException(422, "latitude and longitude must be finite numbers")
+    if not -90 <= lat <= 90:
+        raise HTTPException(422, "latitude must be between -90 and 90")
 
 
 def place_label(body: str, lat: float, lon: float):
@@ -176,7 +184,11 @@ def meta():
 
 @app.get("/api/sources")
 def sources():
-    return {"sources": registry.SOURCES, "not_used": registry.NOT_USED}
+    return {"sources": registry.SOURCES, "not_used": registry.NOT_USED,
+            "site_sources": [{"site_id": p["id"], "name": p["name"], "body": p["body"],
+                              "verification_status": p["verification_status"], "sources": p["sources"]}
+                             for pins in PINS.values() for p in pins],
+            "catalogue": sites.summary()}
 
 
 @app.get("/api/methodology")
@@ -200,6 +212,7 @@ def methodology():
         "grids": {gid: {"cells": int(g.valid.sum()), "shape": list(g.shape), "cell_km": g.meta.get("cell_km")} for gid, g in store.g.items()},
         "earth_reclassified_ice_cells": int(store.g["earth"].a["ice_reclassified"].sum()),
         "reference_sites": len(reference.EARTH_ANALOGS),
+        "site_catalogue": sites.summary(),
     })
 
 
@@ -209,21 +222,34 @@ def pins(body: str):
     return {"pins": PINS[body]}
 
 
+@app.get("/api/sites")
+def site_catalogue(body: Optional[str] = None, q: str = Query("", max_length=100),
+                   classification: Optional[str] = None, verified: bool = False):
+    if body is not None:
+        need_body(body)
+    records = [p for b, pins in PINS.items() if body is None or b == body for p in pins]
+    if q.strip():
+        records = [p for p in records if sites.matches(p, q)]
+    if classification:
+        records = [p for p in records if p["classification"] == classification]
+    if verified:
+        records = [p for p in records if p["verification_status"] == "verified"]
+    return {"sites": records, "catalogue": sites.summary()}
+
+
 @app.get("/api/search")
 def search(body: str, q: str = Query("", max_length=60)):
     need_body(body)
     q = q.strip()
-    if body == "earth":
-        res = enames.search(q)
-        ql = q.lower()
-        res = [{"name": p["name"], "type": "Documented analog site", "lat": p["lat"], "lon": p["lon"]}
-               for p in PINS["earth"] if ql and ql in p["name"].lower()][:6] + res
-    else:
-        res = pnames[body].search(q)
-        ql = q.lower()
-        res = [{"name": p["name"], "type": "Landing site", "lat": p["lat"], "lon": p["lon"]}
-               for p in PINS[body] if p["kind"] == "landing" and ql and ql in p["name"].lower()][:6] + res
-    return {"results": res[:14]}
+    res = enames.search(q) if body == "earth" else pnames[body].search(q)
+    labels = {"historical_mission": "Historical landing site", "candidate_region": "Studied candidate region",
+              "geological_research_region": "Named geological region", "terrestrial_analog": "Documented analog site",
+              "research_candidate": "Research site · evidence review needed"}
+    curated = [{**p, "type": labels[p["classification"]]} for p in PINS[body] if sites.matches(p, q)]
+    curated.sort(key=lambda p: (not sites.normalise_text(p["name"]).startswith(sites.normalise_text(q)), p["name"]))
+    # The curated coordinates take precedence over older gazetteer snapshots.
+    names = {p["name"].casefold() for p in curated}
+    return {"results": (curated + [p for p in res if p["name"].casefold() not in names])[:14]}
 
 
 # =============================================================================
@@ -239,6 +265,7 @@ def suitability_for(g, i, j, mission, weights, limits):
 def cell(body: str, lat: float, lon: float, mission: Optional[str] = None, w: Optional[str] = None,
          limits: Optional[str] = None):
     need_body(body)
+    need_coordinates(lat, lon)
     if not (-90 <= lat <= 90):
         raise HTTPException(400, "lat out of range")
     lon = ((lon + 180.0) % 360.0) - 180.0
@@ -388,10 +415,12 @@ class CompareRequest(TwinRequest):
 
 def nearest_documented(lat, lon, body):
     best = None
-    for p in PINS["earth"]:
+    for p in DOCUMENTED_EARTH:
         d = float(gc_km(lat, lon, p["lat"], p["lon"], RADIUS_KM["earth"]))
         if d <= DOC_RADIUS_KM and (best is None or d < best["distance_km"]):
             best = {"name": p["name"], "distance_km": d, "source": p["source"], "theme": p["theme"],
+                    "site_id": p["id"], "sources": p["sources"], "verification_status": p["verification_status"],
+                    "relationship": "Nearby documented research site; proximity does not establish an identical field location or analogy.",
                     "for_this_body": body in p["bodies"]}
     return best
 
@@ -405,6 +434,9 @@ def req_weights(req):
 
 def twin_setup(req: TwinRequest):
     need_body(req.body, planetary=True)
+    need_coordinates(req.lat, req.lon)
+    if hasattr(req, "earth_lat"):
+        need_coordinates(req.earth_lat, req.earth_lon)
     if req.purpose not in PURPOSES[req.body]:
         raise HTTPException(400, f"purpose must be one of {list(PURPOSES[req.body])}")
     g, i, j = store.locate(req.body, req.lat, req.lon)
@@ -446,11 +478,12 @@ def twin_search(req: TwinRequest):
         c["rank"] = k + 1
 
     documented = []
-    for site in PINS["earth"]:
+    for site in DOCUMENTED_EARTH:
         ei, ej = e.index(site["lat"], site["lon"])
         v = float(score[ei, ej])
         ex = twin.explain(p, dims, ei, ej, req.purpose, req_weights(req))
         documented.append({"name": site["name"], "country": site["country"], "lat": site["lat"], "lon": site["lon"],
+                           "site_id": site["id"], "sources": site["sources"], "verification_status": site["verification_status"],
                            "theme": site["theme"], "source": site["source"], "for_this_body": req.body in site["bodies"],
                            "score": ex["score"], "grade": ex["grade"], "strong": ex["strong"], "weak": ex["weak"],
                            "analysed": bool(e.valid[ei, ej]) and math.isfinite(v)})
@@ -587,10 +620,11 @@ def analogs_nearby(req: NearbyRequest):
 
     # Documented sites: straight-line (great-circle) distance on Earth's surface.
     docs = []
-    for site in PINS["earth"]:
+    for site in DOCUMENTED_EARTH:
         d = float(gc_km(lat, lon, site["lat"], site["lon"], RADIUS_KM["earth"]))
         if d <= req.radius_km:
             docs.append({"kind": "documented", "name": site["name"], "country": site["country"], "lat": site["lat"], "lon": site["lon"],
+                         "site_id": site["id"], "sources": site["sources"], "verification_status": site["verification_status"],
                          "coords": fmt_latlon(site["lat"], site["lon"]), "distance_km": d, "theme": site["theme"],
                          "tags": site["tags"], "source": site["source"], "bodies": site["bodies"]})
     for dd in docs:
@@ -627,7 +661,8 @@ def analogs_nearby(req: NearbyRequest):
         "documented": docs[:limit],
         "documented_in_radius": len(docs),
         "regions": regions[:limit],
-        "catalogue_size": len(PINS["earth"]),
+        "catalogue_size": len(DOCUMENTED_EARTH),
+        "review_pending": len(PINS["earth"]) - len(DOCUMENTED_EARTH),
         "notes": [
             "Distances are straight-line (great-circle) distances on Earth's surface. They say nothing about roads, borders, permits or access.",
             "Documented sites come from RADIUM's reference list of published analog sites; a place missing from it may still have been studied.",

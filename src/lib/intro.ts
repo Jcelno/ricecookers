@@ -7,3 +7,17 @@ export function introSeen(): boolean {
 export function markIntroSeen() {
   try { localStorage.setItem(SEEN_KEY, "1"); } catch { /* nothing to remember in */ }
 }
+
+export interface TourProgress { path: "short" | "detailed"; index: number; completed: number[] }
+export function loadTourProgress(): TourProgress {
+  try {
+    const v = JSON.parse(localStorage.getItem("radium.tutorial.v2") ?? "null");
+    if (v && (v.path === "short" || v.path === "detailed") && Number.isInteger(v.index) && v.index >= 0 && v.index < 32 && Array.isArray(v.completed)) {
+      return { path: v.path, index: v.index, completed: v.completed.filter((n: unknown) => typeof n === "number" && Number.isInteger(n) && n >= 0 && n < 32) };
+    }
+  } catch { /* The tutorial remains usable without storage. */ }
+  return { path: "short", index: 0, completed: [] };
+}
+export function saveTourProgress(progress: TourProgress) {
+  try { localStorage.setItem("radium.tutorial.v2", JSON.stringify(progress)); } catch { /* Optional learning progress. */ }
+}

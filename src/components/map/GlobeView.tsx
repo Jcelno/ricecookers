@@ -1,7 +1,7 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import {
-  Cartesian2, Cartesian3, Cartographic, Color, DistanceDisplayCondition, Ellipsoid, EllipsoidTerrainProvider, type Entity,
+  Cartesian2, Cartesian3, Cartographic, Color, CustomDataSource, DistanceDisplayCondition, Ellipsoid, EllipsoidTerrainProvider, type Entity,
   GeographicProjection, GeographicTilingScheme, Globe, HorizontalOrigin, ImageryLayer, LabelStyle, Math as CMath, NearFarScalar, PolylineDashMaterialProperty,
   Rectangle, ScreenSpaceEventHandler, ScreenSpaceEventType, SingleTileImageryProvider, SkyBox, SplitDirection, TextureMagnificationFilter,
   TextureMinificationFilter, UrlTemplateImageryProvider, VerticalOrigin, Viewer,
@@ -9,6 +9,7 @@ import {
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import { GRADE_HEX, wrapLon } from "@/lib/format";
+import { motionDuration, sphericalCenter } from "@/lib/markers";
 import type { Grade, Pin, Planet, TileLayer } from "@/lib/types";
 import type { Focus } from "@/store";
 
@@ -44,6 +45,8 @@ export interface ImageOverlay { key: string; url: string; rect: [number, number,
 export interface SiteMarker { id: string; lat: number; lon: number; text: string; grade: Grade | null; active?: boolean }
 export interface ViewState { lat: number; lon: number; degPerPx: number; heightKm: number }
 export interface GlobeHandle { zoom: (factor: number) => void; home: () => void }
+const NO_PINS: Pin[] = [];
+const NO_MARKERS: SiteMarker[] = [];
 
 interface Props {
   body: Planet;
@@ -67,28 +70,28 @@ interface Props {
   coverage?: [number, number][][];
 }
 
-function markerImage(text: string, grade: Grade | null, active: boolean) {
-  const s = 56;
+function markerImage(text: string, grade: Grade | null, active: boolean, cluster = false) {
+  const s = 72;
   const c = document.createElement("canvas");
   c.width = c.height = s;
   const g = c.getContext("2d")!;
-  g.beginPath();
-  g.arc(s / 2, s / 2, s / 2 - 5, 0, Math.PI * 2);
-  g.fillStyle = grade ? GRADE_HEX[grade] : "#94938a";
+  g.shadowColor = "#0009"; g.shadowBlur = 5; g.shadowOffsetY = 2;
+  g.beginPath(); g.arc(s / 2, s / 2, s / 2 - 7, 0, Math.PI * 2);
+  g.fillStyle = grade ? GRADE_HEX[grade] : cluster ? "#14283d" : "#415166";
   g.fill();
+  g.shadowBlur = 0; g.shadowOffsetY = 0;
   g.lineWidth = active ? 5 : 3;
-  g.strokeStyle = active ? "#f6f2e9" : "#101216";
-  g.stroke();
-  g.fillStyle = "#101216";
-  g.font = '600 26px "IBM Plex Sans", sans-serif';
-  g.textAlign = "center";
-  g.textBaseline = "middle";
+  g.strokeStyle = "#e4edf5"; g.stroke();
+  if (cluster) { g.beginPath(); g.arc(s / 2, s / 2, s / 2 - 13, 0, Math.PI * 2); g.lineWidth = 1.5; g.stroke(); }
+  g.fillStyle = grade ? "#101216" : "#f0f5fa";
+  g.font = '700 28px "IBM Plex Sans", sans-serif';
+  g.textAlign = "center"; g.textBaseline = "middle";
   g.fillText(text, s / 2, s / 2 + 1);
   return c;
 }
 
 export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
-  { body, base, tileOverlay, images = [], opacity = 0.85, dimBase = false, pins = [], markers = [], selection, focus, interactive = true, onPick, onCursor, onView, onStatus, split = null, coverage },
+  { body, base, tileOverlay, images = [], opacity = 0.85, dimBase = false, pins = NO_PINS, markers = NO_MARKERS, selection, focus, interactive = true, onPick, onCursor, onView, onStatus, split = null, coverage },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -104,6 +107,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
   const cb = useRef({ onPick, onCursor, onView, onStatus });
   cb.current = { onPick, onCursor, onView, onStatus };
   const lastFocus = useRef(0);
+  const [hoverTitle, setHoverTitle] = useState<string | null>(null);
 
   // ------------------------------------------------------------------ viewer
   useEffect(() => {
@@ -169,6 +173,15 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     const handler = new ScreenSpaceEventHandler(scene.canvas);
     handler.setInputAction((e: { position: Cartesian2 }) => {
       const hit = scene.pick(e.position);
+      if (hit && Array.isArray(hit.id)) {
+        const places = (hit.id as Entity[]).map(e => lookup.current.get(e.id)).filter((p): p is { lat: number; lon: number } => !!p);
+        if (places.length) {
+          const center = sphericalCenter(places);
+          const height = Math.max(ctl.minimumZoomDistance, v.camera.positionCartographic.height * 0.4);
+          v.camera.flyTo({ destination: Cartesian3.fromDegrees(center.lon, center.lat, height, ellipsoid), duration: motionDuration(650) / 1000 });
+          return;
+        }
+      }
       const id = hit && (hit.id as Entity | undefined)?.id;
       const known = typeof id === "string" ? lookup.current.get(id) : undefined;
       if (known) return cb.current.onPick?.(known.lat, known.lon);
@@ -179,9 +192,15 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     handler.setInputAction((e: { endPosition: Cartesian2 }) => {
       const pos = Cartesian2.clone(e.endPosition);
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => cb.current.onCursor?.(pickLatLon(pos)));
+      raf = requestAnimationFrame(() => {
+        cb.current.onCursor?.(pickLatLon(pos));
+        const hit = scene.pick(pos);
+        const title = hit && Array.isArray(hit.id) ? `${hit.id.length} locations • select to zoom into cluster` : hit?.id?.name ?? null;
+        setHoverTitle(title);
+        scene.canvas.style.cursor = hit?.id ? "pointer" : "grab";
+      });
     }, ScreenSpaceEventType.MOUSE_MOVE);
-    const leave = () => cb.current.onCursor?.(null);
+    const leave = () => { cb.current.onCursor?.(null); setHoverTitle(null); };
     scene.canvas.addEventListener("mouseleave", leave);
 
     const report = () => {
@@ -251,12 +270,12 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       const h = v.camera.positionCartographic.height;
       const target = Math.max(v.scene.screenSpaceCameraController.minimumZoomDistance, Math.min(v.scene.screenSpaceCameraController.maximumZoomDistance, h * factor));
       const c = v.camera.positionCartographic;
-      v.camera.flyTo({ destination: Cartesian3.fromRadians(c.longitude, c.latitude, target, ELLIPSOID[body]), duration: 0.45 });
+      v.camera.flyTo({ destination: Cartesian3.fromRadians(c.longitude, c.latitude, target, ELLIPSOID[body]), duration: motionDuration(450) / 1000 });
     },
     home: () => {
       const v = viewerRef.current;
       if (!v) return;
-      v.camera.flyTo({ destination: Cartesian3.fromDegrees(HOME[body].lon, HOME[body].lat, ELLIPSOID[body].maximumRadius * 1.75, ELLIPSOID[body]), duration: 1.1 });
+      v.camera.flyTo({ destination: Cartesian3.fromDegrees(HOME[body].lon, HOME[body].lat, ELLIPSOID[body].maximumRadius * 1.75, ELLIPSOID[body]), duration: motionDuration(1100) / 1000 });
     },
   }), [body]);
 
@@ -394,73 +413,73 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     viewer.scene.requestRender();
   }, [viewer, opacity]);
 
-  // ---------------------------------------------------------------------- pins
+  // Curated sites and model outputs share screen-space clustering. Cesium recomputes
+  // clusters when the camera moves, including rotation and zoom; horizon culling
+  // prevents far-side sites from appearing in the visible hemisphere.
   useEffect(() => {
-    if (!viewer) return;
-    const E = ELLIPSOID[body];
-    const R = E.maximumRadius;
-    for (const e of pinEntities.current) {
-      lookup.current.delete(e.id);
-      viewer.entities.remove(e);
-    }
-    pinEntities.current = pins.map((p) => {
-      const landing = p.kind === "landing";
-      const ent = viewer.entities.add({
-        position: Cartesian3.fromDegrees(p.lon, p.lat, R * 0.0006, E),
-        point: {
-          pixelSize: landing ? 8 : 7,
-          color: landing ? Color.fromCssColorString("#f6f2e9") : Color.fromCssColorString("#101216").withAlpha(0.35),
-          outlineColor: landing ? Color.fromCssColorString("#101216") : Color.fromCssColorString("#f6f2e9"),
-          outlineWidth: landing ? 2 : 1.5,
-          scaleByDistance: new NearFarScalar(R * 0.3, 1.25, R * 6, 0.7),
-        },
-        label: {
-          text: p.name,
-          font: landing ? '500 13px "IBM Plex Sans", sans-serif' : 'italic 500 15px "Newsreader Variable", Georgia, serif',
-          fillColor: Color.fromCssColorString("#f6f2e9"),
-          outlineColor: Color.fromCssColorString("#0b0c0e"),
-          outlineWidth: 4,
-          style: LabelStyle.FILL_AND_OUTLINE,
-          horizontalOrigin: HorizontalOrigin.LEFT,
-          verticalOrigin: VerticalOrigin.CENTER,
-          pixelOffset: new Cartesian2(9, 0),
-          distanceDisplayCondition: new DistanceDisplayCondition(0, landing ? R * 4.2 : R * 2.2),
-          scaleByDistance: new NearFarScalar(R * 0.3, 1, R * 4, 0.82),
-        },
-      });
-      lookup.current.set(ent.id, { lat: p.lat, lon: p.lon });
-      return ent;
+    if (!viewer || viewer.isDestroyed()) return;
+    const E = ELLIPSOID[body], R = E.maximumRadius;
+    const source = new CustomDataSource(`${body}-research-sites`);
+    const activeEntities: Entity[] = [];
+    source.clustering.enabled = true;
+    source.clustering.pixelRange = 20;
+    source.clustering.minimumClusterSize = 2;
+    source.clustering.clusterLabels = true;
+    source.clustering.clusterBillboards = true;
+    const offCluster = source.clustering.clusterEvent.addEventListener((entities, cluster) => {
+      cluster.label.show = false;
+      cluster.point.show = false;
+      cluster.billboard.show = true;
+      cluster.billboard.image = markerImage(String(entities.length), null, false, true).toDataURL();
+      cluster.billboard.width = 38;
+      cluster.billboard.height = 38;
+      cluster.billboard.verticalOrigin = VerticalOrigin.CENTER;
+      cluster.billboard.id = entities;
     });
-    cullToHorizon(viewer, pinEntities.current);
-    viewer.scene.requestRender();
-  }, [viewer, pins, body]);
-
-  // -------------------------------------------------------------- ranked sites
-  useEffect(() => {
-    if (!viewer) return;
-    const E = ELLIPSOID[body];
-    const R = E.maximumRadius;
-    for (const e of markerEntities.current) {
-      lookup.current.delete(e.id);
-      viewer.entities.remove(e);
-    }
-    markerEntities.current = markers.map((m) => {
-      const ent = viewer.entities.add({
-        position: Cartesian3.fromDegrees(m.lon, m.lat, R * 0.001, E),
-        billboard: {
-          image: markerImage(m.text, m.grade, !!m.active),
-          width: m.active ? 30 : 24,
-          height: m.active ? 30 : 24,
-          verticalOrigin: VerticalOrigin.CENTER,
-          scaleByDistance: new NearFarScalar(R * 0.2, 1.15, R * 6, 0.8),
-        },
+    const make = (lat: number, lon: number, text: string, grade: Grade | null, name: string, active: boolean, label?: string) => {
+      const e = (active ? viewer.entities : source.entities).add({
+        name,
+        position: Cartesian3.fromDegrees(lon, lat, R * 0.0006, E),
+        billboard: { image: markerImage(text, grade, active), width: 32, height: 32, verticalOrigin: VerticalOrigin.CENTER },
+        ...(label ? { label: {
+          text: label, font: '500 12px "IBM Plex Sans", sans-serif',
+          fillColor: Color.fromCssColorString("#f0f5fa"), outlineColor: Color.fromCssColorString("#09121e"),
+          outlineWidth: 4, style: LabelStyle.FILL_AND_OUTLINE,
+          horizontalOrigin: HorizontalOrigin.LEFT, verticalOrigin: VerticalOrigin.CENTER,
+          pixelOffset: new Cartesian2(18, 0),
+          distanceDisplayCondition: new DistanceDisplayCondition(0, R * 0.8),
+        } } : {}),
       });
-      lookup.current.set(ent.id, { lat: m.lat, lon: m.lon });
-      return ent;
+      if (active) activeEntities.push(e);
+      lookup.current.set(e.id, { lat, lon });
+      return e;
+    };
+    pinEntities.current = pins.filter(p => !markers.some(m => Math.abs(m.lat - p.lat) < 0.0001 && Math.abs(wrapLon(m.lon - p.lon)) < 0.0001)).map(p => {
+      const status = p.verification_status === "review_needed" ? "evidence review needed" : p.kind === "landing" ? "historical landing site" : "geological research site";
+      const active = !!selection && Math.abs(selection.lat - p.lat) < 0.05 && Math.abs(wrapLon(selection.lon - p.lon)) < 0.05;
+      return make(p.lat, p.lon, "•", null, `${p.name}: ${status}; not yet scored`, active, p.name);
     });
-    cullToHorizon(viewer, markerEntities.current);
-    viewer.scene.requestRender();
-  }, [viewer, markers, body]);
+    markerEntities.current = markers.map(m => make(m.lat, m.lon, m.grade ?? "•", m.grade, `${m.grade ? `Mission suitability grade ${m.grade}` : "Insufficient data; not graded"} · result ${m.id}`, !!m.active));
+    cullToHorizon(viewer, [...pinEntities.current, ...markerEntities.current]);
+    let disposed = false;
+    void viewer.dataSources.add(source).then(() => {
+      if (!viewer.isDestroyed()) {
+        if (disposed) viewer.dataSources.remove(source, true);
+        else viewer.scene.requestRender();
+      }
+    });
+    return () => {
+      offCluster();
+      disposed = true;
+      for (const e of source.entities.values) lookup.current.delete(e.id);
+      for (const e of activeEntities) {
+        lookup.current.delete(e.id);
+        if (!viewer.isDestroyed()) viewer.entities.remove(e);
+      }
+      if (!viewer.isDestroyed()) viewer.dataSources.remove(source, true);
+      pinEntities.current = []; markerEntities.current = [];
+    };
+  }, [viewer, pins, markers, body, selection?.lat, selection?.lon]);
 
   // ------------------------------------------------------------- selected cell
   const selKey = selection ? `${selection.lat},${selection.lon},${selection.outline?.length ?? 0},${selection.outline?.[0]?.join(",") ?? ""}` : "";
@@ -514,8 +533,14 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     const E = ELLIPSOID[body];
     const span = (focus.spanKm ?? (E.maximumRadius / 1000) * 0.9) * 1000;
     const height = Math.max(viewer.scene.screenSpaceCameraController.minimumZoomDistance * 2, span * 0.87);
-    viewer.camera.flyTo({ destination: Cartesian3.fromDegrees(focus.lon, focus.lat, height, E), duration: 1.35 });
+    viewer.camera.flyTo({ destination: Cartesian3.fromDegrees(focus.lon, focus.lat, height, E), duration: motionDuration(1350) / 1000 });
   }, [viewer, focus, body]);
 
-  return <div ref={host} className="absolute inset-0" />;
+  return <>
+    <div ref={host} className="absolute inset-0" aria-label={`${body === "moon" ? "Moon" : "Mars"} globe: drag to rotate, scroll or pinch to zoom. Select a research marker to inspect it.`}/>
+    {hoverTitle && <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 max-w-[70%] -translate-x-1/2 rounded-md bg-basalt-950/95 px-3 py-2 text-center text-xs text-regolith-50 ring-1 ring-[var(--hair)]">{hoverTitle}</div>}
+    <div className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:top-14 focus-within:left-3 focus-within:z-40 focus-within:max-h-[55%] focus-within:max-w-[300px] focus-within:overflow-y-auto focus-within:rounded-lg focus-within:bg-basalt-900 focus-within:p-3" aria-label="Accessible map locations">
+      {[...pins.map(p => ({ id: p.id ?? p.name, lat: p.lat, lon: p.lon, label: `${p.name}: ${p.kind}; select location` })), ...markers.map(m => ({ ...m, label: `${m.grade ? `Mission suitability grade ${m.grade}` : "Not graded"}; result ${m.id}` }))].map(p => <button key={p.id} className="ctl block w-full rounded p-2 text-left text-xs" onClick={() => cb.current.onPick?.(p.lat, p.lon)}>{p.label}</button>)}
+    </div>
+  </>;
 });

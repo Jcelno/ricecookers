@@ -51,7 +51,7 @@ export function SitesCompare() {
   }, [list]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ready = list.map((s) => cells[keyOf(s)]).filter((c): c is CellInfo => typeof c === "object");
-  const index = useMemo(() => ready.map((c) => { const m = new Map<string, Measure>(); c.groups.forEach((g) => g.items.forEach((i) => m.set(i.id, i))); return m; }), [ready.length, list]); // eslint-disable-line react-hooks/exhaustive-deps
+  const index = useMemo(() => list.map((site) => { const m = new Map<string, Measure>(); const c=cells[keyOf(site)]; if(typeof c === "object")c.groups.forEach((g) => g.items.forEach((i) => m.set(i.id, i))); return m; }), [cells, list]); // eslint-disable-line react-hooks/exhaustive-deps
   const p = PRESETS.find((x) => x.id === preset)!;
   const rows: [string, Dir][] = useMemo(() => {
     if (p.id !== "all") return p.rows.filter(([id]) => index.some((m) => m.has(id)));
@@ -115,7 +115,7 @@ export function SitesCompare() {
         </div>
         {bodies.size > 1 && <div className="mt-3"><Notice tone="info">These places are on different worlds. Values with the same name are measured by different instruments on different grids (cell sizes shown on each card); terrain uses the same method everywhere, other rows are for orientation only.</Notice></div>}
 
-        <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${list.length}, minmax(0, 1fr))` }}>
+        <div className="comparison-cards mt-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${list.length}, minmax(240px, 1fr))`, overflowX: "auto" }}>
           {list.map((s, si) => {
             const c = cells[keyOf(s)];
             const base = s.body === "earth" ? meta.layers.earth.tiles[0] : meta.layers[s.body].tiles.find((t) => t.group === "imagery") ?? meta.layers[s.body].tiles[0];

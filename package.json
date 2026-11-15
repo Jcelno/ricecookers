@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "RADIUM — planetary site suitability and Earth analog discovery (NASA Space Apps Challenge)",
+  "description": "RADIUM \u2014 planetary site suitability and Earth analog discovery (NASA Space Apps Challenge)",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "concurrently -k -n api,web -c gray,white \"npm:api\" \"npm:web\"",
@@ -19,7 +19,11 @@
     "prebuild": "node scripts/copy-assets.mjs",
     "preweb": "node scripts/copy-assets.mjs",
     "api:prod": ".venv/bin/python -W ignore -m uvicorn backend.app:app --port 8000 --log-level warning",
-    "snapshot": ".venv/bin/python -W ignore scripts/build_snapshot.py"
+    "snapshot": ".venv/bin/python -W ignore scripts/build_snapshot.py",
+    "test:browser": "node tests/browser-workflows.mjs",
+    "test:persistence": "node --test tests/test_persistence.mjs",
+    "test:sharing": "node tests/browser-sharing.mjs",
+    "test:maps-tutorial": "node tests/ui-maps-tutorial.mjs"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",

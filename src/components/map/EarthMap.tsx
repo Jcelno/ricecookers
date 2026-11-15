@@ -3,7 +3,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { type GeoJSONSource, type ImageSource, Map as MlMap, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import { GRADE_HEX, wrapLon } from "@/lib/format";
+import { wrapLon } from "@/lib/format";
+import { clusterPoints, markerButton, motionDuration, sphericalCenter } from "@/lib/markers";
 import type { Basemap, Pin } from "@/lib/types";
 import type { Focus } from "@/store";
 
@@ -12,6 +13,8 @@ import type { GlobeHandle, SiteMarker, ViewState } from "./GlobeView";
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 const MERC = 85.0511287798;
+const NO_PINS: Pin[] = [];
+const NO_MARKERS: SiteMarker[] = [];
 const CORNERS: [[number, number], [number, number], [number, number], [number, number]] = [[-180, MERC], [180, MERC], [180, -MERC], [-180, -MERC]];
 // Borders and place names: OpenFreeMap vector tiles (OpenStreetMap data, OpenMapTiles schema).
 // Keyless and CORS-enabled; styled here so lettering matches the rest of the interface.
@@ -84,50 +87,18 @@ function styleFor(b: Basemap): StyleSpecification {
   };
 }
 
-function pinElement(p: Pin) {
-  const el = document.createElement("button");
-  el.type = "button";
-  // MapLibre places markers by writing `transform` on this element, so it must never be rotated itself:
-  // the CSS `rotate` property composes with that transform and swings the pin away from its location.
-  el.style.cssText = "width:22px;height:22px;padding:0;border:0;background:none;cursor:pointer;display:grid;place-items:center";
-  if (p.badge) {
-    // Atlas badge: a square with text (grade letter or category code), so colour is never the only cue.
-    el.title = p.badge.title;
-    el.setAttribute("aria-label", p.badge.title);
-    const b = document.createElement("span");
-    b.textContent = p.badge.text;
-    b.style.cssText =
-      `display:grid;place-items:center;min-width:19px;height:19px;padding:0 3px;border-radius:4px;font:700 11px "IBM Plex Sans",sans-serif;` +
-      `background:${p.badge.color};color:${p.badge.ink};border:1.5px solid #101216;box-shadow:0 0 0 1.5px rgba(246,242,233,.85),0 2px 6px rgba(0,0,0,.6);pointer-events:none`;
-    el.appendChild(b);
-    return el;
-  }
-  el.title = `${p.name}: documented analog site`;
-  el.setAttribute("aria-label", `${p.name}, documented analog site`);
-  const d = document.createElement("span");
-  d.style.cssText =
-    "display:block;width:12px;height:12px;border-radius:2px;transform:rotate(45deg);background:rgba(16,18,22,.55);border:1.5px solid #f6f2e9;box-shadow:0 1px 4px rgba(0,0,0,.6);pointer-events:none";
-  el.appendChild(d);
-  return el;
+function pinElement(p: Pin, active: boolean) {
+  const status = p.verification_status === "review_needed" ? "research candidate; evidence review needed" : "documented research site";
+  const grade = p.badge && ["A", "B", "C", "D", "F"].includes(p.badge.text) ? p.badge.text as import("@/lib/types").Grade : null;
+  return markerButton({ text: p.badge?.text ?? "•", title: p.badge?.title ?? `${p.name}: ${status}; not yet scored`, grade, active, color: p.badge?.color, ink: p.badge?.ink });
 }
 
 function markerElement(m: SiteMarker) {
-  // Letter = which result (matches the list); ring colour = similarity grade. Two cues, never one letter for both.
-  const el = document.createElement("button");
-  el.type = "button";
-  el.textContent = m.text;
-  el.title = `${m.text}${m.grade ? `: grade ${m.grade}` : ": not graded"}`;
-  el.setAttribute("aria-label", `Result ${m.text}${m.grade ? `, similarity grade ${m.grade}` : ", not graded"}`);
-  const s = m.active ? 32 : 26;
-  const ring = m.grade ? GRADE_HEX[m.grade] : "#7b8fa1";
-  el.style.cssText =
-    `width:${s}px;height:${s}px;border-radius:50%;padding:0;font:700 ${m.text.length > 1 ? 10 : 12}px "IBM Plex Sans",sans-serif;color:#eef4f8;cursor:pointer;` +
-    `background:#08111f;border:3px solid ${ring};box-shadow:${m.active ? "0 0 0 2px #eef4f8," : ""}0 2px 8px rgba(0,0,0,.7)`;
-  return el;
+  return markerButton({ text: m.grade ?? "•", title: `Model result ${m.id}: ${m.grade ? `analog similarity grade ${m.grade}` : "insufficient data; not graded"}`, grade: m.grade, active: m.active });
 }
 
 export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap(
-  { basemap, labels, overlayUrl, opacity = 0.85, dimBase = false, pins = [], markers = [], selection, focus, onPick, onMarker, onCursor, onView, onStatus },
+  { basemap, labels, overlayUrl, opacity = 0.85, dimBase = false, pins = NO_PINS, markers = NO_MARKERS, selection, focus, onPick, onMarker, onCursor, onView, onStatus },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -195,8 +166,8 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
   }, [baseId]);
 
   useImperativeHandle(ref, () => ({
-    zoom: (factor) => mapRef.current?.zoomTo(mapRef.current.getZoom() - Math.log2(factor), { duration: 350 }),
-    home: () => mapRef.current?.flyTo({ center: [12, 22], zoom: 1.55, duration: 900 }),
+    zoom: (factor) => mapRef.current?.zoomTo(mapRef.current.getZoom() - Math.log2(factor), { duration: motionDuration(350) }),
+    home: () => mapRef.current?.flyTo({ center: [12, 22], zoom: 1.55, duration: motionDuration(900) }),
   }), []);
 
   // labels
@@ -237,37 +208,51 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
     if (map?.getLayer("ov")) map.setPaintProperty("ov", "raster-opacity", opacity);
   }, [ready, opacity, overlayUrl]);
 
-  // documented analog sites
+  // Cluster by on-screen distance, keeping active selections independently accessible.
+  // The number is a location count, never a grade; double borders distinguish clusters.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    pinMarkers.current.forEach((m) => m.remove());
-    pinMarkers.current = pins.map((p) => {
-      const el = pinElement(p);
-      el.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        cb.current.onPick?.(p.lat, p.lon);
+    const renderMarkers = () => {
+      pinMarkers.current.forEach(m => m.remove());
+      siteMarkers.current.forEach(m => m.remove());
+      siteMarkers.current = [];
+      const centerLon = map.getCenter().lng;
+      const candidates = [
+        ...pins.filter(p => !markers.some(m => Math.abs(m.lat - p.lat) < 0.0001 && Math.abs(wrapLon(m.lon - p.lon)) < 0.0001)).map(p => ({ lat: p.lat, lon: p.lon, pin: p, marker: undefined as SiteMarker | undefined, active: !!selection && Math.abs(selection.lat - p.lat) < 0.05 && Math.abs(wrapLon(selection.lon - p.lon)) < 0.05 })),
+        ...markers.map(m => ({ lat: m.lat, lon: m.lon, marker: m, pin: undefined as Pin | undefined, active: !!m.active })),
+      ].map(p => {
+        const lon = p.lon + 360 * Math.round((centerLon - p.lon) / 360);
+        const point = map.project([lon, p.lat]);
+        return { ...p, displayLon: lon, x: point.x, y: point.y };
+      }).filter(p => p.x > -50 && p.y > -50 && p.x < map.getCanvas().clientWidth + 50 && p.y < map.getCanvas().clientHeight + 50);
+      pinMarkers.current = clusterPoints(candidates, map.getZoom() > 11 ? 0 : 36).map(group => {
+        const p = group[0];
+        if (group.length === 1) {
+          const el = p.pin ? pinElement(p.pin, p.active) : markerElement(p.marker!);
+          el.style.zIndex = p.active ? "4" : "2";
+          el.addEventListener("click", ev => {
+            ev.stopPropagation();
+            if (p.marker && cb.current.onMarker) cb.current.onMarker(p.marker.id);
+            else cb.current.onPick?.(p.lat, p.lon);
+          });
+          return new Marker({ element: el }).setLngLat([p.displayLon, p.lat]).addTo(map);
+        }
+        const center = sphericalCenter(group);
+        const lon = center.lon + 360 * Math.round((centerLon - center.lon) / 360);
+        const el = markerButton({ text: String(group.length), title: `${group.length} locations in this cluster; zoom in to separate them`, cluster: true });
+        el.addEventListener("click", ev => {
+          ev.stopPropagation();
+          map.easeTo({ center: [lon, center.lat], zoom: Math.min(map.getMaxZoom(), map.getZoom() + 1.7), duration: motionDuration(500) });
+        });
+        return new Marker({ element: el }).setLngLat([lon, center.lat]).addTo(map);
       });
-      return new Marker({ element: el }).setLngLat([p.lon, p.lat]).addTo(map);
-    });
-  }, [ready, pins]);
-
-  // ranked matches
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    siteMarkers.current.forEach((m) => m.remove());
-    siteMarkers.current = markers.map((s) => {
-      const el = markerElement(s);
-      el.style.zIndex = s.active ? "3" : "2";
-      el.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        if (cb.current.onMarker) cb.current.onMarker(s.id);
-        else cb.current.onPick?.(s.lat, s.lon);
-      });
-      return new Marker({ element: el }).setLngLat([s.lon, s.lat]).addTo(map);
-    });
-  }, [ready, markers]);
+    };
+    renderMarkers();
+    map.on("moveend", renderMarkers);
+    map.on("resize", renderMarkers);
+    return () => { map.off("moveend", renderMarkers); map.off("resize", renderMarkers); pinMarkers.current.forEach(m => m.remove()); pinMarkers.current = []; };
+  }, [ready, pins, markers, selection?.lat, selection?.lon]);
 
   // selected cell outline
   const selKey = selection ? `${selection.lat},${selection.lon},${selection.outline?.[0]?.join(",") ?? ""}` : "";
@@ -290,14 +275,14 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
     lastFocus.current = focus.nonce;
     const span = focus.spanKm ?? 2500;
     const zoom = Math.max(1.2, Math.min(11, Math.log2((40075 * Math.cos((focus.lat * Math.PI) / 180)) / span) + 1.2));
-    map.flyTo({ center: [focus.lon, Math.max(-84, Math.min(84, focus.lat))], zoom, duration: 1300, essential: true });
+    map.flyTo({ center: [focus.lon, Math.max(-84, Math.min(84, focus.lat))], zoom, duration: motionDuration(1300) });
   }, [ready, focus]);
 
   // MapLibre's stylesheet sets `position: relative` on its container, so the
   // sized box has to be a wrapper rather than the container itself.
   return (
     <div className="absolute inset-0">
-      <div ref={host} className="size-full" />
+      <div ref={host} className="size-full" aria-label="Earth map: drag to pan, scroll or pinch to zoom; markers select research locations" />
     </div>
   );
 });

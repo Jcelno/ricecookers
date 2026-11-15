@@ -7,7 +7,7 @@ import math
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app import PINS, app
+from backend.app import DOCUMENTED_EARTH, PINS, app
 from backend.geo import RADIUS_KM, gc_km
 
 client = TestClient(app)
@@ -24,7 +24,7 @@ def test_nearest_is_sorted_by_great_circle_distance(lat, lon):
     r = nearby(lat=lat, lon=lon, radius_km=20015)
     assert r.status_code == 200
     docs = r.json()["documented"]
-    assert len(docs) == min(20, len(PINS["earth"]))
+    assert len(docs) == min(20, len(DOCUMENTED_EARTH))
     d = [x["distance_km"] for x in docs]
     assert d == sorted(d)
     for x in docs:  # independent recomputation
