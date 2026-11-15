@@ -78,7 +78,7 @@ export default function App() {
 
   if (metaError) {
     return (
-      <div className="flex h-full flex-col">
+      <div className="radium-shell flex h-full flex-col">
         <div className="hair-b flex items-center gap-3 px-4 py-3">
           <h1 className="text-md font-semibold tracking-[0.14em] text-regolith-50">RADIUM</h1>
           <span className="text-xs text-regolith-400">{metaError}</span>
@@ -101,7 +101,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="radium-shell flex h-full flex-col">
       <SkipLinks />
       <TopBar />
       <TourBootstrap />
