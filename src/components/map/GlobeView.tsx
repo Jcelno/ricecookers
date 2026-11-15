@@ -1,7 +1,8 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
+import "./globe-pins.css";
 
 import {
-  Cartesian2, Cartesian3, Cartographic, Color, CustomDataSource, DistanceDisplayCondition, Ellipsoid, EllipsoidTerrainProvider, type Entity,
+  Cartesian2, Cartesian3, Cartographic, Color, ConstantProperty, CustomDataSource, DistanceDisplayCondition, Ellipsoid, EllipsoidTerrainProvider, type Entity,
   GeographicProjection, GeographicTilingScheme, Globe, HorizontalOrigin, ImageryLayer, LabelStyle, Math as CMath, NearFarScalar, PolylineDashMaterialProperty,
   Rectangle, SceneTransforms, ScreenSpaceEventHandler, ScreenSpaceEventType, SingleTileImageryProvider, SkyBox, SplitDirection, TextureMagnificationFilter,
   TextureMinificationFilter, UrlTemplateImageryProvider, VerticalOrigin, Viewer,
@@ -9,7 +10,7 @@ import {
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import { GRADE_HEX, wrapLon } from "@/lib/format";
-import { clusterPoints, markerButton, motionDuration, sphericalCenter } from "@/lib/markers";
+import { clusterPoints, motionDuration, placeFanMarkers, sphericalCenter } from "@/lib/markers";
 import type { Grade, Pin, Planet, TileLayer } from "@/lib/types";
 import { useStore, type Focus } from "@/store";
 import { emitTour, onTour } from "@/lib/tour/events";
@@ -43,7 +44,7 @@ const ELLIPSOID: Record<Planet, Ellipsoid> = {
 const HOME: Record<Planet, { lon: number; lat: number }> = { moon: { lon: 8, lat: 6 }, mars: { lon: -62, lat: 4 } };
 
 export interface ImageOverlay { key: string; url: string; rect: [number, number, number, number] }
-export interface SiteMarker { id: string; lat: number; lon: number; text: string; grade: Grade | null; active?: boolean }
+export interface SiteMarker { id: string; lat: number; lon: number; text: string; grade: Grade | null; active?: boolean; name?: string; rank?: number; newLead?: boolean }
 export interface ViewState { lat: number; lon: number; degPerPx: number; heightKm: number }
 export interface GlobeHandle { zoom: (factor: number) => void; home: () => void }
 const NO_PINS: Pin[] = [];
@@ -105,12 +106,14 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
   const tileRef = useRef<ImageryLayer | null>(null);
   const imgRef = useRef(new Map<string, ImageryLayer>());
   const pinEntities = useRef<Entity[]>([]);
+  const siteSource = useRef<CustomDataSource | null>(null);
   const markerEntities = useRef<Entity[]>([]);
   const selEntities = useRef<Entity[]>([]);
   const lookup = useRef(new Map<string, { lat: number; lon: number }>());
   const cb = useRef({ onPick, onCursor, onView, onStatus });
   cb.current = { onPick, onCursor, onView, onStatus };
   const lastFocus = useRef(0);
+  const requestedSelection = useStore(s => s.selection);
   const [hoverTitle, setHoverTitle] = useState<string | null>(null);
   const [imageryError, setImageryError] = useState<string | null>(null);
 
@@ -511,6 +514,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     if (!viewer || viewer.isDestroyed()) return;
     const E = ELLIPSOID[body], R = E.maximumRadius;
     const source = new CustomDataSource(`${body}-research-sites`);
+    siteSource.current = source;
     const activeEntities: Entity[] = [];
     source.clustering.enabled = true;
     source.clustering.pixelRange = 20;
@@ -569,49 +573,116 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       }
       if (!viewer.isDestroyed()) viewer.dataSources.remove(source, true);
       pinEntities.current = []; markerEntities.current = [];
+      if (siteSource.current === source) siteSource.current = null;
     };
   }, [viewer, pins, markers, body, selection?.lat, selection?.lon]);
 
-  // DOM hit targets share the exact ground projection with Cesium's marker. Clustered pins
-  // remain handled by Cesium, except the tutorial's named marker after its explicit fly-to.
+  // Nearby pins fan their chips around exact projected ground dots. At overview zoom,
+  // Cesium's native clusters remain the fallback so dense hemispheres stay navigable.
   useEffect(() => {
     if (!viewer || !markerHost.current) return;
     const holder = markerHost.current;
-    const entries = pins.map(pin => {
-      const button = markerButton({ id: pin.id, text: "", title: `${pin.name}: select research site` });
-      button.style.cssText = "position:absolute;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;pointer-events:auto;";
-      button.tabIndex = -1; // the existing accessible location list provides a stable keyboard order
-      button.addEventListener("click", event => { event.stopPropagation(); cb.current.onPick?.(pin.lat, pin.lon, "marker"); });
-      holder.append(button);
-      return { pin, button, position: Cartesian3.fromDegrees(pin.lon, pin.lat, ELLIPSOID[body].maximumRadius * 0.0006, ELLIPSOID[body]) };
+    const E = ELLIPSOID[body];
+    const requested = requestedSelection;
+    const selectedPoint = requested?.body === body ? requested : selection;
+    const sites = [
+      ...markers.map((marker, index) => ({ ...marker, name: marker.name ?? `Candidate ${index + 1}`, priority: marker.rank ?? index + 1, active: !!marker.active })),
+      ...pins.filter(pin => !markers.some(marker => Math.abs(marker.lat - pin.lat) < .0001 && Math.abs(wrapLon(marker.lon - pin.lon)) < .0001)).map(pin => ({ ...pin, grade: null, text: "·", priority: 1000, active: !!selectedPoint && Math.abs(selectedPoint.lat - pin.lat) < .0001 && Math.abs(wrapLon(selectedPoint.lon - pin.lon)) < .0001 })),
+    ];
+    const entries = sites.map(site => {
+      const wrapper = document.createElement("div"); wrapper.className = "globe-fan-marker";
+      wrapper.dataset.active = String(site.active);
+      const chip = document.createElement("button"); chip.type = "button"; chip.className = "globe-fan-chip";
+      chip.dataset.tourMarker = site.id; chip.textContent = site.grade ?? "·";
+      const label = `${site.name}: ${site.grade ? `mission suitability grade ${site.grade}` : "not scored"}; select location`;
+      chip.setAttribute("aria-label", label); chip.title = label;
+      if (site.grade) { chip.style.background = GRADE_HEX[site.grade]; chip.style.color = "var(--color-basalt-950)"; }
+      const dot = document.createElement("button"); dot.type = "button"; dot.className = "globe-fan-dot";
+      dot.dataset.tourGround = site.id; dot.setAttribute("aria-label", label); dot.title = label;
+      const leader = document.createElementNS("http://www.w3.org/2000/svg", "svg"); leader.classList.add("globe-fan-leader"); leader.setAttribute("aria-hidden", "true");
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line"); line.setAttribute("x1", "0"); line.setAttribute("y1", "0"); leader.append(line);
+      const nameplate = document.createElement("span"); nameplate.className = "globe-fan-name"; nameplate.textContent = site.name; nameplate.hidden = true;
+      const pick = (event: MouseEvent) => { event.stopPropagation(); cb.current.onPick?.(site.lat, site.lon, "marker"); };
+      chip.addEventListener("click", pick); dot.addEventListener("click", pick);
+      wrapper.append(leader, dot, chip, nameplate); holder.append(wrapper);
+      return { ...site, wrapper, chip, dot, line, nameplate, position: Cartesian3.fromDegrees(site.lon, site.lat, E.maximumRadius * .0006, E) };
     });
-    let queued = 0;
+    const pulse = document.createElement("div"); pulse.className = "globe-click-pulse"; pulse.hidden = true; holder.append(pulse);
+    let frame = 0, timer = 0, last = 0, previousFan: boolean | null = null;
     const update = () => {
-      queued = 0;
+      frame = 0; last = performance.now();
       if (viewer.isDestroyed()) return;
       const cam = viewer.camera.positionWC;
+      const heightRatio = viewer.camera.positionCartographic.height / E.maximumRadius;
+      const fan = heightRatio < .8;
+      if (fan !== previousFan) {
+        previousFan = fan;
+        if (siteSource.current) siteSource.current.clustering.enabled = !fan;
+        for (const entity of [...pinEntities.current, ...markerEntities.current]) {
+          if (entity.billboard) entity.billboard.show = new ConstantProperty(!fan);
+          if (entity.label) entity.label.show = new ConstantProperty(!fan);
+        }
+        viewer.scene.requestRender();
+      }
+      const scale = Math.max(.7, Math.min(1.08, 1.08 - heightRatio * .35));
       const visible = entries.flatMap(entry => {
         Cartesian3.normalize(entry.position, scratchN);
         Cartesian3.normalize(Cartesian3.subtract(cam, entry.position, scratchV), scratchV);
-        const point = Cartesian3.dot(scratchN, scratchV) > 0.12 ? SceneTransforms.worldToWindowCoordinates(viewer.scene, entry.position) : undefined;
-        entry.button.hidden = true;
-        return point && point.x > 0 && point.y > 0 && point.x < holder.clientWidth && point.y < holder.clientHeight ? [{ ...entry, x: point.x, y: point.y }] : [];
+        const facing = Cartesian3.dot(scratchN, scratchV);
+        const point = facing > 0 ? SceneTransforms.worldToWindowCoordinates(viewer.scene, entry.position) : undefined;
+        entry.wrapper.hidden = true;
+        entry.nameplate.hidden = true;
+        if (!point || point.x < 0 || point.y < 0 || point.x > holder.clientWidth || point.y > holder.clientHeight) return [];
+        entry.wrapper.style.opacity = String(Math.min(1, facing / .16));
+        return [{ ...entry, x: point.x, y: point.y }];
       });
-      for (const group of clusterPoints(visible, 40)) {
-        const targets = group.length === 1 ? group : tourStep.current === "select-site" ? group.filter(entry => entry.pin.name === "Gale") : [];
-        for (const entry of targets) {
-          entry.button.hidden = false;
-          entry.button.style.left = `${entry.x - 16}px`;
-          entry.button.style.top = `${entry.y - 16}px`;
+      const display = fan ? visible : clusterPoints(visible, 40).flatMap(group => group.length === 1 ? group : tourStep.current === "select-site" ? group.filter(entry => entry.name === "Gale") : []);
+      const slots = placeFanMarkers(display, holder.clientWidth, holder.clientHeight, scale);
+      for (const entry of display) {
+        const slot = slots.find(value => value.id === entry.id)!;
+        entry.wrapper.hidden = false;
+        entry.wrapper.dataset.mode = fan ? "fan" : "cluster";
+        entry.wrapper.dataset.folded = String(fan && slot.folded);
+        entry.wrapper.style.transform = `translate(${entry.x}px,${entry.y}px)`;
+        entry.wrapper.style.zIndex = entry.active ? "4" : "2";
+        const dx = fan ? slot.dx : 0, dy = fan ? slot.dy : 0;
+        entry.chip.style.left = `${dx}px`; entry.chip.style.top = `${dy}px`;
+        entry.chip.style.width = `${slot.width}px`; entry.chip.style.height = `${slot.height}px`; entry.chip.style.fontSize = `${Math.max(10, 12 * scale)}px`;
+        entry.chip.tabIndex = fan && !slot.folded ? 0 : -1;
+        entry.dot.tabIndex = fan && slot.folded ? 0 : -1;
+        entry.line.setAttribute("x2", String(dx)); entry.line.setAttribute("y2", String(dy + slot.height / 2));
+        if (entry.active) {
+          const labelWidth = Math.min(200, entry.name.length * 7.5 + 16), labelHeight = 26;
+          const choices = [
+            { left: dx + slot.width / 2 + 7, top: dy - labelHeight / 2 },
+            { left: dx - slot.width / 2 - labelWidth - 7, top: dy - labelHeight / 2 },
+            { left: -labelWidth / 2, top: 14 },
+            { left: dx - labelWidth / 2, top: dy - slot.height / 2 - labelHeight - 7 },
+          ];
+          const position = choices.find(candidate => entry.x + candidate.left >= 8 && entry.x + candidate.left + labelWidth <= holder.clientWidth - 8 && entry.y + candidate.top >= 8 && entry.y + candidate.top + labelHeight <= holder.clientHeight - 8 && !slots.some(other => other.id !== entry.id && !other.folded && entry.x + candidate.left < other.x + other.dx + other.width / 2 && entry.x + candidate.left + labelWidth > other.x + other.dx - other.width / 2 && entry.y + candidate.top < other.y + other.dy + other.height / 2 && entry.y + candidate.top + labelHeight > other.y + other.dy - other.height / 2));
+          if (position) { entry.nameplate.hidden = false; entry.nameplate.style.left = `${position.left}px`; entry.nameplate.style.top = `${position.top}px`; entry.nameplate.style.width = `${labelWidth}px`; }
         }
       }
+      pulse.hidden = true;
+      if (selectedPoint && !sites.some(site => site.active)) {
+        const position = Cartesian3.fromDegrees(selectedPoint.lon, selectedPoint.lat, E.maximumRadius * .0006, E);
+        Cartesian3.normalize(position, scratchN); Cartesian3.normalize(Cartesian3.subtract(cam, position, scratchV), scratchV);
+        const point = Cartesian3.dot(scratchN, scratchV) > 0 ? SceneTransforms.worldToWindowCoordinates(viewer.scene, position) : undefined;
+        if (point) { pulse.hidden = false; pulse.style.left = `${point.x}px`; pulse.style.top = `${point.y}px`; }
+      }
     };
-    const schedule = () => { if (!queued) queued = requestAnimationFrame(update); };
+    const schedule = () => {
+      if (frame || timer) return;
+      const remaining = Math.max(0, 70 - (performance.now() - last));
+      if (remaining) timer = window.setTimeout(() => { timer = 0; frame = requestAnimationFrame(update); }, remaining);
+      else frame = requestAnimationFrame(update);
+    };
     const off = viewer.scene.postRender.addEventListener(schedule);
     const offTour = onTour(event => { if (event.type === "tutorial:changed") schedule(); });
+    const resize = new ResizeObserver(schedule); resize.observe(holder);
     schedule();
-    return () => { cancelAnimationFrame(queued); off(); offTour(); entries.forEach(entry => entry.button.remove()); };
-  }, [viewer, pins, body]);
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer); off(); offTour(); resize.disconnect(); entries.forEach(entry => entry.wrapper.remove()); pulse.remove(); };
+  }, [viewer, pins, markers, body, selection?.lat, selection?.lon, requestedSelection?.body, requestedSelection?.lat, requestedSelection?.lon]);
 
   // ------------------------------------------------------------- selected cell
   const selKey = selection ? `${selection.lat},${selection.lon},${selection.outline?.length ?? 0},${selection.outline?.[0]?.join(",") ?? ""}` : "";
@@ -671,7 +742,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
 
   return <>
     <div ref={host} className="absolute inset-0" aria-label={`${body === "moon" ? "Moon" : "Mars"} globe: drag to rotate, scroll or pinch to zoom. Select a research marker to inspect it.`}/>
-    <div ref={markerHost} className="pointer-events-none absolute inset-0 z-10" aria-hidden="true" />
+    <div ref={markerHost} className="globe-fan-layer" aria-label="Map site markers" />
     {imageryError && <div role="status" className="pointer-events-none absolute top-14 left-3 z-20 max-w-[calc(100%-24px)] rounded-md border border-alert/40 bg-basalt-950/95 px-3 py-2 text-xs text-alert">{imageryError}</div>}
     {hoverTitle && <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 max-w-[70%] -translate-x-1/2 rounded-md bg-basalt-950/95 px-3 py-2 text-center text-xs text-regolith-50 ring-1 ring-[var(--hair)]">{hoverTitle}</div>}
     <div className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:top-14 focus-within:left-3 focus-within:z-40 focus-within:max-h-[55%] focus-within:max-w-[300px] focus-within:overflow-y-auto focus-within:rounded-lg focus-within:bg-basalt-900 focus-within:p-3" aria-label="Accessible map locations">

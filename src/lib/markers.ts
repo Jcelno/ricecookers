@@ -96,3 +96,23 @@ export const motionDuration = (milliseconds: number) =>
   matchMedia("(prefers-reduced-motion: reduce)").matches
     ? 0
     : milliseconds;
+
+export interface FanPoint { id: string; x: number; y: number; priority?: number }
+export interface FanSlot extends FanPoint { dx: number; dy: number; folded: boolean; width: number; height: number }
+/** Places labels only. The x/y ground coordinates are never moved or used to change an analysis cell. */
+export function placeFanMarkers(points: FanPoint[], width: number, height: number, scale = 1): FanSlot[] {
+  const chipWidth = 30 * scale, chipHeight = 27 * scale, padding = 5;
+  const occupied: { left: number; right: number; top: number; bottom: number }[] = [];
+  const offsets = [0, -1, 1, -2, 2, -3, 3].flatMap((column) => [[column * (chipWidth + padding), -(chipHeight + 12)] as const]);
+  offsets.push(...[0, -1, 1, -2, 2, -3, 3].map(column => [column * (chipWidth + padding), -(2 * chipHeight + 19)] as const));
+  return [...points].sort((a, b) => (a.priority ?? 1000) - (b.priority ?? 1000)).map(point => {
+    const slot = offsets.find(([dx, dy]) => {
+      const box = { left: point.x + dx - chipWidth / 2, right: point.x + dx + chipWidth / 2, top: point.y + dy - chipHeight / 2, bottom: point.y + dy + chipHeight / 2 };
+      if (box.left < 8 || box.right > width - 8 || box.top < 8 || box.bottom > height - 8) return false;
+      if (occupied.some(other => box.left < other.right + padding && box.right + padding > other.left && box.top < other.bottom + padding && box.bottom + padding > other.top)) return false;
+      occupied.push(box);
+      return true;
+    });
+    return { ...point, dx: slot?.[0] ?? 0, dy: slot?.[1] ?? -(chipHeight + 12), folded: !slot, width: chipWidth, height: chipHeight };
+  });
+}

@@ -172,7 +172,7 @@ export function Stage() {
   const markers: SiteMarker[] = useMemo(() => {
     if (!inMission || !rank || rank.mission !== missionId) return [];
     return rank.sites.map((s) => ({
-      id: s.id, lat: s.lat, lon: s.lon, text: s.grade ?? "·", grade: s.grade,
+      id: s.id, name: s.place, rank: s.rank, lat: s.lat, lon: s.lon, text: s.grade ?? "·", grade: s.grade,
       active: !!cell && cell.body === body && Math.abs(cell.cell.lat - s.lat) < 1e-6 && Math.abs(cell.cell.lon - s.lon) < 1e-6,
     }));
   }, [inMission, rank, missionId, cell, body]);
@@ -197,7 +197,7 @@ export function Stage() {
       : `Imagery: ${base?.title ?? ""}, ${base?.provider ?? "NASA"}${tileOverlay ? `. Overlay: ${tileOverlay.title}` : ""}`;
 
   return (
-    <div ref={stageRef} className="relative h-full min-w-0 flex-1 overflow-hidden bg-void" data-stage data-tour="map">
+    <div ref={stageRef} className="relative isolate h-full min-w-0 flex-1 overflow-hidden bg-void" data-stage data-tour="map">
       {body === "earth" ? (
         <EarthMap
           ref={handle} basemap={basemap} labels={layerState.labels} overlayUrl={earthOverlay} opacity={layerState.opacity} dimBase={dataOverlayOn}

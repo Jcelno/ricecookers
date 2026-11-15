@@ -19,7 +19,7 @@ try {
   });
   await page.waitForSelector('[data-tour="help"]', { timeout: 60000 });
   const unit = await page.evaluate(async () => {
-    const { clusterPoints, sphericalCenter, markerButton } =
+    const { clusterPoints, sphericalCenter, markerButton, placeFanMarkers } =
       await import("/src/lib/markers.ts");
     const { badgeFor } = await import("/src/lib/atlas.ts");
     const clustered = clusterPoints([
@@ -55,6 +55,8 @@ try {
       clusterGrade: cluster.dataset.grade,
       grade: grade.dataset.grade,
       neutral,
+      fan: placeFanMarkers(Array.from({ length: 20 }, (_, i) => ({ id: `pin-${i}`, x: 150, y: 130, priority: 20 - i })), 300, 200),
+      edge: placeFanMarkers([{ id: "edge", x: 2, y: 2 }], 300, 200),
     };
   });
   assert.deepEqual(unit.sizes, [2, 1, 1]);
@@ -67,6 +69,16 @@ try {
   assert.equal(unit.grade, "A");
   assert.match(unit.neutral.title, /evidence review needed/);
   assert(!unit.neutral.title.includes("documented"));
+  assert.equal(unit.fan[0].id, "pin-19", "best-ranked chip gets first choice");
+  assert.equal(unit.fan[0].dx, 0, "best-ranked chip sits straight above its ground dot");
+  assert(unit.fan.every(pin => pin.x === 150 && pin.y === 130), "fan placement never moves ground coordinates");
+  const unfolded = unit.fan.filter(pin => !pin.folded);
+  assert(unit.fan.some(pin => pin.folded), "overcrowded chips fold while their ground dots survive");
+  for (const pin of unfolded) for (const other of unfolded) {
+    if (pin.id === other.id) continue;
+    assert(Math.abs(pin.dx - other.dx) >= (pin.width + other.width) / 2 || Math.abs(pin.dy - other.dy) >= (pin.height + other.height) / 2, "visible chips never overlap");
+  }
+  assert(unit.edge[0].folded, "a chip outside the viewport folds instead of clipping");
   console.log(
     "PASS marker clusters, active selection, dateline and evidence status",
   );

@@ -1,0 +1,24 @@
+.globe-fan-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+.globe-fan-marker { position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none; }
+.globe-fan-marker[hidden] { display: none; }
+.globe-fan-chip, .globe-fan-dot { position: absolute; pointer-events: auto; cursor: pointer; }
+.globe-fan-chip { display: grid; place-items: center; width: 30px; height: 27px; border: 1px solid var(--color-regolith-200); border-radius: 7px; background: var(--color-basalt-700); color: var(--color-regolith-50); font-size: 12px; font-weight: 700; line-height: 1; box-shadow: 0 2px 6px #000a; transform: translate(-50%,-50%); }
+.globe-fan-chip:hover { outline: 2px solid var(--color-regolith-50); outline-offset: 2px; }
+.globe-fan-chip:active { transform: translate(-50%,-50%) scale(.9); }
+.globe-fan-chip:focus-visible, .globe-fan-dot:focus-visible { outline: 2px solid var(--color-world); outline-offset: 4px; }
+.globe-fan-dot { top: 0; left: 0; width: 16px; height: 16px; padding: 0; border: none; border-radius: 50%; transform: translate(-50%,-50%); background: transparent; }
+.globe-fan-dot::before { content: ''; position: absolute; left: 5px; top: 5px; width: 6px; height: 6px; border: 1px solid var(--color-basalt-950); border-radius: 50%; background: var(--color-regolith-50); box-shadow: 0 1px 3px #000b; }
+.globe-fan-dot:hover::before { transform: scale(1.6); }
+.globe-fan-dot:active::before { transform: scale(1.1); }
+.globe-fan-leader { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.globe-fan-leader line { stroke: var(--color-regolith-200); stroke-width: 1; opacity: .8; }
+.globe-fan-name { position: absolute; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 7px; border-radius: 5px; background: var(--color-basalt-950); border: 1px solid var(--hair-strong); color: var(--color-regolith-50); font-family: var(--font-serif); font-size: 14px; line-height: 1.25; pointer-events: none; }
+.globe-fan-marker[data-folded="true"] .globe-fan-chip, .globe-fan-marker[data-folded="true"] .globe-fan-leader { opacity: 0; pointer-events: none; }
+.globe-fan-marker[data-folded="true"]:hover .globe-fan-chip, .globe-fan-marker[data-folded="true"]:focus-within .globe-fan-chip, .globe-fan-marker[data-folded="true"]:hover .globe-fan-leader, .globe-fan-marker[data-folded="true"]:focus-within .globe-fan-leader { opacity: 1; pointer-events: auto; }
+.globe-fan-marker[data-mode="cluster"] .globe-fan-chip { background: transparent!important; color: transparent!important; border: 0; box-shadow: none; width: 32px!important; height: 32px!important; border-radius: 50%; }
+.globe-fan-marker[data-mode="cluster"] .globe-fan-dot, .globe-fan-marker[data-mode="cluster"] .globe-fan-leader { display: none; }
+.globe-fan-marker[data-active="true"] .globe-fan-dot::after, .globe-click-pulse::after { content: ''; position: absolute; left: -4px; top: -4px; width: 24px; height: 24px; border: 2px solid var(--color-alert); border-radius: 50%; opacity: .8; animation: map-selection-pulse 2.2s ease-out infinite; }
+.globe-click-pulse { position: absolute; width: 16px; height: 16px; pointer-events: none; transform: translate(-50%,-50%); }
+.globe-click-pulse::after { border-color: var(--color-grade-b); }
+@keyframes map-selection-pulse { 0%,100% { transform: scale(.85); opacity: .9; } 65% { transform: scale(1.35); opacity: .25; } }
+@media(prefers-reduced-motion:reduce) { .globe-fan-marker[data-active="true"] .globe-fan-dot::after, .globe-click-pulse::after { animation: none; } }
