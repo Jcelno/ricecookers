@@ -368,6 +368,7 @@ try {
       () => window.radium.getState().rankStatus === "ready",
       { timeout: 90000 },
     );
+    await page.waitForSelector('ol[aria-label="Steps"] li');
     assert.equal(
       await page.$$eval('ol[aria-label="Steps"] li', (els) => els.length),
       5,

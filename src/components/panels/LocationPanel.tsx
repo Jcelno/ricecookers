@@ -1,7 +1,6 @@
 import { ArrowLeftRight, ExternalLink, Layers, LocateFixed, MapPin, Navigation, X } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 
-import { SiteCard } from "@/components/panels/SiteCard";
 import { Photos } from "@/components/ui/Photos";
 import { AssessmentChips, AssessmentGrade } from "@/components/ui/Assessment";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Meter, Notice, Section, Spinner } from "@/components/ui/primitives";
@@ -12,6 +11,7 @@ import { useStore } from "@/store";
 
 const EVIDENCE_ORDER: Evidence[] = ["observed", "inferred", "modelled", "computed", "interpreted"];
 const StarterSites = lazy(() => import("@/components/panels/StarterSites"));
+const SiteCard = lazy(() => import("@/components/panels/SiteCard").then(module => ({ default: module.SiteCard })));
 
 /** One click: Gale crater, rover mobility, compared with its best Earth match. Real API results, nothing canned. */
 export function runWorkedExample() {
@@ -262,7 +262,7 @@ export function LocationPanel() {
   if (!cell || cell.body !== body) return status === "loading" ? <div className="p-5"><Spinner label="Reading the grids for this place" /></div> : <Empty body={body} />;
   return (
     <div className={cx("relative", status === "loading" && "opacity-70")} aria-busy={status === "loading"}>
-      <SiteCard cell={cell} />
+      <Suspense fallback={<Spinner label="Opening site evidence" />}><SiteCard cell={cell} /></Suspense>
     </div>
   );
 }
