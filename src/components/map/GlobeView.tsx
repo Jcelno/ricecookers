@@ -112,6 +112,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
   cb.current = { onPick, onCursor, onView, onStatus };
   const lastFocus = useRef(0);
   const [hoverTitle, setHoverTitle] = useState<string | null>(null);
+  const [imageryError, setImageryError] = useState<string | null>(null);
 
   // ------------------------------------------------------------------ viewer
   useEffect(() => {
@@ -375,13 +376,17 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
   // --------------------------------------------------------------- base layer
   useEffect(() => {
     if (!viewer || !base) return;
-    const layer = new ImageryLayer(tiles(base));
+    setImageryError(null);
+    const provider = tiles(base);
+    const offError = provider.errorEvent.addEventListener(() => setImageryError(`Imagery unavailable: ${base.provider || "Solar System Treks"}`));
+    const layer = new ImageryLayer(provider);
     viewer.imageryLayers.add(layer, 0);
     if (baseRef.current) viewer.imageryLayers.remove(baseRef.current, true);
     baseRef.current = layer;
     layer.saturation = dimBase ? 0.1 : 1;
     layer.brightness = dimBase ? 0.62 : 1;
     viewer.scene.requestRender();
+    return offError;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewer, base?.id]);
 
@@ -399,13 +404,17 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       viewer.imageryLayers.remove(tileRef.current, true);
       tileRef.current = null;
     }
+    let offError: (() => void) | undefined;
     if (tileOverlay) {
-      const layer = new ImageryLayer(tiles(tileOverlay), { alpha: opacity });
+      const provider = tiles(tileOverlay);
+      offError = provider.errorEvent.addEventListener(() => setImageryError(`Overlay unavailable: ${tileOverlay.provider || "Solar System Treks"}`));
+      const layer = new ImageryLayer(provider, { alpha: opacity });
       layer.splitDirection = splitRef.current === null ? SplitDirection.NONE : SplitDirection.RIGHT;
       viewer.imageryLayers.add(layer, 1);
       tileRef.current = layer;
     }
     viewer.scene.requestRender();
+    return () => offError?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewer, tileOverlay?.id]);
 
@@ -663,6 +672,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
   return <>
     <div ref={host} className="absolute inset-0" aria-label={`${body === "moon" ? "Moon" : "Mars"} globe: drag to rotate, scroll or pinch to zoom. Select a research marker to inspect it.`}/>
     <div ref={markerHost} className="pointer-events-none absolute inset-0 z-10" aria-hidden="true" />
+    {imageryError && <div role="status" className="pointer-events-none absolute top-14 left-3 z-20 max-w-[calc(100%-24px)] rounded-md border border-alert/40 bg-basalt-950/95 px-3 py-2 text-xs text-alert">{imageryError}</div>}
     {hoverTitle && <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 max-w-[70%] -translate-x-1/2 rounded-md bg-basalt-950/95 px-3 py-2 text-center text-xs text-regolith-50 ring-1 ring-[var(--hair)]">{hoverTitle}</div>}
     <div className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:top-14 focus-within:left-3 focus-within:z-40 focus-within:max-h-[55%] focus-within:max-w-[300px] focus-within:overflow-y-auto focus-within:rounded-lg focus-within:bg-basalt-900 focus-within:p-3" aria-label="Accessible map locations">
       {[...pins.map(p => ({ id: p.id ?? p.name, lat: p.lat, lon: p.lon, label: `${p.name}: ${p.kind}; select location` })), ...markers.map(m => ({ ...m, label: `${m.grade ? `Mission suitability grade ${m.grade}` : "Not graded"}; result ${m.id}` }))].map(p => <button key={p.id} className="ctl block w-full rounded p-2 text-left text-xs" onClick={() => cb.current.onPick?.(p.lat, p.lon, "marker")}>{p.label}</button>)}

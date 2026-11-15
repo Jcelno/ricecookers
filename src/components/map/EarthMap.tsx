@@ -105,6 +105,7 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(0);
+  const [imageryError, setImageryError] = useState<string | null>(null);
   const pinMarkers = useRef<Marker[]>([]);
   const siteMarkers = useRef<Marker[]>([]);
   const cb = useRef({ onPick, onMarker, onCursor, onView, onStatus });
@@ -114,6 +115,7 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
 
   useEffect(() => {
     if (!host.current || !basemap) return;
+    setImageryError(null);
     let map: MlMap;
     try {
       map = new MlMap({
@@ -135,6 +137,11 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
       cb.current.onStatus?.({ ready: false, error: "This browser could not start WebGL, which the map needs." });
       return;
     }
+    map.on("error", event => {
+      const source = (event as typeof event & { sourceId?: string }).sourceId;
+      if (source === "base") setImageryError(`Imagery unavailable: ${basemap.provider}`);
+      else if (source === "ov") setImageryError("Data overlay unavailable: RADIUM grid");
+    });
     map.touchZoomRotate.disableRotation();
     const report = () => {
       const c = map.getCenter();
@@ -294,6 +301,7 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
   // sized box has to be a wrapper rather than the container itself.
   return (
     <div className="absolute inset-0">
+      {imageryError && <div role="status" className="pointer-events-none absolute top-14 left-3 z-20 max-w-[calc(100%-24px)] rounded-md border border-alert/40 bg-basalt-950/95 px-3 py-2 text-xs text-alert">{imageryError}</div>}
       <div ref={host} className="size-full" aria-label="Earth map: drag to pan, scroll or pinch to zoom; markers select research locations" />
     </div>
   );
