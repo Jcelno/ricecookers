@@ -1,7 +1,7 @@
 import {
   Check, Copy, LocateFixed, ArrowLeftRight, Bookmark, BookmarkCheck, Columns2, Droplets, ExternalLink, Mountain, Navigation, Radio, Rocket, Sun, Thermometer, Wind, X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { SiteEvidence } from "@/components/catalog/SiteCatalog";
 import { CellDetails, SuitabilityBlock } from "@/components/panels/LocationPanel";
@@ -19,6 +19,8 @@ import { photoKey, photosFor } from "@/lib/photos";
 import { openPhotoGallery } from "@/lib/gallery";
 import type { Body, CellInfo, Measure, Planet, Suitability, TwinResult } from "@/lib/types";
 import { type SiteRef, useStore } from "@/store";
+
+const EarthContext = lazy(() => import("./EarthContext"));
 
 /* --------------------------------------------------------------- metrics */
 const ICON: Record<string, ReactNode> = {
@@ -208,6 +210,7 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
   const meta = useStore((s) => s.meta)!;
   const st = useStore();
   const [tab, setTab] = useState<Tab>("overview");
+  const [contextOpen, setContextOpen] = useState(false);
   const [coordinateCopy, setCoordinateCopy] = useState<"idle" | "copied" | "failed">("idle");
   useEffect(() => setCoordinateCopy("idle"), [cell]);
   useEffect(() => { if (cell.body === "earth" && (tab === "twins" || tab === "mission")) setTab("overview"); }, [cell.body, tab]);
@@ -274,6 +277,7 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
             <div className="flex items-center gap-3"><AssessmentGrade grade={cell.suitability.grade} coverage={cell.suitability.coverage} minCoverage={cell.suitability.min_coverage} excluded={cell.suitability.excluded} size="lg" /><div className="min-w-0"><p className="text-xs font-medium text-regolith-100">{meta.missions.find(m => m.id === cell.suitability!.mission)?.label}</p><p className="mb-1 text-xs text-regolith-400">{cell.suitability.excluded ? "Ruled out by a hard limit" : "Computed mission suitability"}</p><AssessmentChips coverage={cell.suitability.coverage} factors={cell.suitability.factors} /></div></div>
             <DecisionCards factors={cell.suitability.factors} />
           </section>}
+          {cell.body === "earth" && <details className="mx-4 mt-3 rounded-md border border-[var(--hair)]" onToggle={e => setContextOpen(e.currentTarget.open)}><summary className="row-ctl cursor-pointer rounded-md p-3 text-sm text-regolith-200">Context (not scored)</summary>{contextOpen && <Suspense fallback={<div className="p-3"><Spinner label="Loading Earth context" /></div>}><EarthContext lat={ref.lat} lon={ref.lon} /></Suspense>}</details>}
           {catalogSite && <section className="m-4 rounded-lg bg-basalt-800 p-3 ring-1 ring-[var(--hair)]"><SiteEvidence site={catalogSite} /></section>}
           <section className="px-4 pt-3">
             <div className={cx("rounded-md px-3 py-2.5 ring-1", a.tone === "good" ? "bg-[color-mix(in_srgb,var(--color-grade-b)_14%,transparent)] ring-[var(--color-grade-b)]/40" : a.tone === "warn" ? "bg-[color-mix(in_srgb,var(--color-grade-d)_14%,transparent)] ring-[var(--color-grade-d)]/40" : "bg-basalt-800 ring-[var(--hair)]")}>
