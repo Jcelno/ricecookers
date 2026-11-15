@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { MissionStatus, TELEMETRY_KEY } from "./MissionStatus";
+import { setPreference, usePreference } from "@/lib/preferences";
 import { quickTourSummary } from "@/lib/intro";
 import { onTour } from "@/lib/tour/events";
 import { api } from "@/lib/api";
@@ -25,6 +27,7 @@ import {
 } from "./catalog/SiteCatalog";
 
 function Menu() {
+  const telemetry = usePreference(TELEMETRY_KEY, true);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -77,6 +80,7 @@ function Menu() {
               {label}
             </button>
           ))}
+          <button role="menuitemcheckbox" aria-checked={telemetry} className="ctl flex w-full items-center gap-2 rounded-md p-3 text-left" onClick={() => { setPreference(TELEMETRY_KEY, !telemetry); setOpen(false); }}>{telemetry ? "Hide" : "Show"} mission status</button>
         </div>
       )}
     </div>
@@ -549,6 +553,7 @@ export function TopBar() {
           </span>
         </Button>
       </div>
+      <MissionStatus />
       {s.saveNotice && (
         <div className="save-toast" role="status">
           {s.persistenceError ?? s.saveNotice}
