@@ -19,7 +19,7 @@ export function CompareTray() {
         <ul className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto">
           {list.map((s, i) => (
             <li key={`${s.body}${s.lat}${s.lon}`} className="flex shrink-0 items-center gap-1 rounded-full bg-basalt-800 py-0.5 pr-0.5 pl-2 text-xs text-regolith-100">
-              <span className="size-2 rounded-full" style={{ background: DOT[s.body] }} aria-hidden />
+              <span className="size-2 rounded-full" data-new-lead={s.newLead ? "true" : undefined} style={s.newLead ? { background: "transparent", border: "1px dashed var(--color-world)", width: 10, height: 10 } : { background: DOT[s.body] }} title={s.newLead ? "New lead: computed screening result, not a verified field site" : undefined} aria-hidden />
               <span className="max-w-[140px] truncate">{s.label}</span>
               <button type="button" className="ctl grid size-5 place-items-center rounded-full text-regolith-400" aria-label={`Remove ${s.label} from Compare`} onClick={() => removeCompare(i)}><X size={11} /></button>
             </li>

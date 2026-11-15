@@ -1,5 +1,5 @@
 import { ArrowLeft, Columns2, Download, FileText, Home, Minus, Navigation, Plus, RotateCcw } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/LazyEarthMap";
 import { type GlobeHandle, GlobeView, type SiteMarker, type ViewState } from "@/components/map/GlobeView";
@@ -15,6 +15,7 @@ import { photoKey, photosFor } from "@/lib/photos";
 import { formatCoord, formatKm, GRADE_HEX, formatMeasure, formatValue, GRADE_MEANING, pct } from "@/lib/format";
 import type { Candidate, CellInfo, CompareResult, DimDetail, DocumentedSite, Measure, Planet } from "@/lib/types";
 import { useStore } from "@/store";
+import { LeadFilter, TargetContext } from "./TargetContext";
 
 /* ---------------------------------------------------------------- left column */
 function Origin({ mobileOpen = false }: { mobileOpen?: boolean }) {
@@ -149,10 +150,10 @@ function CandidateRow({ c, active, onClick }: { c: Candidate; active: boolean; o
   const thumb = tpl ? earthTile(tpl, c.lat, c.lon, 8) : null;
   const useful = c.fitness.filter((f) => f.grade === "A" || f.grade === "B").map((f) => f.label.toLowerCase());
   return (
-    <li className="border-t border-[var(--hair)]">
+    <li className="border-t border-[var(--hair)]" data-new-lead={c.novel ? "true" : undefined}>
       <button type="button" aria-current={active} onClick={onClick} className={cx("row-ctl grid w-full grid-cols-[24px_32px_1fr_52px] items-start gap-x-2.5 px-4 py-2.5 text-left", active && "bg-basalt-800")}>
         <span className="tnum pt-1.5 text-xs text-regolith-400" aria-label={`Rank ${c.rank}`}>#{c.rank}</span>
-        <GradeTile grade={c.grade} />
+        <span className={c.novel ? "new-lead-grade" : undefined}><GradeTile grade={c.grade} /></span>
         <span className="min-w-0">
           <span className="placename block text-md leading-tight text-regolith-50 [overflow-wrap:anywhere]">{c.place.label}</span>
           <span className="tnum mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-regolith-400">
@@ -160,7 +161,7 @@ function CandidateRow({ c, active, onClick }: { c: Candidate; active: boolean; o
             {c.documented ? (
               <span className="rounded-xs bg-basalt-600 px-1.5 py-px text-2xs text-regolith-100" title={`${c.documented.name}, ${formatKm(c.documented.distance_km)} away. ${c.documented.source}`}>Documented analog nearby</span>
             ) : (
-              <span className="rounded-xs px-1.5 py-px text-2xs text-world ring-1 ring-[var(--world)]" title="No site in RADIUM's reference list of documented analogs lies within 150 km. That does not mean the area has never been studied.">Not in reference list</span>
+              <span className="rounded-xs px-1.5 py-px text-2xs text-world ring-1 ring-[var(--world)]" title="No site in RADIUM's reference list of documented analogs lies within 150 km. That does not mean the area has never been studied.">New lead · not verified</span>
             )}
           </span>
           {useful.length > 0 && <span className="mt-1 block text-2xs leading-snug text-regolith-300">Useful for {useful.join(", ")}.</span>}
@@ -211,6 +212,9 @@ function Results() {
   const showOverlay = useStore((s) => s.showTwinOverlay);
   const { pickEarth, runTwin } = useStore.getState();
   const [tab, setTab] = useState<"best" | "documented">("best");
+  const documented = useStore((s) => s.showDocumented), modelled = useStore((s) => s.showModelled);
+  const onlyLeads = modelled && !documented;
+  useEffect(() => { if (!modelled && documented) setTab("documented"); else if (onlyLeads) setTab("best"); }, [documented, modelled, onlyLeads]);
 
   if (!origin) {
     return (
@@ -230,7 +234,9 @@ function Results() {
   return (
     <div aria-busy={status === "loading"} className={cx(status === "loading" && "opacity-70")}>
       <header className="px-4 pt-4 pb-3">
-        <h2 className="text-md font-semibold text-regolith-50">Closest places on Earth</h2>
+        <h2 className="text-md font-semibold text-regolith-50">{onlyLeads ? "Discovered leads" : "Closest places on Earth"}</h2>
+        <TargetContext twin={twin} />
+        <LeadFilter />
         <p className="mt-1 text-xs leading-relaxed text-regolith-400">
           {dist.cells.toLocaleString("en-US")} land cells compared. {ab.toLocaleString("en-US")} grade B or better{dist.grades.A ? `, ${dist.grades.A.toLocaleString("en-US")} of them A` : ""}. Listed matches are at least {twin.separation_km} km apart.
         </p>
@@ -249,15 +255,16 @@ function Results() {
         <div className="-mx-2 mt-2"><Switch checked={showOverlay} onChange={(v) => useStore.setState({ showTwinOverlay: v })} label="Colour all of Earth by match grade" /></div>
       </header>
       <div role="tablist" aria-label="Lists" className="hair-t flex gap-1 px-3 pt-2">
-        {([["best", "Best matches"], ["documented", "Documented analog sites"]] as const).map(([id, label]) => (
+        {([["best", "Best matches"], ["documented", "Documented analog sites"]] as const).filter(([id]) => id === "best" ? modelled : documented).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className="ctl h-7 rounded-sm px-2.5 text-xs font-medium text-regolith-300">{label}</button>
         ))}
       </div>
       {tab === "best" ? (
         <>
-          <ol className="mt-2">{twin.candidates.map((c) => <CandidateRow key={c.id} c={c} active={!!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13} onClick={() => void pickEarth(c.lat, c.lon, true)} />)}</ol>
+          <ol className="mt-2" data-discovery-results>{twin.candidates.filter((c) => !onlyLeads || c.novel).map((c) => <CandidateRow key={c.id} c={c} active={!!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13} onClick={() => void pickEarth(c.lat, c.lon, true)} />)}</ol>
+          {onlyLeads && !twin.candidates.some((c) => c.novel) && <p className="p-4 text-xs leading-relaxed text-regolith-400">No new leads in these top results. Choose Both to inspect every screened candidate, or change the target or purpose.</p>}
           <p className="hair-t px-4 py-3 text-2xs leading-relaxed text-regolith-500">
-            Ranked by data alone. The list of documented analog sites is used only to label results and never changes a grade. Click anywhere on the map to grade a place of your own.
+            Ranked by data alone. Dashed rings identify computed new leads, not verified field sites. The list of documented analog sites is used only to label results and never changes a grade. Click anywhere on the map to grade a place of your own.
           </p>
         </>
       ) : (
@@ -407,7 +414,7 @@ function Comparison({ c }: { c: CompareResult }) {
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Button size="sm" variant="solid" onClick={() => useStore.getState().openBrief({ lat: c.earth.cell.lat, lon: c.earth.cell.lon })}><FileText size={13} /> Create a test brief</Button>
           <Button size="sm" variant="outline" onClick={() => useStore.getState().setMode("compare")}><Columns2 size={13} /> Full side-by-side view</Button>
-          <Button size="sm" variant="outline" onClick={() => { const st = useStore.getState(); st.addCompare({ body: c.planet.body, lat: c.planet.cell.lat, lon: c.planet.cell.lon, label: c.planet.place.label }); st.addCompare({ body: "earth", lat: c.earth.cell.lat, lon: c.earth.cell.lon, label: c.earth.place.label }); }}>Add both to Compare</Button>
+          <Button size="sm" variant="outline" onClick={() => { const st = useStore.getState(); st.addCompare({ body: c.planet.body, lat: c.planet.cell.lat, lon: c.planet.cell.lon, label: c.planet.place.label }); st.addCompare({ body: "earth", lat: c.earth.cell.lat, lon: c.earth.cell.lon, label: c.earth.place.label, newLead: !c.documented && c.earth.analysed && c.match.grade !== null }); }}>Add both to Compare</Button>
           <Button size="sm" variant="outline" onClick={() => useStore.getState().setMode("near")}><Navigation size={13} /> Find nearer analogs</Button>
         </div>
       </section>
@@ -492,9 +499,9 @@ export function TwinView() {
   const url = origin && showOverlay ? overlay.twin(origin.body, origin.lat, origin.lon, purpose, twinWeights) : null;
   const markers: SiteMarker[] = useMemo(
     () => (showModelled ? twin?.candidates ?? [] : [])
-      .filter((c) => gradeFilter.includes(c.grade ?? "none"))
-      .map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, text: (c.grade ?? "·"), grade: c.grade, active: !!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13 })),
-    [twin, picked, showModelled, gradeFilter],
+      .filter((c) => gradeFilter.includes(c.grade ?? "none") && (showDocumented || c.novel))
+      .map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, text: (c.grade ?? "·"), grade: c.grade, newLead: c.novel, active: !!picked && Math.abs(picked.lat - c.lat) < 0.13 && Math.abs(picked.lon - c.lon) < 0.13 })),
+    [twin, picked, showModelled, showDocumented, gradeFilter],
   );
   // Atlas: documented sites become text badges coloured by grade, environment or study theme, then filtered.
   const ctx = useMemo(() => {
@@ -526,12 +533,13 @@ export function TwinView() {
 
   return (
     <>
-      <Button className="surface-float absolute top-3 left-3 z-40 md:hidden" aria-expanded={mobileSettings} onClick={()=>setMobileSettings(!mobileSettings)}>{mobileSettings ? "Close target settings" : "Target settings"}</Button>
+      <div className="absolute top-3 left-3 z-40 md:hidden"><Button className="surface-float" aria-expanded={mobileSettings} onClick={()=>setMobileSettings(!mobileSettings)}>{mobileSettings ? "Close target settings" : "Target settings"}</Button></div>
       <Origin mobileOpen={mobileSettings} />
       <div className="relative h-full min-w-0 flex-1 overflow-hidden bg-void">
         <EarthMap ref={handle} basemap={basemap} labels={earthLayers.labels} overlayUrl={url} opacity={0.8} dimBase={!!url} pins={gradedPins} markers={markers} selection={sel} focus={focus} onPick={onPick} onView={onView}
           onMarker={(id) => { const c = twin?.candidates.find((x) => x.id === id); if (c) void pickEarth(c.lat, c.lon, true); }} />
         <Tapes ref={tapes} />
+        {twin && <div className="match-target-map-wrap"><TargetContext twin={twin} compact /></div>}
         <div className="surface-float absolute top-3 right-3 z-20 flex flex-col rounded-md ring-1 ring-[var(--hair)]">
           <IconButton label="Zoom in" onClick={() => handle.current?.zoom(0.5)}><Plus size={16} /></IconButton>
           <IconButton label="Zoom out" onClick={() => handle.current?.zoom(2)}><Minus size={16} /></IconButton>
@@ -560,7 +568,7 @@ export function TwinView() {
 /* ------------------------------------------------------------------ atlas */
 function AtlasPanel({ twin, shownDocs, shownModel, context, body }: { twin: ReturnType<typeof useStore.getState>["twin"]; shownDocs: number; shownModel: number; context: string; body: Planet }) {
   const s = useStore();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => window.innerWidth >= 640);
   const cats = s.colorBy === "grade" ? [] : categoriesFor(s.colorBy);
   const toggleGrade = (g: (typeof s.gradeFilter)[number]) =>
     s.setAtlas({ gradeFilter: s.gradeFilter.includes(g) ? s.gradeFilter.filter((x) => x !== g) : [...s.gradeFilter, g] });
@@ -573,7 +581,7 @@ function AtlasPanel({ twin, shownDocs, shownModel, context, body }: { twin: Retu
   const totalDocs = s.pins.earth.filter(p=>p.verification_status !== "review_needed").length;
   const totalModel = twin?.candidates.length ?? 0;
   return (
-    <div className="pointer-events-none absolute bottom-11 left-[72px] z-20 max-sm:right-3 max-sm:left-3">
+    <div className="analog-atlas-position pointer-events-none absolute bottom-11 left-[72px] z-20 max-sm:right-3 max-sm:left-3">
       <div className="surface-float anim-rise pointer-events-auto w-[300px] rounded-md p-3 ring-1 ring-[var(--hair)] max-sm:w-auto">
         <div className="flex items-center gap-2">
           <span className="text-sm leading-tight font-semibold text-regolith-50">Analog atlas</span>
@@ -581,6 +589,7 @@ function AtlasPanel({ twin, shownDocs, shownModel, context, body }: { twin: Retu
         </div>
         {open && (
           <>
+            <LeadFilter />
             <div className="mt-2"><Segmented size="sm" label="Colour documented sites by" value={s.colorBy} onChange={(v) => s.setAtlas({ colorBy: v, catFilter: null })}
               options={[{ value: "grade", label: "Grade" }, { value: "environment", label: "Environment" }, { value: "application", label: "Study theme" }]} /></div>
             <p className="mt-1.5 text-2xs leading-snug text-regolith-400">
@@ -609,7 +618,7 @@ function AtlasPanel({ twin, shownDocs, shownModel, context, body }: { twin: Retu
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-regolith-200">
               <label className="inline-flex items-center gap-1.5"><input type="checkbox" className="accent-[var(--world)]" checked={s.showDocumented} onChange={(e) => s.setAtlas({ showDocumented: e.target.checked })} /> Documented sites</label>
-              <label className="inline-flex items-center gap-1.5"><input type="checkbox" className="accent-[var(--world)]" checked={s.showModelled} onChange={(e) => s.setAtlas({ showModelled: e.target.checked })} /> Model matches</label>
+              <label className="inline-flex items-center gap-1.5"><input type="checkbox" className="accent-[var(--world)]" checked={s.showModelled} onChange={(e) => s.setAtlas({ showModelled: e.target.checked })} /> Screened candidates</label>
               <button type="button" className="ctl ml-auto inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-regolith-300" onClick={reset}><RotateCcw size={11} /> Reset</button>
             </div>
             <p className="tnum mt-1.5 text-2xs text-regolith-400" aria-live="polite">Showing {shownDocs} of {totalDocs} documented sites and {shownModel} of {totalModel} model matches.</p>

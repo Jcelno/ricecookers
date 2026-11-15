@@ -95,7 +95,9 @@ function pinElement(p: Pin, active: boolean) {
 }
 
 function markerElement(m: SiteMarker) {
-  return markerButton({ id: m.id, text: m.grade ?? "•", title: `Model result ${m.id}: ${m.grade ? `analog similarity grade ${m.grade}` : "insufficient data; not graded"}`, grade: m.grade, active: m.active });
+  const element = markerButton({ id: m.id, text: m.grade ?? "•", title: `${m.newLead ? "New lead" : "Screened candidate"} ${m.id}: ${m.grade ? `analog similarity grade ${m.grade}` : "insufficient data; not graded"}`, grade: m.grade, active: m.active });
+  if (m.newLead) { element.dataset.newLead = "true"; element.style.borderStyle = "dashed"; }
+  return element;
 }
 
 export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap(

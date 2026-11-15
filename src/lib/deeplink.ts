@@ -50,7 +50,7 @@ export function applyLink(hash: string) {
   if (q.has("cl2")) {
     try {
       const v = JSON.parse(q.get("cl2")!);
-      if (Array.isArray(v)) list = v.filter(validSite).slice(0, 4).map(({ body, lat, lon, label }) => ({ body, lat, lon, label: label.slice(0, 160) }));
+      if (Array.isArray(v)) list = v.filter(validSite).slice(0, 4).map(({ body, lat, lon, label, newLead }) => ({ body, lat, lon, label: label.slice(0, 160), ...(body === "earth" && newLead === true ? { newLead: true } : {}) }));
     } catch { /* damaged comparison list */ }
   } else if (q.get("cl")) {
     list = q.get("cl")!.split(";").flatMap((part) => {
@@ -139,7 +139,7 @@ export function currentLink(): string {
     if (s.sheet === "scenarios" && s.scenarioB?.mission === s.missionId) { q.set("wb", encWeights(s.scenarioB.weights)); q.set("lb", s.scenarioB.limits.join(",") || "-"); }
   }
   if (s.mode === "near") { q.set("nr", String(s.nearRadius)); q.set("nm", s.nearMode); if (s.nearDocOnly) q.set("nd", "1"); }
-  if (s.compareList.length) q.set("cl2", JSON.stringify(s.compareList.map(({ body, lat, lon, label }) => ({ body, lat, lon, label: label.slice(0, 160) }))));
+  if (s.compareList.length) q.set("cl2", JSON.stringify(s.compareList.map(({ body, lat, lon, label, newLead }) => ({ body, lat, lon, label: label.slice(0, 160), ...(body === "earth" && newLead === true ? { newLead: true } : {}) }))));
   if (s.sheet && s.sheet !== "intro") q.set("sh", s.sheet);
   return `${location.origin}${location.pathname}${location.search}#${q}`;
 }

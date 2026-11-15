@@ -5,6 +5,8 @@ export interface SiteRef {
   lat: number;
   lon: number;
   label: string;
+  /** Computed screening provenance; absent means unknown, never a verified analog. */
+  newLead?: boolean;
 }
 export interface SavedSource {
   title: string;
@@ -130,6 +132,7 @@ const context = (v: unknown): SavedContext | undefined =>
     : undefined;
 const cleanSite = (s: SavedSite): SavedSite => ({
   ...s,
+  newLead: s.body === "earth" && s.newLead === true ? true : undefined,
   collection: typeof s.collection === "string" ? s.collection.slice(0, 80) : "",
   sources: sources(s.sources),
   context: context(s.context),

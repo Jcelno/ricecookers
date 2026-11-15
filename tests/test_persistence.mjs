@@ -56,3 +56,17 @@ test("invalid pair endpoints, mission weights, and collections are sanitized", (
   const { saved, rejected } = parseSaved(input);
   assert.equal(saved.sites[0].collection, ""); assert.equal(rejected, 2);
 });
+
+test("new-lead provenance survives saved comparison export without inventing unknown provenance", () => {
+  const earth = { body: "earth", lat: -24.25, lon: -69.75, label: "Screened cell", newLead: true };
+  const comparison = { id: "lead", name: "Fieldwork lead", kind: "sites", sites: [site, earth], purpose: "general", weights: null, created: "2026-11-15T12:00:00Z", sources: [] };
+  const s = storage();
+  assert.equal(writeSaved({ ...emptySaved(), sites: [earth, { ...earth, lat: 1, newLead: "true" }, { ...site, newLead: true }], comparisons: [comparison] }, s), null);
+  const restored = readSaved(s).saved;
+  assert.equal(restored.sites[0].newLead, true);
+  assert.equal(restored.sites[1].newLead, undefined);
+  assert.equal(restored.sites[2].newLead, undefined);
+  assert.equal(restored.comparisons[0].sites[0].newLead, undefined);
+  assert.equal(restored.comparisons[0].sites[1].newLead, true);
+  assert.equal(JSON.parse(JSON.stringify(restored)).comparisons[0].sites[1].newLead, true);
+});
