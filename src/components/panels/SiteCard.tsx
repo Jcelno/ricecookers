@@ -309,7 +309,7 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
           </section>
           <section className="pt-3">
             <h3 className="mb-1.5 px-4 text-xs font-semibold text-regolith-100">Photographs</h3>
-            <Photos id={photoKey(cell)} load={() => photosFor(cell)} orbital={{ body: cell.body, lat: cell.cell.lat, lon: cell.cell.lon, layer: baseLayer }} compact />
+            <Photos id={photoKey(cell)} load={() => photosFor(cell)} orbital={{ body: cell.body, lat: cell.cell.lat, lon: cell.cell.lon, layer: baseLayer, viewpoint: { lat: ref.lat, lon: ref.lon } }} compact />
           </section>
         </div>
       )}

@@ -1,6 +1,6 @@
 /** Reusable screenshot.mjs --run hook. Choose ?qa=site|mission|earth|twin|gallery|tour. */
 export default async function prepare(page) {
-  await page.waitForFunction(() => window.__radium?.getState().meta, { timeout: 60000 });
+  await page.waitForFunction(() => window.__radium?.getState().meta && ["moon", "mars", "earth"].every(body => window.__radium.getState().pins[body].length), { timeout: 60000 });
   const scenario = new URL(page.url()).searchParams.get("qa");
   if (!scenario || scenario === "tour") return;
   if (scenario === "shortcuts") { await page.evaluate(() => window.dispatchEvent(new Event("radium:shortcuts"))); return; }
@@ -15,6 +15,7 @@ export default async function prepare(page) {
     if (scenario === "twin") st.startTwin({ body, lat: site.lat, lon: site.lon });
   }, scenario);
   await page.waitForFunction(() => window.__radium.getState().cellStatus !== "loading");
+  if (scenario === "twin") await page.waitForFunction(() => window.__radium.getState().twinStatus === "ready" || window.__radium.getState().twinStatus === "error", { timeout: 60000 });
   if (scenario === "gallery") {
     await page.waitForSelector('[data-gallery-open], [aria-label^="Open photograph:"]', { timeout: 20000 });
     await page.click('[data-gallery-open], [aria-label^="Open photograph:"]');

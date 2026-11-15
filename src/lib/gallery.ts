@@ -1,7 +1,7 @@
 import type { Basemap, Body, TileLayer } from "./types";
 import type { Photo } from "./photos";
 
-export interface OrbitalContext { body: Body; lat: number; lon: number; layer: TileLayer | Basemap | undefined }
+export interface OrbitalContext { body: Body; lat: number; lon: number; layer: TileLayer | Basemap | undefined; viewpoint?: { lat: number; lon: number } }
 export interface GalleryFrame extends Omit<Photo, "archive" | "kind"> {
   archive: string;
   kind?: "ground" | "orbital" | "map" | "photograph";
