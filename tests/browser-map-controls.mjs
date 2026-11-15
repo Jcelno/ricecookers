@@ -31,6 +31,7 @@ try {
   await page.focus('[aria-label="Quick data layer opacity"]');
   await page.keyboard.press("Home");
   await page.waitForFunction(() => window.__radium.getState().layers.earth.opacity === .2 && window.__maplibre.getPaintProperty("ov", "raster-opacity") === .2);
+  assert.equal(await page.$eval("[data-overlay-ramp]", el => Number(getComputedStyle(el).opacity)), .2, "legend applies the same layer opacity as the rendered overlay");
   await page.keyboard.press("Escape");
   assert.equal(await page.$("#quick-layer-popover"), null, "Escape closes the menu");
   await page.click(".quick-boundaries");

@@ -39,9 +39,10 @@ function fmtLegend(v: number, unit: string, fmt?: string | null) {
 }
 
 function GradientLegend({ legend, unit, fmt }: { legend: LegendT; unit: string; fmt?: string | null }) {
+  const opacity = useStore(s => s.layers[s.body].opacity);
   return (
     <div>
-      <div className="h-2 rounded-xs ring-1 ring-black/40" style={{ background: `linear-gradient(to right, ${legend.stops.join(",")})` }} />
+      <div data-overlay-ramp className="h-2 rounded-xs ring-1 ring-black/40" style={{ opacity, background: `linear-gradient(to right, ${legend.stops.join(",")})` }} />
       <div className="tnum mt-1 flex justify-between text-2xs text-regolith-300">
         <span>{fmtLegend(legend.min, unit, fmt)}</span>
         <span className="text-regolith-500">{legend.log ? "logarithmic, low to high" : "continuous, low to high"}</span>
