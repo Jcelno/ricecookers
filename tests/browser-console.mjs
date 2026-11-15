@@ -18,6 +18,7 @@ try {
   await page.keyboard.press("l");
   assert.equal(await page.evaluate(() => window.__radium.getState().leftOpen), !panel);
   await page.keyboard.press("/");
+  await page.waitForFunction(() => document.activeElement.matches('input[role="combobox"]'));
   await page.keyboard.type("-5.44, 137.7");
   await page.waitForSelector('[role="option"]');
   await page.keyboard.press("Enter");
@@ -36,7 +37,9 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')].some(el => el.textContent.includes("Keyboard shortcuts")));
   await page.setViewport({ width: 390, height: 844 });
+  await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press("2");
+  await page.waitForSelector('input[role="combobox"]');
   await page.keyboard.press("/");
   await page.waitForFunction(() => document.activeElement.matches('input[role="combobox"]'));
   assert(await page.evaluate(() => { const el = document.activeElement; const r = el.getBoundingClientRect(); return el.matches('input[role="combobox"]') && r.width > 0 && r.right <= innerWidth; }), "mobile search opens when focused by shortcut");

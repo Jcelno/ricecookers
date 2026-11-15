@@ -26,7 +26,11 @@ export function KeyboardControls() {
       else if (k === "/") {
         const registry = [...document.querySelectorAll<HTMLSelectElement>(".workspace-context select")].find(el => el.getClientRects().length);
         if (registry) registry.focus();
-        else window.dispatchEvent(new Event("radium:focus-search"));
+        else {
+          const search = document.querySelector<HTMLInputElement>('input[role="combobox"]');
+          if (search?.getClientRects().length) search.focus();
+          else window.dispatchEvent(new Event("radium:focus-search"));
+        }
       } else if (k === "1" || k === "2" || k === "3") s.setBody(k === "1" ? "moon" : k === "2" ? "mars" : "earth");
       else if (k === "l") { if (s.mode !== "explore") s.setMode("explore"); s.setPanel("left", !s.leftOpen); }
       else if (k === "t" && s.selection?.body !== "earth" && s.selection) s.startTwin({ ...s.selection, body: s.selection.body });
