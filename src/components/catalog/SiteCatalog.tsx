@@ -6,7 +6,8 @@ import {
   Rocket,
   Search,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { emitTour } from "@/lib/tour/events";
 import { Button, GradeTile, Sheet } from "@/components/ui/primitives";
 import { formatCoord } from "@/lib/format";
 import type { Body, Pin } from "@/lib/types";
@@ -177,6 +178,7 @@ export function SiteCatalog({ onClose }: { onClose: () => void }) {
   const twin = useStore((s) => s.twin);
   const origin = useStore((s) => s.twinOrigin);
   const [query, setQuery] = useState("");
+  useEffect(() => { emitTour("catalog:opened", {}); }, []);
   const [world, setWorld] = useState("all");
   const [kind, setKind] = useState("all");
   const [grade, setGrade] = useState("all");
@@ -219,6 +221,7 @@ export function SiteCatalog({ onClose }: { onClose: () => void }) {
     s.setMode("explore");
     s.setBody(body);
     void s.select(body, p.lat, p.lon, {
+      source: "catalog",
       fly: true,
       spanKm: body === "earth" ? 900 : 650,
     });
@@ -242,14 +245,14 @@ export function SiteCatalog({ onClose }: { onClose: () => void }) {
               aria-label="Search research sites"
               placeholder="Search a site, mission, geology or research purpose"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); emitTour("catalog:filtered", { query: e.target.value }); }}
             />
           </label>
           <select
             aria-label="Filter planet"
             className="field"
             value={world}
-            onChange={(e) => setWorld(e.target.value)}
+            onChange={(e) => { setWorld(e.target.value); emitTour("catalog:filtered", { query: e.target.value }); }}
           >
             <option value="all">All worlds</option>
             {Object.entries(WORLD).map(([b, n]) => (
@@ -262,7 +265,7 @@ export function SiteCatalog({ onClose }: { onClose: () => void }) {
             aria-label="Filter classification"
             className="field"
             value={kind}
-            onChange={(e) => setKind(e.target.value)}
+            onChange={(e) => { setKind(e.target.value); emitTour("catalog:filtered", { query: e.target.value }); }}
           >
             <option value="all">All classifications</option>
             {classes.map((c) => (
@@ -275,7 +278,7 @@ export function SiteCatalog({ onClose }: { onClose: () => void }) {
             aria-label="Filter analog environment"
             className="field"
             value={analogType}
-            onChange={(e) => setAnalogType(e.target.value)}
+            onChange={(e) => { setAnalogType(e.target.value); emitTour("catalog:filtered", { query: e.target.value }); }}
           >
             <option value="all">All analog environments</option>
             {analogTypes.map((t) => (
@@ -288,7 +291,7 @@ export function SiteCatalog({ onClose }: { onClose: () => void }) {
             aria-label="Filter calculated grade"
             className="field"
             value={grade}
-            onChange={(e) => setGrade(e.target.value)}
+            onChange={(e) => { setGrade(e.target.value); emitTour("catalog:filtered", { query: e.target.value }); }}
           >
             <option value="all">Any similarity grade</option>
             {["A", "B", "C", "D", "F"].map((g) => (
@@ -300,7 +303,7 @@ export function SiteCatalog({ onClose }: { onClose: () => void }) {
             aria-label="Filter data availability"
             className="field"
             value={availability}
-            onChange={(e) => setAvailability(e.target.value)}
+            onChange={(e) => { setAvailability(e.target.value); emitTour("catalog:filtered", { query: e.target.value }); }}
           >
             <option value="all">All evidence</option>
             <option value="references">Source references</option>
@@ -388,7 +391,7 @@ export function SiteCatalog({ onClose }: { onClose: () => void }) {
                       const s = useStore.getState();
                       s.setBody(p.body);
                       s.setMode("mission");
-                      void s.select(p.body, p.lat, p.lon, { fly: true });
+                      void s.select(p.body, p.lat, p.lon, { fly: true, source: "catalog" });
                       onClose();
                     }}
                   >

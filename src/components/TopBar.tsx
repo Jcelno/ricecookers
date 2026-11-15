@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { quickTourSummary } from "@/lib/intro";
+import { onTour } from "@/lib/tour/events";
 import { api } from "@/lib/api";
 import { copyCurrentViewLink } from "@/lib/sharing";
 import { formatCoord } from "@/lib/format";
@@ -258,7 +260,7 @@ function Search() {
         .setNear({
           nearLoc: { lat: h.lat, lon: h.lon, source: "search", label: h.name },
         });
-    else void select(target, h.lat, h.lon, { fly: true, spanKm: span });
+    else void select(target, h.lat, h.lon, { fly: true, spanKm: span, source: "search" });
   };
 
   return (
@@ -378,6 +380,8 @@ export function TopBar() {
     })),
   );
   const [catalog, setCatalog] = useState(false);
+  const [tourProgress, setTourProgress] = useState(quickTourSummary);
+  useEffect(() => onTour(event => { if (event.type === "tutorial:changed") setTourProgress(quickTourSummary()); }), []);
   const analog = ["twin", "compare", "near"].includes(s.mode);
   useEffect(() => {
     if (!s.saveNotice) return;
@@ -444,10 +448,11 @@ export function TopBar() {
           <Button
             data-tour="help"
             aria-label="Help and interactive tutorial"
-            title="Help and interactive tutorial"
+            title={tourProgress.complete ? "Help and interactive tutorial" : `Resume tour (${tourProgress.completedCount} of ${tourProgress.total})`}
             onClick={() => s.setSheet("intro")}
           >
             <CircleHelp size={17} />
+            {!tourProgress.complete && <span className="tour-help-dot" aria-hidden="true" />}
             <span className="max-xl:hidden">Help</span>
           </Button>
         </div>

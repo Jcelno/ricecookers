@@ -205,7 +205,7 @@ function PairView() {
             ) : <p className="mt-2 text-sm text-regolith-400">No compared dimension falls below grade C.</p>}
           </section>
           <section className="rounded-md bg-basalt-900/60 p-4 ring-1 ring-[var(--hair)]">
-            <h3 className="text-sm font-semibold text-regolith-50">Cannot reproduce on Earth</h3>
+            <h3 data-tour="analogy-breakdown" className="text-sm font-semibold text-regolith-50">Cannot reproduce on Earth</h3>
             <ul className="mt-2 space-y-2">
               {m.breaks_down.map((b) => (
                 <li key={b.label} className="text-xs leading-snug"><span className="font-medium text-regolith-50">{b.label}</span> <span className="tnum text-regolith-300">{b.planet} vs {b.earth}</span><span className="mt-0.5 block text-regolith-400">{b.text}</span></li>

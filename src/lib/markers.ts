@@ -49,6 +49,7 @@ export function markerButton({
   cluster = false,
   color,
   ink,
+  id,
 }: {
   text: string;
   title: string;
@@ -57,9 +58,11 @@ export function markerButton({
   cluster?: boolean;
   color?: string;
   ink?: string;
+  id?: string;
 }) {
   const el = document.createElement("button");
   el.type = "button";
+  if (id) el.dataset.tourMarker = id;
   el.className = "radium-map-marker";
   el.textContent = text;
   el.title = title;

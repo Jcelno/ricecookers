@@ -15,9 +15,9 @@ const SIMPLE_NAME: Record<string, string> = {
 const firstSentence = (t: string) => (t.match(/^.*?[.!?](\s|$)/)?.[0] ?? t).trim();
 const GROUP_ORDER = ["Terrain", "Surface temperature", "Sunlight and energy", "Communication", "Water and ice", "Atmosphere and dust", "Composition and geology", "Surface cover"];
 
-function Radio({ on, onClick, title, sub, evidence }: { on: boolean; onClick: () => void; title: string; sub?: string; evidence?: Evidence }) {
+function Radio({ on, onClick, title, sub, evidence, tour }: { tour?: string; on: boolean; onClick: () => void; title: string; sub?: string; evidence?: Evidence }) {
   return (
-    <button type="button" role="radio" aria-checked={on} onClick={onClick} aria-current={on} className="row-ctl flex w-full items-start gap-2.5 px-4 py-1.5 text-left">
+    <button data-tour={tour} type="button" role="radio" aria-checked={on} onClick={onClick} aria-current={on} className="row-ctl flex w-full items-start gap-2.5 px-4 py-1.5 text-left">
       <span className={cx("mt-1 grid size-3.5 shrink-0 place-items-center rounded-full ring-1", on ? "ring-[var(--world)]" : "ring-[var(--hair-strong)]")}>
         {on && <span className="size-2 rounded-full bg-world" />}
       </span>
@@ -66,7 +66,7 @@ export function LayersPanel() {
       <header className="px-4 pt-4 pb-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-md font-semibold text-regolith-50">Map layers</h2>
-          <Segmented size="sm" label="Detail level" value={advanced ? "adv" : "simple"} onChange={(v) => useStore.setState({ advanced: v === "adv" })}
+          <Segmented size="sm" label="Detail level" value={advanced ? "adv" : "simple"} onChange={(v) => useStore.getState().setAdvanced(v === "adv")}
             options={[{ value: "simple", label: "Simple", title: "Plain-language names and explanations" }, { value: "adv", label: "Advanced", title: "Scientific names, resolutions and every NASA map" }]} />
         </div>
         <p className="mt-1 text-xs leading-relaxed text-regolith-400">
@@ -107,7 +107,7 @@ export function LayersPanel() {
           {ordered.map(([name, items]) => (
             <LayerGroup key={`${body}-${name}`} name={advanced ? name : (SIMPLE_NAME[name] ?? name)} open={activeGroup(items) || name === "Terrain"}>
               {items.grid.map((g) => (
-                <Radio key={g.id} on={isOn(st.overlay, "grid", g.id)} onClick={() => pick("grid", g.id)} title={g.title} evidence={advanced ? g.evidence : undefined}
+                <Radio key={g.id} tour={g.id.includes("slope") ? "slope-layer" : `layer-${g.id}`} on={isOn(st.overlay, "grid", g.id)} onClick={() => pick("grid", g.id)} title={g.title} evidence={advanced ? g.evidence : undefined}
                   sub={advanced ? `RADIUM grid, ${g.res}${g.polar_only ? ". Polar squares only" : ""}` : `${firstSentence(g.description)}${g.polar_only ? " Near the poles only." : ""}`} />
               ))}
               {items.tiles.map((t) => (

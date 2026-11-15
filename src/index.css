@@ -1088,3 +1088,9 @@ a:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* First-run invitation stays out of the map's primary controls. */
+.tour-invitation { position: fixed; z-index: 75; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--hair-strong); border-radius: 10px; max-width: calc(100vw - 24px); font-size: 12px; }
+.tour-help-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-world); animation: tour-help-pulse 2.4s ease-in-out infinite; }
+@keyframes tour-help-pulse { 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .tour-help-dot { animation: none !important; } }

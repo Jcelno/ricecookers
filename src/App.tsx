@@ -5,6 +5,7 @@ import { Stage } from "@/components/map/Stage";
 import { LayersPanel } from "@/components/panels/LayersPanel";
 import { LocationPanel } from "@/components/panels/LocationPanel";
 import { MissionPanel } from "@/components/panels/MissionPanel";
+import { TourBootstrap } from "@/components/TourBootstrap";
 import { TopBar } from "@/components/TopBar";
 import { Button, cx, IconButton, Notice, Spinner } from "@/components/ui/primitives";
 import { CompareTray } from "@/components/CompareTray";
@@ -17,7 +18,6 @@ const NearView = lazy(() => import("@/components/near/NearView").then((m) => ({ 
 const CompareView = lazy(() => import("@/components/compare/CompareView").then((m) => ({ default: m.CompareView })));
 const Methodology = lazy(() => import("@/components/sheets/Methodology"));
 const Sources = lazy(() => import("@/components/sheets/Sources"));
-const Intro = lazy(() => import("@/components/sheets/Intro"));
 const BriefSheet = lazy(() => import("@/components/sheets/Brief"));
 const Scenarios = lazy(() => import("@/components/sheets/Scenarios"));
 const MissionReport = lazy(() => import("@/components/sheets/MissionReport"));
@@ -101,6 +101,7 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <TopBar />
+      <TourBootstrap />
       <main className="relative flex min-h-0 flex-1">
         <CompareTray />
         {mode === "saved" ? (<Suspense fallback={<Spinner label="Opening saved research" />}><SavedView /></Suspense>) : mode === "twin" ? (
@@ -124,7 +125,6 @@ export default function App() {
       <Suspense fallback={null}>
         {sheet === "methodology" && <Methodology onClose={() => setSheet(null)} />}
         {sheet === "sources" && <Sources onClose={() => setSheet(null)} />}
-        {sheet === "intro" && <Intro onClose={() => setSheet(null)} />}
         {sheet === "brief" && <BriefSheet onClose={() => setSheet(null)} />}
         {sheet === "scenarios" && <Scenarios onClose={() => setSheet(null)} />}
         {sheet === "report" && <MissionReport onClose={() => setSheet(null)} />}

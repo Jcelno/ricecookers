@@ -10,6 +10,7 @@ import { ProfileChart } from "@/components/panels/ProfileChart";
 import { TimelineChart } from "@/components/panels/TimelineChart";
 import { Photos } from "@/components/ui/Photos";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Notice, Segmented, Spinner } from "@/components/ui/primitives";
+import { emitTour } from "@/lib/tour/events";
 import { api } from "@/lib/api";
 import { formatKm, formatValue, GRADE_HEX, GRADE_MEANING, inUnit } from "@/lib/format";
 import { photoKey, photosFor } from "@/lib/photos";
@@ -240,17 +241,17 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
           <IconButton label="Clear the selection" onClick={st.clearSelection} className="-mt-1 -mr-2"><X size={16} /></IconButton>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-1.5">
-          {cell.body !== "earth" && <Button size="sm" variant="solid" className="justify-center" onClick={() => st.startTwin({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon })}><ArrowLeftRight size={13} /> Find Earth twins</Button>}
+          {cell.body !== "earth" && <Button size="sm" variant="solid" className="justify-center" data-tour="find-twin" onClick={() => st.startTwin({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon })}><ArrowLeftRight size={13} /> Find Earth twins</Button>}
           {cell.body !== "earth" && <Button size="sm" variant="outline" className="justify-center" onClick={() => { st.setTarget({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon }); st.setMode("near"); }}><Navigation size={13} /> Similar near me</Button>}
           <Button size="sm" variant="outline" className="justify-center" aria-pressed={inCompare} onClick={() => { st.addCompare(ref); st.setMode("compare"); }}><Columns2 size={13} /> {inCompare ? "In Compare" : "Compare"}</Button>
-          <Button size="sm" variant="outline" className="justify-center" aria-pressed={saved} onClick={() => st.saveSite(ref)} disabled={saved}>{saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />} {saved ? "Saved" : "Save"}</Button>
+          <Button size="sm" variant="outline" className="justify-center" data-tour="save-place" aria-pressed={saved} onClick={() => st.saveSite(ref)} disabled={saved}>{saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />} {saved ? "Saved" : "Save"}</Button>
           {cell.body !== "earth" && <Button size="sm" variant="outline" className="col-span-2 justify-center" onClick={() => setTab("mission")}><Rocket size={13} /> Plan mission</Button>}
         </div>
       </header>
 
-      <div role="tablist" aria-label="Site details" className="no-scrollbar hair-t hair-b flex gap-0.5 overflow-x-auto px-2 py-1.5">
+      <div role="tablist" data-tour="site-details" aria-label="Site details" className="no-scrollbar hair-t hair-b flex gap-0.5 overflow-x-auto px-2 py-1.5">
         {tabs.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className="ctl h-7 shrink-0 rounded-sm px-2.5 text-xs font-medium text-regolith-300">{t.label}</button>
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => { setTab(t.id); emitTour("locationTab:changed", { tab: t.id }); }} className="ctl h-7 shrink-0 rounded-sm px-2.5 text-xs font-medium text-regolith-300">{t.label}</button>
         ))}
       </div>
 

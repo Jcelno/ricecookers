@@ -30,6 +30,7 @@ function MissionPicker({ missions, value, onChange }: { missions: Mission[]; val
 }
 
 const STEPS = ["Destination", "Mission", "Priorities", "Candidates", "Save"];
+const STEP_IDS = ["destination", "mission", "priorities", "candidates", "save"] as const;
 
 function Movement({ s }: { s: SiteCard }) {
   if (s.prev_rank === undefined) return null;
@@ -60,7 +61,9 @@ export function MissionPanel() {
   const share = shares(raw);
   const timer = useRef<number | undefined>(undefined);
   const [compare, setCompare] = useState<string[]>([]);
-  const [step, setStep] = useState(0);
+  const missionStep = useStore(s => s.missionStep);
+  const step = STEP_IDS.indexOf(missionStep);
+  const setStep = (index: number) => useStore.getState().setMissionStep(STEP_IDS[index]);
   const [name, setName] = useState("");
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const saved = useStore((s) => s.saved);
@@ -100,7 +103,7 @@ export function MissionPanel() {
         <ol className="mt-3 grid grid-cols-5 gap-1" aria-label="Steps">
           {STEPS.map((t, k) => (
             <li key={t}>
-              <button data-mission-step={k} type="button" onClick={() => setStep(k)} aria-current={step === k ? "step" : undefined}
+              <button data-mission-step={k} data-mission-step-id={STEP_IDS[k]} type="button" onClick={() => setStep(k)} aria-current={step === k ? "step" : undefined}
                 className={cx("ctl flex w-full flex-col items-center gap-1 rounded-sm px-0.5 py-1 text-[10px] leading-tight", step === k ? "text-regolith-50" : "text-regolith-400")}>
                 <span className={cx("grid size-5 place-items-center rounded-full text-[10px] font-bold ring-1", step === k ? "bg-world text-world-ink ring-transparent" : k < step ? "ring-[var(--world)] text-world" : "ring-[var(--hair-strong)]")}>{k < step ? <Check size={11} /> : k + 1}</span>
                 {t}
@@ -112,7 +115,7 @@ export function MissionPanel() {
 
       {step === 0 && (
         <Section title="1. Choose a destination">
-          <div className="px-4 pb-3"><RegistrySelect label="Curated destination" worlds={[mission.body]} onSelect={(p,b)=>void select(b,p.lat,p.lon,{fly:true,spanKm:600})}/></div>
+          <div className="px-4 pb-3"><RegistrySelect label="Curated destination" worlds={[mission.body]} onSelect={(p,b)=>void select(b,p.lat,p.lon,{source:"catalog",fly:true,spanKm:600})}/></div>
           <div className="px-4 pb-3">
             <Segmented label="World" value={mission.body} onChange={(b) => { const m = meta.missions.find((x) => x.body === b); if (m) setMission(m.id); }} options={[{ value: "moon", label: "Moon" }, { value: "mars", label: "Mars" }]} />
             <div className="mt-3 rounded-md bg-basalt-800 px-3 py-2.5 text-sm">
@@ -129,7 +132,7 @@ export function MissionPanel() {
               <>
                 <div className="mt-3 text-2xs text-regolith-400">From Compare and your saved places</div>
                 <ul className="mt-1">{pickable.map((p) => (
-                  <li key={`${p.lat}${p.lon}`}><button type="button" className="row-ctl -mx-2 block w-[calc(100%+16px)] rounded-sm px-2 py-1.5 text-left" onClick={() => void select(p.body, p.lat, p.lon, { fly: true, spanKm: 500 })}>
+                  <li key={`${p.lat}${p.lon}`}><button type="button" className="row-ctl -mx-2 block w-[calc(100%+16px)] rounded-sm px-2 py-1.5 text-left" onClick={() => void select(p.body, p.lat, p.lon, { source: "catalog", fly: true, spanKm: 500 })}>
                     <span className="placename block truncate text-md text-regolith-50">{p.label}</span><span className="tnum text-2xs text-regolith-400">{p.lat.toFixed(2)}, {p.lon.toFixed(2)}</span>
                   </button></li>
                 ))}</ul>
@@ -156,7 +159,7 @@ export function MissionPanel() {
           <RotateCcw size={11} /> Reset
         </button>
       }>
-        <ul className="px-4 pb-3">
+        <ul data-tour="mission-priorities" className="px-4 pb-3">
           {mission.criteria.map((c) => {
             const v = raw[c.id] ?? 0;
             return (
@@ -166,7 +169,7 @@ export function MissionPanel() {
                   <span className="tnum text-xs text-regolith-300" title="Share of the overall grade after all sliders are rescaled to 100%">{pct(share[c.id] ?? 0)}</span>
                 </div>
                 <input
-                  id={`w-${c.id}`} type="range" min={0} max={100} step={1} value={v} className="slider"
+                  id={`w-${c.id}`} data-tour={c.id === "moon_ice" ? "mission-ice" : "mission-priority"} type="range" min={0} max={100} step={1} value={v} className="slider"
                   style={{ ["--fill" as string]: `${v}%` }}
                   onChange={(e) => onSlide(c.id, Number(e.target.value))}
                   aria-valuetext={`${pct(share[c.id] ?? 0)} of the grade`}
@@ -217,7 +220,7 @@ export function MissionPanel() {
                 <div className="flex">
                   <button
                     type="button" aria-current={active}
-                    onClick={() => void select(mission.body, s.lat, s.lon, { fly: true, spanKm: Math.max(s.cell_km[0] * 60, 260) })}
+                    onClick={() => void select(mission.body, s.lat, s.lon, { source: "catalog", fly: true, spanKm: Math.max(s.cell_km[0] * 60, 260) })}
                     className="row-ctl grid min-w-0 flex-1 grid-cols-[18px_32px_1fr] items-center gap-x-2.5 py-2 pr-1 pl-4 text-left"
                   >
                     <span className="tnum text-right text-xs text-regolith-400">{s.rank}</span>

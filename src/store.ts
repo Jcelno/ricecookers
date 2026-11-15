@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { api, ApiError } from "@/lib/api";
+import { emitTour } from "@/lib/tour/events";
 import { readSaved, writeSaved, sameSite, type SavedState, type SavedKind, type SavedSite, type SavedMission, type SavedComparison, type SavedContext, type SavedSource, type SiteRef } from "@/lib/persistence";
 export type { SiteRef, SavedMission } from "@/lib/persistence";
 import type { Body, CellInfo, CompareResult, Grade, Meta, NearbyResult, Pin, Planet, RankResult, TwinResult } from "@/lib/types";
@@ -53,6 +54,7 @@ interface State {
   cellError: string | null;
 
   missionId: string;
+  missionStep: "destination" | "mission" | "priorities" | "candidates" | "save";
   rawWeights: Record<string, Record<string, number>>;
   limitsOn: Record<string, string[]>;
   rank: RankResult | null;
@@ -112,11 +114,13 @@ interface State {
   setLayer: (body: Body, patch: Partial<LayerState>) => void;
   setCursor: (c: State["cursor"]) => void;
   flyTo: (body: Body, lat: number, lon: number, spanKm?: number) => void;
-  select: (body: Body, lat: number, lon: number, o?: { fly?: boolean; spanKm?: number }) => Promise<void>;
+  select: (body: Body, lat: number, lon: number, o?: { fly?: boolean; spanKm?: number; source?: "marker" | "click" | "catalog" | "search" }) => Promise<void>;
   clearSelection: () => void;
   refreshCell: () => Promise<void>;
 
   setMission: (id: string) => void;
+  setMissionStep: (step: State["missionStep"]) => void;
+  setAdvanced: (advanced: boolean) => void;
   setWeight: (criterion: string, value: number) => void;
   resetWeights: () => void;
   toggleLimit: (id: string) => void;
@@ -200,6 +204,7 @@ export const useStore = create<State>((set, get) => ({
   cellError: null,
 
   missionId: "lunar_base",
+  missionStep: "destination",
   rawWeights: {},
   limitsOn: {},
   rank: null,
@@ -288,11 +293,13 @@ export const useStore = create<State>((set, get) => ({
     if (missionId !== s.missionId || b !== s.body) rankAbort?.abort();
     document.documentElement.dataset.world = b;
     set({ body: b, mode, missionId, selection: null, cell: null, cellStatus: "idle", cursor: null, rank: mode === "mission" && missionId !== s.missionId ? null : s.rank });
+    if (b !== s.body) emitTour("body:changed", { body: b });
     if (mode === "mission") void get().runRank();
   },
 
   setMode: (m) => {
     const s = get();
+    if (m !== s.mode) queueMicrotask(() => { if (get().mode === m) emitTour("view:changed", { mode: m }); });
     if (m === "mission") {
       let body = s.body;
       let missionId = s.missionId;
@@ -325,7 +332,18 @@ export const useStore = create<State>((set, get) => ({
     void get().refreshCell();
   },
 
-  setLayer: (body, patch) => set((s) => ({ layers: { ...s.layers, [body]: { ...s.layers[body], ...patch } } })),
+  setLayer: (body, patch) => {
+    const previous = get().layers[body].overlay;
+    set((s) => ({ layers: { ...s.layers, [body]: { ...s.layers[body], ...patch } } }));
+    if (patch.overlay && (previous?.id !== patch.overlay.id || previous?.kind !== patch.overlay.kind)) {
+      emitTour("layer:enabled", { body, id: patch.overlay.id });
+    }
+  },
+  setAdvanced: (advanced) => {
+    const changed = get().advanced !== advanced;
+    set({ advanced });
+    if (changed) emitTour("layer:mode-changed", { advanced });
+  },
   setCursor: (cursor) => set({ cursor }),
   flyTo: (body, lat, lon, spanKm) => set({ focus: { body, lat, lon, spanKm, nonce: ++nonce } }),
 
@@ -337,10 +355,11 @@ export const useStore = create<State>((set, get) => ({
     set({ selection: { body, lat, lon }, cellStatus: "loading", cellError: null, rightOpen: true });
     if (o.fly) get().flyTo(body, lat, lon, o.spanKm);
     try {
-      const mission = s.mode === "mission" && body !== "earth" ? s.missionId : undefined;
+      const mission = body === "earth" ? undefined : s.meta?.missions.find(m => m.id === s.missionId && m.body === body)?.id ?? s.meta?.missions.find(m => m.body === body)?.id;
       const cell = await api.cell(body, lat, lon, mission ? { mission, weights: s.rawWeights[mission], limits: s.limitsOn[mission] } : {}, signal);
       if (signal.aborted) return;
       set({ cell, cellStatus: "ready" });
+      if (o.source) emitTour("selection:set", { body, lat, lon, source: o.source });
     } catch (e) {
       if (signal.aborted || aborted(e)) return;
       set({ cellStatus: "error", cellError: message(e) });
@@ -368,8 +387,17 @@ export const useStore = create<State>((set, get) => ({
     void get().refreshCell();
   },
 
-  setWeight: (criterion, value) =>
-    set((s) => ({ rawWeights: { ...s.rawWeights, [s.missionId]: { ...s.rawWeights[s.missionId], [criterion]: value } } })),
+  setMissionStep: (missionStep) => {
+    if (get().missionStep === missionStep) return;
+    set({ missionStep });
+    emitTour("mission:stepChanged", { step: missionStep });
+  },
+
+  setWeight: (criterion, value) => {
+    if (get().rawWeights[get().missionId]?.[criterion] === value) return;
+    set((s) => ({ rawWeights: { ...s.rawWeights, [s.missionId]: { ...s.rawWeights[s.missionId], [criterion]: value } } }));
+    emitTour("mission:weightChanged", { criterion, value });
+  },
 
   resetWeights: () => {
     const s = get();
@@ -388,6 +416,7 @@ export const useStore = create<State>((set, get) => ({
       const cur = s.limitsOn[s.missionId] ?? [];
       return { limitsOn: { ...s.limitsOn, [s.missionId]: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] } };
     });
+    emitTour("mission:hardLimitToggled", { id, enabled: get().limitsOn[get().missionId].includes(id) });
     void get().runRank();
     void get().refreshCell();
   },
@@ -434,6 +463,7 @@ export const useStore = create<State>((set, get) => ({
   setPurpose: (purpose) => {
     compareAbort?.abort();
     set({ purpose, compare: null, compareStatus: "idle", twinWeights: null });
+    emitTour("twin:purposeChanged", { purpose });
     if (get().mode === "near" && get().nearLoc) void get().runNearby();
     void get().runTwin().then(() => {
       const p = get().picked;
@@ -452,6 +482,7 @@ export const useStore = create<State>((set, get) => ({
       const twin = await api.twin({ ...s.twinOrigin, purpose: s.purpose, n: 10, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, signal);
       if (signal.aborted) return;
       set({ twin, twinStatus: "ready" });
+      emitTour("twin:started", { ...s.twinOrigin });
     } catch (e) {
       if (signal.aborted || aborted(e)) return;
       set({ twinStatus: "error", twinError: message(e), twin: null });
@@ -513,6 +544,7 @@ export const useStore = create<State>((set, get) => ({
       }, signal);
       if (signal.aborted) return;
       set({ nearResult, nearStatus: "ready", nearActive: null });
+      emitTour("near:searched", { count: nearResult.documented.length + nearResult.regions.length });
     } catch (e) {
       if (signal.aborted || aborted(e)) return;
       set({ nearStatus: "error", nearError: message(e), nearResult: null });
@@ -538,10 +570,12 @@ export const useStore = create<State>((set, get) => ({
     if (s.nearLoc) void get().runNearby();
   },
 
-  addCompare: (site) => set((s) => {
-    if (s.compareList.some((x) => sameSite(x, site))) return {};
-    return { compareList: [...s.compareList, site].slice(-COMPARE_MAX), compareTab: "sites" };
-  }),
+  addCompare: (site) => {
+    const s = get();
+    if (s.compareList.some((x) => sameSite(x, site))) return;
+    set({ compareList: [...s.compareList, site].slice(-COMPARE_MAX), compareTab: "sites" });
+    emitTour("compare:added", { body: site.body, lat: site.lat, lon: site.lon });
+  },
   removeCompare: (i) => set((s) => ({ compareList: s.compareList.filter((_, k) => k !== i) })),
   clearCompare: () => set({ compareList: [] }),
   saveSite: (site) => {
@@ -549,6 +583,7 @@ export const useStore = create<State>((set, get) => ({
     if (s.saved.sites.some((x) => sameSite(x, site))) { set({ saveNotice: "This place is already saved." }); return; }
     const saved = { ...s.saved, sites: [enrichSite(site, s), ...s.saved.sites] };
     set({ saved, persistenceError: writeSaved(saved), saveNotice: "Place saved to your research workspace." });
+    emitTour("save:added", { kind: "site" });
   },
   saveMission: (name) => {
     const s = get();
@@ -564,6 +599,7 @@ export const useStore = create<State>((set, get) => ({
       created: new Date().toISOString(), collection: "", context: sel?.context, sources: sel?.sources ?? [] };
     const saved = { ...s.saved, missions: [m, ...s.saved.missions] };
     set({ saved, persistenceError: writeSaved(saved), saveNotice: "Mission and its settings saved." });
+    emitTour("save:added", { kind: "mission" });
   },
   saveComparison: (name, kind = get().compareTab) => {
     const s = get();
@@ -586,6 +622,7 @@ export const useStore = create<State>((set, get) => ({
     if (s.saved.comparisons.some((c) => comparisonKey(c) === comparisonKey(comparison))) { set({ saveNotice: "This comparison and its settings are already saved." }); return true; }
     const saved = { ...s.saved, comparisons: [comparison, ...s.saved.comparisons] };
     set({ saved, persistenceError: writeSaved(saved), saveNotice: "Comparison, sources and model context saved." });
+    emitTour("save:added", { kind: "comparison" });
     return true;
   },
   removeSaved: (kind, i) => {
@@ -648,10 +685,11 @@ export const useStore = create<State>((set, get) => ({
     const s = get();
     if (!s.twinOrigin) return;
     set({ brief: { ...s.twinOrigin, purpose: s.purpose, earth_lat: earth.lat, earth_lon: earth.lon }, sheet: "brief" });
+    emitTour("brief:opened", {});
   },
 
   setPanel: (side, open) => set(side === "left" ? { leftOpen: open } : { rightOpen: open }),
-  setSheet: (sheet) => set({ sheet }),
+  setSheet: (sheet) => { set({ sheet }); if (sheet) emitTour("sheet:opened", { sheet }); },
 }));
 
 export const currentMission = (s: State) => s.meta?.missions.find((m) => m.id === s.missionId) ?? null;

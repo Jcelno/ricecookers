@@ -3,6 +3,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { type GeoJSONSource, type ImageSource, Map as MlMap, Marker, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
+import { emitTour } from "@/lib/tour/events";
 import { wrapLon } from "@/lib/format";
 import { clusterPoints, markerButton, motionDuration, sphericalCenter } from "@/lib/markers";
 import type { Basemap, Pin } from "@/lib/types";
@@ -35,7 +36,7 @@ export interface EarthMapProps {
   markers?: SiteMarker[];
   selection?: { lat: number; lon: number; outline?: [number, number][] } | null;
   focus?: Focus | null;
-  onPick?: (lat: number, lon: number) => void;
+  onPick?: (lat: number, lon: number, source?: "marker" | "click") => void;
   /** Clicking a numbered/lettered site marker. Falls back to onPick when not given. */
   onMarker?: (id: string) => void;
   onCursor?: (c: { lat: number; lon: number } | null) => void;
@@ -90,11 +91,11 @@ function styleFor(b: Basemap): StyleSpecification {
 function pinElement(p: Pin, active: boolean) {
   const status = p.verification_status === "review_needed" ? "research candidate; evidence review needed" : "documented research site";
   const grade = p.badge && ["A", "B", "C", "D", "F"].includes(p.badge.text) ? p.badge.text as import("@/lib/types").Grade : null;
-  return markerButton({ text: p.badge?.text ?? "•", title: p.badge?.title ?? `${p.name}: ${status}; not yet scored`, grade, active, color: p.badge?.color, ink: p.badge?.ink });
+  return markerButton({ id: p.id, text: p.badge?.text ?? "•", title: p.badge?.title ?? `${p.name}: ${status}; not yet scored`, grade, active, color: p.badge?.color, ink: p.badge?.ink });
 }
 
 function markerElement(m: SiteMarker) {
-  return markerButton({ text: m.grade ?? "•", title: `Model result ${m.id}: ${m.grade ? `analog similarity grade ${m.grade}` : "insufficient data; not graded"}`, grade: m.grade, active: m.active });
+  return markerButton({ id: m.id, text: m.grade ?? "•", title: `Model result ${m.id}: ${m.grade ? `analog similarity grade ${m.grade}` : "insufficient data; not graded"}`, grade: m.grade, active: m.active });
 }
 
 export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap(
@@ -141,7 +142,10 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
       cb.current.onView?.({ lat: c.lat, lon: wrapLon(c.lng), degPerPx: 360 / (512 * 2 ** z), heightKm: 0 });
     };
     map.on("move", report);
-    map.on("click", (e) => cb.current.onPick?.(e.lngLat.lat, wrapLon(e.lngLat.lng)));
+    // MapLibre marks physical drag/zoom events with originalEvent; flights must not complete a tutorial task.
+    map.on("dragend", (e) => { if (e.originalEvent) emitTour("map:moved", { body: "earth" }); });
+    map.on("zoomend", (e) => { if (e.originalEvent) emitTour("map:zoomed", { body: "earth" }); });
+    map.on("click", (e) => cb.current.onPick?.(e.lngLat.lat, wrapLon(e.lngLat.lng), "click"));
     map.on("mousemove", (e) => cb.current.onCursor?.({ lat: e.lngLat.lat, lon: wrapLon(e.lngLat.lng) }));
     map.on("mouseout", () => cb.current.onCursor?.(null));
     map.on("load", () => {
@@ -150,6 +154,8 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
       setReady((n) => n + 1);
       cb.current.onStatus?.({ ready: true, error: null });
       report();
+      map.once("render", () => emitTour("ready:frame", { body: "earth" }));
+      map.triggerRepaint();
     });
     const ro = new ResizeObserver(() => map.resize());
     ro.observe(host.current);
@@ -166,7 +172,13 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
   }, [baseId]);
 
   useImperativeHandle(ref, () => ({
-    zoom: (factor) => mapRef.current?.zoomTo(mapRef.current.getZoom() - Math.log2(factor), { duration: motionDuration(350) }),
+    zoom: (factor) => {
+      const map = mapRef.current;
+      if (!map) return;
+      const before = map.getZoom();
+      map.once("zoomend", () => { if (Math.abs(map.getZoom() - before) > 0.001) emitTour("map:zoomed", { body: "earth" }); });
+      map.zoomTo(before - Math.log2(factor), { duration: motionDuration(350) });
+    },
     home: () => mapRef.current?.flyTo({ center: [12, 22], zoom: 1.55, duration: motionDuration(900) }),
   }), []);
 
@@ -234,7 +246,7 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
           el.addEventListener("click", ev => {
             ev.stopPropagation();
             if (p.marker && cb.current.onMarker) cb.current.onMarker(p.marker.id);
-            else cb.current.onPick?.(p.lat, p.lon);
+            else cb.current.onPick?.(p.lat, p.lon, "marker");
           });
           return new Marker({ element: el }).setLngLat([p.displayLon, p.lat]).addTo(map);
         }

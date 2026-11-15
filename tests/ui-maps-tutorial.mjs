@@ -114,48 +114,48 @@ try {
   );
   console.log("PASS native globe cluster click zoom");
   await page.click('[data-tour="help"]');
-  await page.waitForSelector("#tutorial-title");
+  await page.waitForSelector("[data-tour-welcome]");
   await page.evaluate(() =>
-    [...document.querySelectorAll("button")]
-      .find((b) => b.textContent.includes("Complete field guide"))
+    [...document.querySelectorAll("[data-tour-welcome] button")]
+      .find((b) => b.textContent.includes("Full field guide"))
       .click(),
   );
-  await page.click('[data-tour="nav-explore"]');
-  await page.waitForFunction(() =>
-    document.body.textContent.includes("Control explored"),
+  await page.waitForSelector('[data-tour-step="pick-world"]');
+  // Clicking panel whitespace must never count as a task. Only a world change does.
+  await page.evaluate(() => document.querySelector('[data-tour="navigation"]')?.click());
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("radium.tutorial.v3")).completed.includes("pick-world")), false);
+  await page.evaluate(() =>
+    [...document.querySelectorAll('[data-tour="worlds"] button')]
+      .find((b) => b.textContent.includes("Mars"))
+      .click(),
   );
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem("radium.tutorial.v3")).completed.includes("pick-world"));
+  await page.waitForSelector('[data-tour-step="workspaces"]');
   await page.click('[aria-label="Choose tutorial topic"]');
   await page.evaluate(() =>
     [...document.querySelectorAll('[role="dialog"] button')]
       .find((b) => b.textContent.includes("Adjust priorities and limits"))
       .click(),
   );
+  await page.waitForSelector('[data-tour-step="priorities"]');
   await page.evaluate(() =>
-    [...document.querySelectorAll('[role="dialog"] button')]
-      .find((b) => b.textContent.includes("Show the controls"))
+    [...document.querySelectorAll('[data-tour-step="priorities"] button')]
+      .find((b) => b.textContent.includes("Show me"))
       .click(),
   );
   await page.waitForFunction(
-    () =>
-      document
-        .querySelector('[data-mission-step="2"]')
-        ?.getAttribute("aria-current") === "step" ||
-      document
-        .querySelector('[data-mission-step="2"]')
-        ?.getAttribute("aria-selected") === "true",
+    () => document.querySelector('[data-mission-step-id="priorities"]')?.getAttribute("aria-current") === "step",
   );
-  await page.screenshot({
-    path: "temporary screenshots/tutorial-priorities-qa.png",
-  });
+  await page.screenshot({ path: "temporary screenshots/tutorial-priorities-qa.png" });
   await page.click('[aria-label="Close tutorial"]');
   await page.click('[data-tour="help"]');
+  await page.waitForSelector("[data-tour-welcome]");
   const resume = await page.evaluate(() =>
-    [...document.querySelectorAll("button")].some((b) =>
-      b.textContent.includes("Resume: Adjust priorities"),
-    ),
+    [...document.querySelectorAll("[data-tour-welcome] button")].some((b) => /resume/i.test(b.textContent)),
   );
-  assert(resume, "tutorial resumes last topic");
-  await page.click('[aria-label="Close tutorial"]');
+  assert(resume, "tutorial resumes last topic by stable id");
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("radium.tutorial.v3")).stepId), "priorities");
+  await page.keyboard.press("Escape");
   await page.click('[data-tour="nav-explore"]');
   await page.evaluate(() =>
     [...document.querySelectorAll('[data-tour="worlds"] button')]
@@ -190,11 +190,13 @@ try {
   }
   await page.setViewport({ width: 390, height: 844 });
   await page.click('[data-tour="help"]');
+  await page.waitForSelector("[data-tour-welcome]");
   await page.evaluate(() =>
-    [...document.querySelectorAll("button")]
-      .find((b) => b.textContent.includes("Quick start"))
+    [...document.querySelectorAll("[data-tour-welcome] button")]
+      .find((b) => b.textContent.includes("Quick tour"))
       .click(),
   );
+  await page.waitForSelector("[data-tour-step]");
   await page.screenshot({
     path: "temporary screenshots/tutorial-mobile-qa.png",
   });

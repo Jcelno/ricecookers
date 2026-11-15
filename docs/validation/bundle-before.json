@@ -1,0 +1,36 @@
+{
+  "chunks": [
+    {
+      "path": "/assets/index-BuZAFak4.js",
+      "bytes": 151822,
+      "gzip": 47650
+    },
+    {
+      "path": "/assets/rolldown-runtime-pP25SEvz.js",
+      "bytes": 989,
+      "gzip": 568
+    },
+    {
+      "path": "/assets/react-CEqTg746.js",
+      "bytes": 220126,
+      "gzip": 68080
+    },
+    {
+      "path": "/assets/format-BBOUN_iW.js",
+      "bytes": 1342,
+      "gzip": 713
+    },
+    {
+      "path": "/assets/store-DYqsHGpW.js",
+      "bytes": 32616,
+      "gzip": 11183
+    },
+    {
+      "path": "/assets/cesium-DqEjkNnA.js",
+      "bytes": 4177534,
+      "gzip": 1111554
+    }
+  ],
+  "initialBytes": 4584429,
+  "initialGzipBytes": 1239748
+}

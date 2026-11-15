@@ -1,3 +1,4 @@
+import { emitTour } from "./tour/events";
 import { currentLink } from "./deeplink";
 
 /** Return success only when the browser reports an actual clipboard write. */
@@ -9,6 +10,7 @@ export async function copyCurrentViewLink(): Promise<{
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(url);
+      emitTour("link:copied", { url });
       return { copied: true, url };
     }
   } catch {
@@ -23,7 +25,9 @@ export async function copyCurrentViewLink(): Promise<{
   document.body.append(text);
   try {
     text.select();
-    return { copied: document.execCommand("copy") === true, url };
+    const copied = document.execCommand("copy") === true;
+    if (copied) emitTour("link:copied", { url });
+    return { copied, url };
   } catch {
     return { copied: false, url };
   } finally {

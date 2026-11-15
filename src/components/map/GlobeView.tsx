@@ -3,15 +3,16 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import {
   Cartesian2, Cartesian3, Cartographic, Color, CustomDataSource, DistanceDisplayCondition, Ellipsoid, EllipsoidTerrainProvider, type Entity,
   GeographicProjection, GeographicTilingScheme, Globe, HorizontalOrigin, ImageryLayer, LabelStyle, Math as CMath, NearFarScalar, PolylineDashMaterialProperty,
-  Rectangle, ScreenSpaceEventHandler, ScreenSpaceEventType, SingleTileImageryProvider, SkyBox, SplitDirection, TextureMagnificationFilter,
+  Rectangle, SceneTransforms, ScreenSpaceEventHandler, ScreenSpaceEventType, SingleTileImageryProvider, SkyBox, SplitDirection, TextureMagnificationFilter,
   TextureMinificationFilter, UrlTemplateImageryProvider, VerticalOrigin, Viewer,
 } from "cesium";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import { GRADE_HEX, wrapLon } from "@/lib/format";
-import { motionDuration, sphericalCenter } from "@/lib/markers";
+import { clusterPoints, markerButton, motionDuration, sphericalCenter } from "@/lib/markers";
 import type { Grade, Pin, Planet, TileLayer } from "@/lib/types";
-import type { Focus } from "@/store";
+import { useStore, type Focus } from "@/store";
+import { emitTour, onTour } from "@/lib/tour/events";
 
 /** Hide pins that have rotated to the far side or to within a grazing angle of the rim, so a pin or its
  *  label is never drawn half-clipped by the horizon (which reads as a pin floating off the globe). */
@@ -60,7 +61,7 @@ interface Props {
   selection?: { lat: number; lon: number; outline?: [number, number][] } | null;
   focus?: Focus | null;
   interactive?: boolean;
-  onPick?: (lat: number, lon: number) => void;
+  onPick?: (lat: number, lon: number, source?: "marker" | "click") => void;
   onCursor?: (c: { lat: number; lon: number } | null) => void;
   onView?: (v: ViewState) => void;
   onStatus?: (s: { ready: boolean; error: string | null }) => void;
@@ -96,6 +97,9 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
 ) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
+  const markerHost = useRef<HTMLDivElement>(null);
+  const tourStep = useRef<string | null>(null);
+  const resetGesture = useRef<(() => void) | null>(null);
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const baseRef = useRef<ImageryLayer | null>(null);
   const tileRef = useRef<ImageryLayer | null>(null);
@@ -178,15 +182,16 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
         if (places.length) {
           const center = sphericalCenter(places);
           const height = Math.max(ctl.minimumZoomDistance, v.camera.positionCartographic.height * 0.4);
-          v.camera.flyTo({ destination: Cartesian3.fromDegrees(center.lon, center.lat, height, ellipsoid), duration: motionDuration(650) / 1000 });
+          resetGesture.current?.();
+          v.camera.flyTo({ destination: Cartesian3.fromDegrees(center.lon, center.lat, height, ellipsoid), duration: motionDuration(650) / 1000, complete: () => { if (!v.isDestroyed()) emitTour("map:zoomed", { body, altitudeKm: v.camera.positionCartographic.height / 1000 }); } });
           return;
         }
       }
       const id = hit && (hit.id as Entity | undefined)?.id;
       const known = typeof id === "string" ? lookup.current.get(id) : undefined;
-      if (known) return cb.current.onPick?.(known.lat, known.lon);
+      if (known) return cb.current.onPick?.(known.lat, known.lon, "marker");
       const p = pickLatLon(e.position);
-      if (p) cb.current.onPick?.(p.lat, p.lon);
+      if (p) cb.current.onPick?.(p.lat, p.lon, "click");
     }, ScreenSpaceEventType.LEFT_CLICK);
     let raf = 0;
     handler.setInputAction((e: { endPosition: Cartesian2 }) => {
@@ -203,12 +208,47 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     const leave = () => { cb.current.onCursor?.(null); setHoverTitle(null); };
     scene.canvas.addEventListener("mouseleave", leave);
 
+    // Completion follows changed camera coordinates after a physical gesture, never a scripted flight.
+    let gestureUntil = 0;
+    let pointerStart: { x: number; y: number } | null = null;
+    let dragged = false;
+    let zoomGesture = false;
+    let lastCamera = Cartographic.clone(v.camera.positionCartographic);
+    const pointers = new Set<number>();
+    const down = (event: PointerEvent) => {
+      pointers.add(event.pointerId);
+      pointerStart = { x: event.clientX, y: event.clientY };
+      dragged = false;
+      zoomGesture = pointers.size > 1;
+      lastCamera = Cartographic.clone(v.camera.positionCartographic);
+      gestureUntil = performance.now() + 1600;
+    };
+    const move = (event: PointerEvent) => {
+      if (!pointers.has(event.pointerId) || !pointerStart) return;
+      if (Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) > 4) dragged = true;
+      if (pointers.size > 1) zoomGesture = true;
+      gestureUntil = performance.now() + 1600;
+    };
+    const up = (event: PointerEvent) => { pointers.delete(event.pointerId); gestureUntil = performance.now() + 800; };
+    const wheel = () => { dragged = false; zoomGesture = true; gestureUntil = performance.now() + 1600; };
+    resetGesture.current = () => { gestureUntil = 0; dragged = false; zoomGesture = false; };
+    scene.canvas.addEventListener("pointerdown", down);
+    scene.canvas.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    scene.canvas.addEventListener("wheel", wheel, { passive: true });
     const report = () => {
       if (v.isDestroyed()) return; // a queued camera event can arrive after the viewer is torn down
       const w = scene.canvas.clientWidth;
       const h = scene.canvas.clientHeight;
       const centre = pickLatLon(new Cartesian2(w / 2, h / 2));
-      const height = v.camera.positionCartographic.height;
+      const currentCamera = v.camera.positionCartographic;
+      const height = currentCamera.height;
+      if (performance.now() < gestureUntil) {
+        const deltaAngle = Math.abs(currentCamera.latitude - lastCamera.latitude) + Math.abs(currentCamera.longitude - lastCamera.longitude);
+        if (dragged && deltaAngle > 0.00001) emitTour("map:moved", { body, altitudeKm: height / 1000 });
+        if (zoomGesture && Math.abs(height - lastCamera.height) > 1) emitTour("map:zoomed", { body, altitudeKm: height / 1000 });
+      }
+      lastCamera = Cartographic.clone(currentCamera);
       if (!centre) return;
       const side = pickLatLon(new Cartesian2(w / 2 + 40, h / 2));
       let degPerPx = (2 * Math.atan((height / ellipsoid.maximumRadius) * Math.tan(v.camera.frustum instanceof Object && "fovy" in v.camera.frustum ? (v.camera.frustum as any).fovy / 2 : 0.5)) * 180) / Math.PI / h;
@@ -239,10 +279,23 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     setViewer(v);
     if (import.meta.env.DEV && interactive) (window as unknown as { __cesium?: Viewer }).__cesium = v; // for screenshot scripts
     cb.current.onStatus?.({ ready: true, error: null });
-    setTimeout(report, 60);
+    let firstFrame = true;
+    const offFrame = scene.postRender.addEventListener(() => {
+      if (!firstFrame) return;
+      firstFrame = false;
+      emitTour("ready:frame", { body });
+    });
+    scene.requestRender();
+    const reportTimer = window.setTimeout(report, 60);
 
     return () => {
       cancelAnimationFrame(raf);
+      window.clearTimeout(reportTimer);
+      offFrame();
+      scene.canvas.removeEventListener("pointerdown", down);
+      scene.canvas.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      scene.canvas.removeEventListener("wheel", wheel);
       ro.disconnect();
       offChanged();
       offCull();
@@ -257,24 +310,53 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
       selEntities.current = [];
       lookup.current.clear();
       viewerRef.current = null;
+      resetGesture.current = null;
       setViewer(null);
       if (!v.isDestroyed()) v.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [body]);
 
+  useEffect(() => {
+    if (!viewer || !interactive) return;
+    let frame = 0;
+    let last = 0;
+    let welcome = false;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    const stop = () => { cancelAnimationFrame(frame); frame = 0; last = 0; };
+    const rotate = (now: number) => {
+      if (!welcome || reduced.matches || viewer.isDestroyed() || useStore.getState().sheet !== "intro") { stop(); return; }
+      if (last) viewer.camera.rotateRight(Math.min((now - last) / 1000, 0.05) * 0.012);
+      last = now;
+      viewer.scene.requestRender();
+      frame = requestAnimationFrame(rotate);
+    };
+    const update = () => { if (welcome && !reduced.matches && !frame) frame = requestAnimationFrame(rotate); else if (!welcome || reduced.matches) stop(); };
+    const off = onTour(event => {
+      if (event.type !== "tutorial:changed") return;
+      if (event.payload.running !== undefined) tourStep.current = event.payload.running ? event.payload.stepId ?? null : null;
+      else if (event.payload.stepId && tourStep.current) tourStep.current = event.payload.stepId;
+      if (event.payload.welcome !== undefined) welcome = event.payload.welcome;
+      update();
+    });
+    reduced.addEventListener("change", update);
+    return () => { stop(); off(); reduced.removeEventListener("change", update); };
+  }, [viewer, interactive]);
+
   useImperativeHandle(ref, () => ({
     zoom: (factor) => {
       const v = viewerRef.current;
       if (!v) return;
+      resetGesture.current?.();
       const h = v.camera.positionCartographic.height;
       const target = Math.max(v.scene.screenSpaceCameraController.minimumZoomDistance, Math.min(v.scene.screenSpaceCameraController.maximumZoomDistance, h * factor));
       const c = v.camera.positionCartographic;
-      v.camera.flyTo({ destination: Cartesian3.fromRadians(c.longitude, c.latitude, target, ELLIPSOID[body]), duration: motionDuration(450) / 1000 });
+      v.camera.flyTo({ destination: Cartesian3.fromRadians(c.longitude, c.latitude, target, ELLIPSOID[body]), duration: motionDuration(450) / 1000, complete: () => { if (!v.isDestroyed() && Math.abs(v.camera.positionCartographic.height - h) > 1) emitTour("map:zoomed", { body, altitudeKm: v.camera.positionCartographic.height / 1000 }); } });
     },
     home: () => {
       const v = viewerRef.current;
       if (!v) return;
+      resetGesture.current?.();
       v.camera.flyTo({ destination: Cartesian3.fromDegrees(HOME[body].lon, HOME[body].lat, ELLIPSOID[body].maximumRadius * 1.75, ELLIPSOID[body]), duration: motionDuration(1100) / 1000 });
     },
   }), [body]);
@@ -481,6 +563,47 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     };
   }, [viewer, pins, markers, body, selection?.lat, selection?.lon]);
 
+  // DOM hit targets share the exact ground projection with Cesium's marker. Clustered pins
+  // remain handled by Cesium, except the tutorial's named marker after its explicit fly-to.
+  useEffect(() => {
+    if (!viewer || !markerHost.current) return;
+    const holder = markerHost.current;
+    const entries = pins.map(pin => {
+      const button = markerButton({ id: pin.id, text: "", title: `${pin.name}: select research site` });
+      button.style.cssText = "position:absolute;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:transparent;color:transparent;pointer-events:auto;";
+      button.tabIndex = -1; // the existing accessible location list provides a stable keyboard order
+      button.addEventListener("click", event => { event.stopPropagation(); cb.current.onPick?.(pin.lat, pin.lon, "marker"); });
+      holder.append(button);
+      return { pin, button, position: Cartesian3.fromDegrees(pin.lon, pin.lat, ELLIPSOID[body].maximumRadius * 0.0006, ELLIPSOID[body]) };
+    });
+    let queued = 0;
+    const update = () => {
+      queued = 0;
+      if (viewer.isDestroyed()) return;
+      const cam = viewer.camera.positionWC;
+      const visible = entries.flatMap(entry => {
+        Cartesian3.normalize(entry.position, scratchN);
+        Cartesian3.normalize(Cartesian3.subtract(cam, entry.position, scratchV), scratchV);
+        const point = Cartesian3.dot(scratchN, scratchV) > 0.12 ? SceneTransforms.worldToWindowCoordinates(viewer.scene, entry.position) : undefined;
+        entry.button.hidden = true;
+        return point && point.x > 0 && point.y > 0 && point.x < holder.clientWidth && point.y < holder.clientHeight ? [{ ...entry, x: point.x, y: point.y }] : [];
+      });
+      for (const group of clusterPoints(visible, 40)) {
+        const targets = group.length === 1 ? group : tourStep.current === "select-site" ? group.filter(entry => entry.pin.name === "Gale") : [];
+        for (const entry of targets) {
+          entry.button.hidden = false;
+          entry.button.style.left = `${entry.x - 16}px`;
+          entry.button.style.top = `${entry.y - 16}px`;
+        }
+      }
+    };
+    const schedule = () => { if (!queued) queued = requestAnimationFrame(update); };
+    const off = viewer.scene.postRender.addEventListener(schedule);
+    const offTour = onTour(event => { if (event.type === "tutorial:changed") schedule(); });
+    schedule();
+    return () => { cancelAnimationFrame(queued); off(); offTour(); entries.forEach(entry => entry.button.remove()); };
+  }, [viewer, pins, body]);
+
   // ------------------------------------------------------------- selected cell
   const selKey = selection ? `${selection.lat},${selection.lon},${selection.outline?.length ?? 0},${selection.outline?.[0]?.join(",") ?? ""}` : "";
   useEffect(() => {
@@ -530,6 +653,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
   useEffect(() => {
     if (!viewer || !focus || focus.body !== body || focus.nonce === lastFocus.current) return;
     lastFocus.current = focus.nonce;
+    resetGesture.current?.();
     const E = ELLIPSOID[body];
     const span = (focus.spanKm ?? (E.maximumRadius / 1000) * 0.9) * 1000;
     const height = Math.max(viewer.scene.screenSpaceCameraController.minimumZoomDistance * 2, span * 0.87);
@@ -538,9 +662,10 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
 
   return <>
     <div ref={host} className="absolute inset-0" aria-label={`${body === "moon" ? "Moon" : "Mars"} globe: drag to rotate, scroll or pinch to zoom. Select a research marker to inspect it.`}/>
+    <div ref={markerHost} className="pointer-events-none absolute inset-0 z-10" aria-hidden="true" />
     {hoverTitle && <div className="pointer-events-none absolute bottom-16 left-1/2 z-20 max-w-[70%] -translate-x-1/2 rounded-md bg-basalt-950/95 px-3 py-2 text-center text-xs text-regolith-50 ring-1 ring-[var(--hair)]">{hoverTitle}</div>}
     <div className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:top-14 focus-within:left-3 focus-within:z-40 focus-within:max-h-[55%] focus-within:max-w-[300px] focus-within:overflow-y-auto focus-within:rounded-lg focus-within:bg-basalt-900 focus-within:p-3" aria-label="Accessible map locations">
-      {[...pins.map(p => ({ id: p.id ?? p.name, lat: p.lat, lon: p.lon, label: `${p.name}: ${p.kind}; select location` })), ...markers.map(m => ({ ...m, label: `${m.grade ? `Mission suitability grade ${m.grade}` : "Not graded"}; result ${m.id}` }))].map(p => <button key={p.id} className="ctl block w-full rounded p-2 text-left text-xs" onClick={() => cb.current.onPick?.(p.lat, p.lon)}>{p.label}</button>)}
+      {[...pins.map(p => ({ id: p.id ?? p.name, lat: p.lat, lon: p.lon, label: `${p.name}: ${p.kind}; select location` })), ...markers.map(m => ({ ...m, label: `${m.grade ? `Mission suitability grade ${m.grade}` : "Not graded"}; result ${m.id}` }))].map(p => <button key={p.id} className="ctl block w-full rounded p-2 text-left text-xs" onClick={() => cb.current.onPick?.(p.lat, p.lon, "marker")}>{p.label}</button>)}
     </div>
   </>;
 });

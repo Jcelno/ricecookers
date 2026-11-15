@@ -128,7 +128,7 @@ export function Stage() {
       setView(v);
     }
   }, []);
-  const onPick = useCallback((lat: number, lon: number) => void select(useStore.getState().body, lat, lon), [select]);
+  const onPick = useCallback((lat: number, lon: number, source: "marker" | "click" = "click") => void select(useStore.getState().body, lat, lon, { source }), [select]);
   const onCursor = useCallback((c: { lat: number; lon: number } | null) => setCursor(c ? { body: useStore.getState().body, ...c } : null), [setCursor]);
 
   const inMission = mode === "mission" && body !== "earth";
@@ -197,7 +197,7 @@ export function Stage() {
       : `Imagery: ${base?.title ?? ""}, ${base?.provider ?? "NASA"}${tileOverlay ? `. Overlay: ${tileOverlay.title}` : ""}`;
 
   return (
-    <div ref={stageRef} className="relative h-full min-w-0 flex-1 overflow-hidden bg-void" data-stage>
+    <div ref={stageRef} className="relative h-full min-w-0 flex-1 overflow-hidden bg-void" data-stage data-tour="map">
       {body === "earth" ? (
         <EarthMap
           ref={handle} basemap={basemap} labels={layerState.labels} overlayUrl={earthOverlay} opacity={layerState.opacity} dimBase={dataOverlayOn}

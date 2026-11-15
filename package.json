@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "RADIUM \u2014 planetary site suitability and Earth analog discovery (NASA Space Apps Challenge)",
+  "description": "RADIUM — planetary site suitability and Earth analog discovery (NASA Space Apps Challenge)",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "concurrently -k -n api,web -c gray,white \"npm:api\" \"npm:web\"",
@@ -23,7 +23,8 @@
     "test:browser": "node tests/browser-workflows.mjs",
     "test:persistence": "node --test tests/test_persistence.mjs",
     "test:sharing": "node tests/browser-sharing.mjs",
-    "test:maps-tutorial": "node tests/ui-maps-tutorial.mjs"
+    "test:maps-tutorial": "node tests/ui-maps-tutorial.mjs",
+    "test:tour": "node tests/tour.mjs"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",
