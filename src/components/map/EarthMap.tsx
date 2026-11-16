@@ -96,8 +96,22 @@ function pinElement(p: Pin, active: boolean) {
 }
 
 function markerElement(m: SiteMarker) {
-  const element = markerButton({ id: m.id, text: m.grade ?? "•", title: `${m.newLead ? "New lead" : "Screened candidate"} ${m.id}: ${m.grade ? `analog similarity grade ${m.grade}` : "insufficient data; not graded"}`, grade: m.grade, active: m.active });
+  const what = m.grade ? `twin grade ${m.grade}${m.score !== null && m.score !== undefined ? `, score ${m.score.toFixed(2)}` : ""}` : "not enough data to grade";
+  const numbered = m.numbered && m.rank !== undefined;
+  const element = markerButton({ id: m.id, text: numbered ? String(m.rank) : (m.grade ?? "•"),
+    title: numbered ? `Match ${m.rank}${m.name ? `, ${m.name}` : ""}: ${what}${m.newLead ? "; new lead, not a documented analog site" : ""}` : `${m.newLead ? "New lead" : "Screened candidate"} ${m.id}: ${m.grade ? `analog similarity grade ${m.grade}` : "insufficient data; not graded"}`,
+    grade: m.grade, active: m.active });
   if (m.newLead) { element.dataset.newLead = "true"; element.style.borderStyle = "dashed"; }
+  if (numbered) {
+    // The number is the rank in the list; the small letter keeps the grade readable without colour.
+    element.dataset.rank = String(m.rank);
+    element.classList.add("radium-rank-pin");
+    const letter = document.createElement("span");
+    letter.className = "radium-rank-grade";
+    letter.textContent = m.grade ?? "–";
+    letter.setAttribute("aria-hidden", "true");
+    element.appendChild(letter);
+  }
   return element;
 }
 
@@ -111,6 +125,8 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
   const [imageryError, setImageryError] = useState<string | null>(null);
   const pinMarkers = useRef<Marker[]>([]);
   const siteMarkers = useRef<Marker[]>([]);
+  // Numbered pins drop in once per result set, not on every pan.
+  const dropped = useRef<{ list: SiteMarker[] | null; ids: Set<string> }>({ list: null, ids: new Set() });
   const cb = useRef({ onPick, onMarker, onCursor, onView, onStatus });
   cb.current = { onPick, onMarker, onCursor, onView, onStatus };
   const lastFocus = useRef(0);
@@ -193,6 +209,13 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
       map.zoomTo(before - Math.log2(factor), { duration: motionDuration(350) });
     },
     home: () => mapRef.current?.flyTo({ center: [12, 22], zoom: 1.55, duration: motionDuration(900) }),
+    project: (lat, lon) => {
+      const map = mapRef.current;
+      if (!map) return null;
+      const shown = lon + 360 * Math.round((map.getCenter().lng - lon) / 360);
+      const p = map.project([shown, lat]), box = map.getCanvas();
+      return p.x < -40 || p.y < -40 || p.x > box.clientWidth + 40 || p.y > box.clientHeight + 40 ? null : { x: p.x, y: p.y };
+    },
   }), []);
 
   // labels
@@ -238,14 +261,15 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    if (dropped.current.list !== markers) dropped.current = { list: markers, ids: new Set() };
     const renderMarkers = () => {
       pinMarkers.current.forEach(m => m.remove());
       siteMarkers.current.forEach(m => m.remove());
       siteMarkers.current = [];
       const centerLon = map.getCenter().lng;
       const candidates = [
-        ...pins.filter(p => !markers.some(m => Math.abs(m.lat - p.lat) < 0.0001 && Math.abs(wrapLon(m.lon - p.lon)) < 0.0001)).map(p => ({ lat: p.lat, lon: p.lon, pin: p, marker: undefined as SiteMarker | undefined, active: !!selection && Math.abs(selection.lat - p.lat) < 0.05 && Math.abs(wrapLon(selection.lon - p.lon)) < 0.05 })),
-        ...markers.map(m => ({ lat: m.lat, lon: m.lon, marker: m, pin: undefined as Pin | undefined, active: !!m.active })),
+        ...pins.filter(p => !markers.some(m => Math.abs(m.lat - p.lat) < 0.0001 && Math.abs(wrapLon(m.lon - p.lon)) < 0.0001)).map(p => ({ lat: p.lat, lon: p.lon, pin: p, marker: undefined as SiteMarker | undefined, solo: false, active: !!selection && Math.abs(selection.lat - p.lat) < 0.05 && Math.abs(wrapLon(selection.lon - p.lon)) < 0.05 })),
+        ...markers.map(m => ({ lat: m.lat, lon: m.lon, marker: m, pin: undefined as Pin | undefined, active: !!m.active, solo: !!m.numbered })),
       ].map(p => {
         const lon = p.lon + 360 * Math.round((centerLon - p.lon) / 360);
         const point = map.project([lon, p.lat]);
@@ -255,13 +279,26 @@ export const EarthMap = forwardRef<GlobeHandle, EarthMapProps>(function EarthMap
         const p = group[0];
         if (group.length === 1) {
           const el = p.pin ? pinElement(p.pin, p.active) : markerElement(p.marker!);
-          el.style.zIndex = p.active ? "4" : "2";
+          el.style.zIndex = p.active ? "4" : p.marker?.numbered ? "3" : "2";
           el.addEventListener("click", ev => {
             ev.stopPropagation();
             if (p.marker && cb.current.onMarker) cb.current.onMarker(p.marker.id);
             else cb.current.onPick?.(p.lat, p.lon, "marker");
           });
-          return new Marker({ element: el }).setLngLat([p.displayLon, p.lat]).addTo(map);
+          // MapLibre owns the marker element's transform, so the drop animation runs on the pin inside a holder.
+          let holder: HTMLElement = el;
+          if (p.marker?.numbered) {
+            holder = document.createElement("div");
+            holder.className = "radium-rank-holder";
+            holder.style.zIndex = el.style.zIndex;
+            holder.appendChild(el);
+            if (!dropped.current.ids.has(p.marker.id)) {
+              dropped.current.ids.add(p.marker.id);
+              el.classList.add("pin-drop");
+              el.style.setProperty("--i", String((p.marker.rank ?? 1) - 1));
+            }
+          }
+          return new Marker({ element: holder }).setLngLat([p.displayLon, p.lat]).addTo(map);
         }
         const center = sphericalCenter(group);
         const lon = center.lon + 360 * Math.round((centerLon - center.lon) / 360);

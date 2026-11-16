@@ -543,7 +543,10 @@ def twin_compare(req: CompareRequest):
     rank_among = None
     if score is not None and ex["score"] is not None:
         v = score[np.isfinite(score)]
-        rank_among = {"better_cells": int((v > ex["score"]).sum()), "cells": int(v.size)}
+        # Count against this cell's value in the ranked array itself: the explanation recomputes the same score in
+        # double precision, and a last-digit difference must not make the best cell look as if one beats it.
+        own = float(score[ei, ej])
+        rank_among = {"better_cells": int((v > (own if math.isfinite(own) else ex["score"])).sum()), "cells": int(v.size)}
     return clean({
         "planet": {**pd, "place": pnames[req.body].context(plat, plon), "coords": fmt_latlon(plat, plon)},
         "earth": {**ed, "place": enames.place(elat, elon), "coords": fmt_latlon(elat, elon), "analysed": bool(e.valid[ei, ej])},

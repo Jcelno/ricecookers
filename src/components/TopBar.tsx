@@ -495,7 +495,7 @@ export function TopBar() {
             onClick={() => setCatalog(true)}
           >
             <MapPinned size={16} />
-            <span className="max-2xl:hidden">Research Sites</span>
+            <span className="max-2xl:hidden">Research </span><span className="max-xl:hidden">Sites</span>
             <span className="mono text-2xs opacity-70" data-site-count>{sites > 0 ? sites : "–"}</span>
           </Button>
           <Menu />

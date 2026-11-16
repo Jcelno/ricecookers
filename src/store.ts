@@ -2,6 +2,9 @@ import { create } from "zustand";
 
 import { api, ApiError } from "@/lib/api";
 import { emitTour } from "@/lib/tour/events";
+import { useNotebook } from "@/lib/notebook";
+import { purposeVerb } from "@/lib/plain";
+import { findings } from "@/lib/findings";
 import { readSaved, writeSaved, sameSite, type SavedState, type SavedKind, type SavedSite, type SavedMission, type SavedComparison, type SavedContext, type SavedSource, type SiteRef } from "@/lib/persistence";
 export type { SiteRef, SavedMission } from "@/lib/persistence";
 import type { Body, CellInfo, CompareResult, Grade, Meta, NearbyResult, Pin, Planet, RankResult, TwinResult } from "@/lib/types";
@@ -552,6 +555,12 @@ export const useStore = create<State>((set, get) => ({
       const twin = await api.twin({ ...s.twinOrigin, purpose: s.purpose, n: 10, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, signal);
       if (signal.aborted) return;
       set({ twin, twinStatus: "ready" });
+      // A search the visitor asked to see (not the quiet one that checks which purposes apply) goes in the Notebook.
+      if (get().twinStep === 3 && !s.twinWeights) {
+        useNotebook.getState().logSearch({ body: s.twinOrigin.body, target: { ...s.twinOrigin, label: targetLabel(get(), s.twinOrigin, twin.planet.place.label) }, purpose: s.purpose,
+          purposeLabel: purposeVerb(s.purpose, s.twinOrigin.body).label, best: twin.distribution.best, gradeA: twin.distribution.grades.A,
+          purposes: twin.purposes.filter((p) => p.applicable).map((p) => p.id) });
+      }
       emitTour("twin:started", { ...s.twinOrigin });
     } catch (e) {
       if (signal.aborted || aborted(e)) return;
@@ -571,6 +580,11 @@ export const useStore = create<State>((set, get) => ({
       const compare = await api.compare({ ...s.twinOrigin, purpose: s.purpose, earth_lat: lat, earth_lon: lon, ...(s.twinWeights ? { weights: s.twinWeights } : {}) }, signal);
       if (signal.aborted) return;
       set({ compare, compareStatus: "ready" });
+      if (compare.earth.analysed && !s.twinWeights) {
+        useNotebook.getState().logComparison({ body: s.twinOrigin.body, target: { ...s.twinOrigin, label: targetLabel(get(), s.twinOrigin, compare.planet.place.label) }, purpose: s.purpose,
+          purposeLabel: purposeVerb(s.purpose, s.twinOrigin.body).label, earth: { lat: compare.earth.cell.lat, lon: compare.earth.cell.lon, label: compare.earth.place.label },
+          grade: compare.match.grade, score: compare.match.score, newLead: !compare.documented });
+      }
     } catch (e) {
       if (signal.aborted || aborted(e)) return;
       set({ compareStatus: "error", compareError: message(e) });
@@ -761,6 +775,12 @@ export const useStore = create<State>((set, get) => ({
   setPanel: (side, open) => set(side === "left" ? { leftOpen: open } : { rightOpen: open }),
   setSheet: (sheet) => { set({ sheet }); if (sheet) emitTour("sheet:opened", { sheet }); },
 }));
+
+/** The name a visitor knows a target by: a famous site, a catalogued place, or else the computed place label. */
+export function targetLabel(s: Pick<State, "pins">, t: { body: Planet; lat: number; lon: number }, fallback: string): string {
+  const near = (a: { lat: number; lon: number }) => Math.abs(a.lat - t.lat) < 0.01 && Math.abs(a.lon - t.lon) < 0.01;
+  return findings.famous.find((f) => f.body === t.body && near(f))?.name ?? s.pins[t.body].find(near)?.name ?? fallback;
+}
 
 export const currentMission = (s: State) => s.meta?.missions.find((m) => m.id === s.missionId) ?? null;
 

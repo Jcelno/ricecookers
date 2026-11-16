@@ -141,7 +141,14 @@ export interface Match {
   score: number | null; grade: Grade | null; meaning: string | null; coverage: number; dimensions: DimDetail[];
   strong: string[]; weak: string[]; missing: string[];
   fitness: { id: string; label: string; score: number | null; grade: Grade | null; use: string; coverage: number; applicable: boolean; note: string | null }[];
-  breaks_down: { label: string; planet: string; earth: string; text: string }[];
+  breaks_down: Condition[];
+}
+/** A condition Earth cannot reproduce (or, rarely, nearly matches). Reported with numbers; never scored. */
+export interface Condition {
+  label: string; planet: string; earth: string; text: string;
+  id?: string; kind?: "cannot" | "close"; unit?: string; ratio?: number | null; ratio_text?: string; remedy?: string;
+  planet_value?: number | null; earth_value?: number | null; planet_range?: (number | null)[]; earth_range?: (number | null)[];
+  reference?: boolean; source?: string; earth_source?: string;
 }
 export interface CompareResult {
   planet: CellInfo; earth: CellInfo; purpose: string; match: Match;
@@ -183,7 +190,7 @@ export interface Brief {
   purpose: { id: string; label: string };
   match: { score: number | null; grade: Grade | null; meaning: string | null; coverage: number };
   why_useful: BriefDim[]; mismatches: BriefDim[]; not_assessed: { id: string; label: string; text: string }[];
-  cannot_reproduce: { label: string; planet: string; earth: string; text: string }[];
+  cannot_reproduce: Condition[];
   protocol: { setting: string; instrument_class: string; controlled: string[]; measured: string[]; data_to_collect: string[]; comparison: string; informative_outcome: string; laboratory_needs: string };
   preparation: string[]; unknowns: Record<string, string>;
   meta: { generated_utc: string; radium_version: string; build: string; settings: Record<string, string | number> };

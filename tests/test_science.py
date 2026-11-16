@@ -529,3 +529,34 @@ def test_reference_sites_are_on_land_and_well_formed(store):
         assert ref.strip() and why.strip() and theme.strip(), name
         i, j = e.index(lat, lon)
         assert e.a["land_frac"][i, j] > 0.2, f"{name} falls on water"
+
+
+def test_cannot_reproduce_items_carry_numbers_and_a_remedy_but_never_a_score(store, twin):
+    """The 'Earth can't reproduce' list is disclosure only: machine-readable, cited, and outside every score."""
+    from backend.similarity import DAY_HOURS, GRAVITY, RADIATION
+    for body, lat, lon in (("mars", -4.59, 137.44), ("moon", 0.67, 23.47)):
+        g, i, j = store.locate(body, lat, lon)
+        p, dims, score, _ = twin.score_all(g, i, j, "general")
+        ei, ej = twin.top(score, 1)[0]
+        items = {b["id"]: b for b in twin.breaks_down(p, ei, ej)}
+        assert {"gravity", "pressure", "radiation", "water_life", "day_length"} <= set(items)
+        assert all(b["kind"] in ("cannot", "close") and b["remedy"] and b["ratio_text"] for b in items.values())
+        assert items["gravity"]["ratio"] == pytest.approx(GRAVITY["earth"] / GRAVITY[body])
+        # Radiation is a published reference measurement, cited, and flagged as not being a value for this site.
+        rad = items["radiation"]
+        assert rad["reference"] is True and rad["source"] == RADIATION[body]["cite"]
+        assert rad["planet_value"] == RADIATION[body]["msv_day"] and "does not score it" in rad["text"]
+        assert rad["ratio"] == pytest.approx(RADIATION[body]["msv_day"] / (2.4 / 365.25))
+        # Nothing on the list is a similarity dimension.
+        assert not set(items) & set(dims)
+    # Only the Mars day nearly matches Earth's; everything else is a condition Earth cannot reproduce.
+    g, i, j = store.locate("mars", -4.59, 137.44)
+    p, _, score, _ = twin.score_all(g, i, j, "general")
+    kinds = {b["id"]: b["kind"] for b in twin.breaks_down(p, *twin.top(score, 1)[0])}
+    assert kinds["day_length"] == "close" and {k for k, v in kinds.items() if v == "close"} == {"day_length"}
+    assert DAY_HOURS["mars"] / DAY_HOURS["earth"] == pytest.approx(1.0275, abs=1e-3)
+    g, i, j = store.locate("moon", 0.67, 23.47)
+    p, _, score, _ = twin.score_all(g, i, j, "general")
+    moon = {b["id"]: b for b in twin.breaks_down(p, *twin.top(score, 1)[0])}
+    assert moon["day_length"]["kind"] == "cannot" and moon["pressure"]["planet"] == "vacuum" and moon["pressure"]["ratio"] is None
+    assert moon["temperature"]["remedy"] == "Needs a thermal-vacuum chamber"

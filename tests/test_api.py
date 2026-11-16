@@ -261,3 +261,12 @@ def test_timeline_keeps_unobserved_hours_missing():
     m = client.get("/api/timeline", params={"body": "mars", "lat": -4.59, "lon": 137.44}).json()
     assert [len(x["values"]) for x in m["series"]] == [12, 12]
     assert client.get("/api/timeline", params={"body": "venus", "lat": 0, "lon": 0}).status_code == 400
+
+
+def test_the_best_match_has_no_better_place():
+    """The top-ranked Earth place must report that nothing matches better (a float round-off once said one did)."""
+    target = {"body": "mars", "lat": -4.59, "lon": 137.44, "purpose": "mobility"}
+    top = client.post("/api/twin", json={**target, "n": 3}).json()["candidates"][0]
+    cmp_ = client.post("/api/twin/compare", json={**target, "earth_lat": top["lat"], "earth_lon": top["lon"]}).json()
+    assert cmp_["rank_among"]["better_cells"] == 0
+    assert cmp_["match"]["score"] == pytest.approx(top["score"], abs=1e-6)

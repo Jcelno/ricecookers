@@ -44,9 +44,13 @@ const ELLIPSOID: Record<Planet, Ellipsoid> = {
 const HOME: Record<Planet, { lon: number; lat: number }> = { moon: { lon: 8, lat: 6 }, mars: { lon: -62, lat: 4 } };
 
 export interface ImageOverlay { key: string; url: string; rect: [number, number, number, number] }
-export interface SiteMarker { id: string; lat: number; lon: number; text: string; grade: Grade | null; active?: boolean; name?: string; rank?: number; newLead?: boolean }
+export interface SiteMarker { id: string; lat: number; lon: number; text: string; grade: Grade | null; active?: boolean; name?: string; rank?: number; newLead?: boolean; score?: number | null;
+  /** Earth map only: draw as a numbered pin (the rank) with its grade letter, and drop it in when first shown. */
+  numbered?: boolean }
 export interface ViewState { lat: number; lon: number; degPerPx: number; heightKm: number }
-export interface GlobeHandle { zoom: (factor: number) => void; home: () => void }
+export interface GlobeHandle { zoom: (factor: number) => void; home: () => void;
+  /** Earth map only: where a place is drawn, in CSS pixels inside the map, or null when it is off screen. */
+  project?: (lat: number, lon: number) => { x: number; y: number } | null }
 const NO_PINS: Pin[] = [];
 const NO_MARKERS: SiteMarker[] = [];
 

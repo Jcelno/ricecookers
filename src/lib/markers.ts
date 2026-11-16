@@ -3,16 +3,16 @@ import { GRADE_HEX } from "./format";
 
 /** Screen-space grouping: never groups separate worlds or sites hidden behind a globe. */
 export function clusterPoints<
-  T extends { x: number; y: number; active?: boolean },
+  T extends { x: number; y: number; active?: boolean; solo?: boolean },
 >(points: T[], radius = 36): T[][] {
   const groups: T[][] = [];
   for (const p of points) {
-    if (p.active) {
+    if (p.active || p.solo) {
       groups.push([p]);
       continue;
     }
     const group = groups.find(
-      (g) => !g[0].active && Math.hypot(g[0].x - p.x, g[0].y - p.y) < radius,
+      (g) => !g[0].active && !g[0].solo && Math.hypot(g[0].x - p.x, g[0].y - p.y) < radius,
     );
     if (group) group.push(p);
     else groups.push([p]);

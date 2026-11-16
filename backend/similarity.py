@@ -54,6 +54,20 @@ SEPARATION_KM = 500.0
 
 GRAVITY = {"moon": 1.62, "mars": 3.71, "earth": 9.81}
 DAY_LENGTH = {"moon": "29.5 Earth days", "mars": "24 h 39 min", "earth": "24 h"}
+DAY_HOURS = {"moon": 29.53 * 24.0, "mars": 24.0 + 39.0 / 60.0 + 35.0 / 3600.0, "earth": 24.0}
+
+# Surface radiation: published dose-equivalent rates, in millisieverts per day. These are reference
+# measurements made at one place and time, shown so the "radiation" item carries a number. They are
+# never scored and are not a dataset: RADIUM holds no radiation map of any world.
+RADIATION = {
+    "mars": {"msv_day": 0.67, "where": "Gale crater", "by": "the RAD instrument on the Curiosity rover, August 2012 to June 2013",
+             "cite": "Hassler et al. 2014, Science 343, 1244797",
+             "url": "https://www.swri.org/newsroom/press-releases/swri-scientists-publish-first-radiation-measurements-the-surface-of-mars"},
+    "moon": {"msv_day": 1.369, "where": "Von Kármán crater", "by": "the LND instrument on the Chang'E-4 lander, 2019",
+             "cite": "Zhang et al. 2020, Science Advances 6, eaaz1334", "url": "https://doi.org/10.1126/sciadv.aaz1334"},
+    "earth": {"msv_day": 2.4 / 365.25, "where": "worldwide average", "by": "natural background, all sources",
+              "cite": "UNSCEAR 2008 Report: 2.4 mSv a year", "url": "https://www.unscear.org/unscear/en/publications/2008_1.html"},
+}
 
 # ---------------------------------------------------------------- lithology
 LITH = {v[0]: k for k, v in catalog.LITH_CLASSES.items()}      # code → class id
@@ -404,40 +418,68 @@ class Twin:
         }
 
     def breaks_down(self, p: dict, ei: int, ej: int):
-        """Conditions Earth cannot reproduce — always reported, never scored."""
+        """Conditions Earth cannot reproduce — always reported, never scored.
+
+        Each item carries plain text plus machine-readable fields for the interface: `kind` ("cannot" or
+        "close"), numeric values where a number exists, the ratio between the two worlds and `remedy`, the
+        way a test campaign makes up the difference. None of these fields enters any score.
+        """
         e = self.e
         body = p["body"]
         ps_e = e.value("ps_mean", ei, ej)
+        g_ratio = GRAVITY["earth"] / GRAVITY[body]
         items = [{
-            "label": "Gravity", "planet": f"{GRAVITY[body]:.2f} m/s²", "earth": f"{GRAVITY['earth']:.2f} m/s²",
-            "text": f"Earth's gravity is {GRAVITY['earth'] / GRAVITY[body]:.1f} times stronger. Loads, traction, dust settling and human movement all differ.",
+            "id": "gravity", "kind": "cannot", "label": "Gravity",
+            "planet": f"{GRAVITY[body]:.2f} m/s²", "earth": f"{GRAVITY['earth']:.2f} m/s²",
+            "planet_value": GRAVITY[body], "earth_value": GRAVITY["earth"], "unit": "m/s²",
+            "ratio": g_ratio, "ratio_text": f"{g_ratio:.1f}× stronger on Earth", "remedy": "Needs reduced-gravity offloading",
+            "text": f"Earth's gravity is {g_ratio:.1f} times stronger. Loads, traction, dust settling and human movement all differ.",
         }]
         if body == "mars":
             ps_p = p.get("ps_mean")
             if ps_p and ps_e:
-                items.append({"label": "Air pressure", "planet": f"{ps_p:,.0f} Pa", "earth": f"{ps_e:,.0f} Pa",
+                items.append({"id": "pressure", "kind": "cannot", "label": "Air pressure", "planet": f"{ps_p:,.0f} Pa", "earth": f"{ps_e:,.0f} Pa",
+                              "planet_value": ps_p, "earth_value": ps_e, "unit": "Pa", "ratio": ps_e / ps_p,
+                              "ratio_text": f"{ps_e / ps_p:,.0f}× denser on Earth", "remedy": "Needs a low-pressure chamber",
                               "text": f"The air here is about {ps_e / ps_p:,.0f} times denser than at the Mars site. Wind forces, heat transfer, parachutes and boiling points cannot be reproduced outdoors."})
         else:
-            items.append({"label": "Air pressure", "planet": "vacuum", "earth": f"{ps_e:,.0f} Pa" if ps_e else "—",
+            items.append({"id": "pressure", "kind": "cannot", "label": "Air pressure", "planet": "vacuum", "earth": f"{ps_e:,.0f} Pa" if ps_e else "—",
+                          "planet_value": None, "earth_value": ps_e, "unit": "Pa", "ratio": None,
+                          "ratio_text": "no air on the Moon", "remedy": "Needs a vacuum chamber",
                           "text": "The Moon has no atmosphere. Vacuum effects on lubricants, seals, dust and heat rejection need a chamber, not a field site."})
             tx, tn = p.get("tmax"), p.get("tmin")
             ex, en = e.value("tmax", ei, ej), e.value("tmin", ei, ej)
             if tx and ex:
                 lunar = f"{tn:.0f}–{tx:.0f} K" if tn else f"up to {tx:.0f} K"
-                items.append({"label": "Temperature", "planet": lunar, "earth": f"{en:.0f}–{ex:.0f} K",
+                items.append({"id": "temperature", "kind": "cannot", "label": "Temperature", "planet": lunar, "earth": f"{en:.0f}–{ex:.0f} K",
+                              "planet_range": [tn, tx], "earth_range": [en, ex], "unit": "K", "ratio": None,
+                              "ratio_text": f"a {tx - tn:.0f} K swing against {ex - en:.0f} K" if tn else f"up to {tx:.0f} K", "remedy": "Needs a thermal-vacuum chamber",
                               "text": "Lunar surface temperatures are set by sunlight and radiation to space with no air to moderate them. No place on Earth spans this range, so temperature is not scored for the Moon."})
-        items.append({"label": "Radiation", "planet": "unshielded", "earth": "shielded",
-                      "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."})
+        rad, rad_e = RADIATION[body], RADIATION["earth"]
+        r_ratio = rad["msv_day"] / rad_e["msv_day"]
+        items.append({"id": "radiation", "kind": "cannot", "label": "Radiation", "planet": f"{rad['msv_day']:.2f} mSv/day", "earth": f"{rad_e['msv_day']:.3f} mSv/day",
+                      "planet_value": rad["msv_day"], "earth_value": rad_e["msv_day"], "unit": "mSv/day", "ratio": r_ratio,
+                      "ratio_text": f"about {round(r_ratio, -1):.0f}× Earth's background", "remedy": "Needs radiation testing in a laboratory",
+                      "reference": True, "source": rad["cite"], "earth_source": rad_e["cite"],
+                      "text": (f"With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth: "
+                               f"{rad['msv_day']:.2f} mSv a day was measured at {rad['where']} by {rad['by']} ({rad['cite']}), about {round(r_ratio, -1):.0f} times "
+                               f"the average natural background on Earth ({rad_e['cite']}). These are published reference measurements at one place, "
+                               "not values for this site. RADIUM holds no radiation map and does not score it.")})
         ndvi, pr = e.value("ndvi_max", ei, ej), e.value("precip_mm_yr", ei, ej)
         life = []
         if pr is not None:
             life.append(f"{pr:,.0f} mm of precipitation a year")
         if ndvi is not None:
             life.append(f"a peak vegetation index of {ndvi:.2f}")
-        items.append({"label": "Water and life", "planet": "none known", "earth": "present",
+        items.append({"id": "water_life", "kind": "cannot", "label": "Water and life", "planet": "none known", "earth": "present",
+                      "ratio": None, "ratio_text": "present on Earth only", "remedy": "Cannot be removed in the field",
                       "text": ("This Earth cell has " + " and ".join(life) + ". " if life else "") +
                               "Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."})
-        items.append({"label": "Length of day", "planet": DAY_LENGTH[body], "earth": DAY_LENGTH["earth"],
+        d_ratio = DAY_HOURS[body] / DAY_HOURS["earth"]
+        items.append({"id": "day_length", "kind": "cannot" if body == "moon" else "close", "label": "Length of day", "planet": DAY_LENGTH[body], "earth": DAY_LENGTH["earth"],
+                      "planet_value": DAY_HOURS[body], "earth_value": DAY_HOURS["earth"], "unit": "h", "ratio": d_ratio,
+                      "ratio_text": f"{d_ratio:.1f}× longer than Earth's" if body == "moon" else "within 3% of Earth's",
+                      "remedy": "Needs simulated lighting and thermal cycles" if body == "moon" else "Matches",
                       "text": "Thermal cycling and lighting follow a different rhythm." if body == "moon" else "Close to Earth's, one of the few conditions that nearly matches."})
         return items
 
