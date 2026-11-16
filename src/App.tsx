@@ -1,17 +1,21 @@
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 
-import { Stage } from "@/components/map/Stage";
-import { MobileSheetHandle, type SheetSnap } from "@/components/MobileSheetHandle";
 import { CaveatFooter, SkipLinks } from "@/components/AccessibilityChrome";
-import { KeyboardControls } from "@/components/KeyboardControls";
-import { TourBootstrap } from "@/components/TourBootstrap";
-import { TopBar } from "@/components/TopBar";
-import { Button, cx, IconButton, Notice, Spinner } from "@/components/ui/primitives";
+import { BootPanel } from "@/components/BootPanel";
 import { CompareTray } from "@/components/CompareTray";
+import { KeyboardControls } from "@/components/KeyboardControls";
+import { MobileSheetHandle, type SheetSnap } from "@/components/MobileSheetHandle";
+import { StartScreen } from "@/components/start/StartScreen";
+import { TopBar } from "@/components/TopBar";
+import { cx, IconButton, Spinner } from "@/components/ui/primitives";
+import { useBoot, useBootRetry } from "@/lib/boot";
 import { applyLink, startLinkSync } from "@/lib/deeplink";
 import { useStore } from "@/store";
 
+// Everything below loads on demand. The start screen needs none of it, so the first paint never waits
+// for a map engine (CesiumJS alone is over 1 MB compressed).
+const Stage = lazy(() => import("@/components/map/Stage").then((m) => ({ default: m.Stage })));
 const LayersPanel = lazy(() => import("@/components/panels/LayersPanel").then(m => ({ default: m.LayersPanel })));
 const LocationPanel = lazy(() => import("@/components/panels/LocationPanel").then(m => ({ default: m.LocationPanel })));
 const MissionPanel = lazy(() => import("@/components/panels/MissionPanel").then(m => ({ default: m.MissionPanel })));
@@ -24,7 +28,11 @@ const Sources = lazy(() => import("@/components/sheets/Sources"));
 const BriefSheet = lazy(() => import("@/components/sheets/Brief"));
 const Scenarios = lazy(() => import("@/components/sheets/Scenarios"));
 const MissionReport = lazy(() => import("@/components/sheets/MissionReport"));
+const Help = lazy(() => import("@/components/sheets/Help"));
+const Findings = lazy(() => import("@/components/sheets/Findings"));
 const OfflineDemo = lazy(() => import("@/components/OfflineDemo"));
+const CoachMarks = lazy(() => import("@/components/flow/CoachMarks"));
+const DemoPlayer = lazy(() => import("@/components/flow/DemoPlayer"));
 
 function Side({ side, open, children, label }: { side: "left" | "right"; open: boolean; children: React.ReactNode; label: string }) {
   const setPanel = useStore((s) => s.setPanel);
@@ -60,85 +68,97 @@ function Side({ side, open, children, label }: { side: "left" | "right"; open: b
   );
 }
 
+const Loading = ({ label }: { label: string }) => <div className="grid flex-1 place-items-center"><Spinner label={label} /></div>;
+
 export default function App() {
   const meta = useStore((s) => s.meta);
-  const metaError = useStore((s) => s.metaError);
   const init = useStore((s) => s.init);
+  const started = useStore((s) => s.started);
   const mode = useStore((s) => s.mode);
   const leftOpen = useStore((s) => s.leftOpen);
   const rightOpen = useStore((s) => s.rightOpen);
   const sheet = useStore((s) => s.sheet);
+  const demo = useStore((s) => s.demo);
   const setSheet = useStore((s) => s.setSheet);
+  const boot = useBoot();
 
   useEffect(() => {
     void init();
   }, [init]);
+  useBootRetry();
   // Restore a shared link once the app has loaded, then keep the address in sync with what is on screen.
-  const ready = useStore((s) => !!s.meta);
+  const ready = !!meta;
   useEffect(() => {
     if (!ready) return;
     applyLink(location.hash);
     return startLinkSync();
   }, [ready]);
+  // Fetch the globe engine while the visitor reads the start screen, so the first globe opens promptly.
+  useEffect(() => {
+    const t = window.setTimeout(() => { void import("@/components/map/GlobeView"); }, 2500);
+    return () => window.clearTimeout(t);
+  }, []);
+  // After 20 s without an answer the saved example is offered. It stays until the visitor leaves it,
+  // even if the live service answers meanwhile: a page should not change under a reader.
+  const [savedOpen, setSavedOpen] = useState(false);
+  useEffect(() => {
+    if (boot.phase === "saved" && started) setSavedOpen(true);
+  }, [boot.phase, started]);
+  const close = () => setSheet(null);
 
-  if (metaError) {
-    return (
-      <div className="radium-shell flex h-full flex-col">
-        <div className="hair-b flex items-center gap-3 px-4 py-3">
-          <h1 className="text-md font-semibold tracking-[0.14em] text-regolith-50">RADIUM</h1>
-          <span className="text-xs text-regolith-400">{metaError}</span>
-          <Button className="ml-auto" variant="outline" size="sm" onClick={() => void init()}>Try again</Button>
-        </div>
-        <div className="min-h-0 flex-1">
-          <Suspense fallback={<div className="p-6"><Spinner label="Opening the saved example" /></div>}>
-            <OfflineDemo onRetry={() => void init()} />
-          </Suspense>
-        </div>
-      </div>
-    );
-  }
-  if (!meta) {
-    return (
-      <div className="grid h-full place-items-center">
-        <Spinner label="Loading the Moon, Mars and Earth grids" />
-      </div>
-    );
-  }
+  const sheets = (
+    <Suspense fallback={null}>
+      {sheet === "methodology" && <Methodology onClose={close} />}
+      {sheet === "sources" && <Sources onClose={close} />}
+      {sheet === "help" && <Help onClose={close} />}
+      {sheet === "findings" && <Findings onClose={close} />}
+      {meta && sheet === "brief" && <BriefSheet onClose={close} />}
+      {meta && sheet === "scenarios" && <Scenarios onClose={close} />}
+      {meta && sheet === "report" && <MissionReport onClose={close} />}
+    </Suspense>
+  );
+
+  if (!started) return <>{<StartScreen />}{sheets}</>;
 
   return (
-    <div className="radium-shell flex h-full flex-col">
+    <div className="radium-shell flex h-full flex-col" data-mode={mode}>
       <SkipLinks />
       <TopBar />
-      <TourBootstrap />
-      <KeyboardControls />
+      {meta && <KeyboardControls />}
       <main className="relative flex min-h-0 flex-1">
-        <CompareTray />
-        {mode === "saved" ? (<Suspense fallback={<Spinner label="Opening saved research" />}><SavedView /></Suspense>) : mode === "twin" ? (
-          <Suspense fallback={<div className="grid flex-1 place-items-center"><Spinner label="Opening Earth Analogs" /></div>}><TwinView /></Suspense>
-        ) : mode === "near" ? (
-          <Suspense fallback={<div className="grid flex-1 place-items-center"><Spinner label="Opening Near Me" /></div>}><NearView /></Suspense>
-        ) : mode === "compare" ? (
-          <Suspense fallback={<div className="grid flex-1 place-items-center"><Spinner label="Opening Compare" /></div>}><CompareView /></Suspense>
+        {savedOpen ? (
+          <Suspense fallback={<Loading label="Opening the saved example" />}><OfflineDemo live={ready} onLive={() => setSavedOpen(false)} onRetry={() => void init()} /></Suspense>
+        ) : !meta ? (
+          <BootPanel />
         ) : (
           <>
-            <Side side="left" open={leftOpen} label={mode === "mission" ? "Mission panel" : "Layers panel"}>
-              <Suspense fallback={<div className="p-4"><Spinner label="Opening controls" /></div>}>{mode === "mission" ? <MissionPanel /> : <LayersPanel />}</Suspense>
-            </Side>
-            <Stage />
-            <Side side="right" open={rightOpen} label="Location panel">
-              <Suspense fallback={<div className="p-4"><Spinner label="Opening the location panel" /></div>}><LocationPanel /></Suspense>
-            </Side>
+            <CompareTray />
+            {mode === "saved" ? (<Suspense fallback={<Loading label="Opening your notebook" />}><SavedView /></Suspense>) : mode === "twin" ? (
+              <Suspense fallback={<Loading label="Opening Find Earth Twins" />}><TwinView /></Suspense>
+            ) : mode === "near" ? (
+              <Suspense fallback={<Loading label="Opening Near Me" />}><NearView /></Suspense>
+            ) : mode === "compare" ? (
+              <Suspense fallback={<Loading label="Opening Compare" />}><CompareView /></Suspense>
+            ) : (
+              <>
+                <Side side="left" open={leftOpen} label={mode === "mission" ? "Mission panel" : "Layers panel"}>
+                  <Suspense fallback={<div className="p-4"><Spinner label="Opening controls" /></div>}>{mode === "mission" ? <MissionPanel /> : <LayersPanel />}</Suspense>
+                </Side>
+                <Suspense fallback={<div className="relative min-w-0 flex-1 bg-void" data-stage><Loading label="Loading the globe" /></div>}><Stage /></Suspense>
+                <Side side="right" open={rightOpen} label="Location panel">
+                  <Suspense fallback={<div className="p-4"><Spinner label="Opening the location panel" /></div>}><LocationPanel /></Suspense>
+                </Side>
+              </>
+            )}
           </>
         )}
       </main>
-      <CaveatFooter />
       <Suspense fallback={null}>
-        {sheet === "methodology" && <Methodology onClose={() => setSheet(null)} />}
-        {sheet === "sources" && <Sources onClose={() => setSheet(null)} />}
-        {sheet === "brief" && <BriefSheet onClose={() => setSheet(null)} />}
-        {sheet === "scenarios" && <Scenarios onClose={() => setSheet(null)} />}
-        {sheet === "report" && <MissionReport onClose={() => setSheet(null)} />}
+        {meta && !savedOpen && <CoachMarks />}
+        {meta && demo && !savedOpen && <DemoPlayer />}
       </Suspense>
+      <CaveatFooter />
+      {sheets}
     </div>
   );
 }

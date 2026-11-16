@@ -13,7 +13,7 @@ interface Snapshot {
 }
 
 /** Shown only when the data service cannot be reached: one saved, real result, clearly labelled as not live. */
-export default function OfflineDemo({ onRetry }: { onRetry: () => void }) {
+export default function OfflineDemo({ onRetry, live = false, onLive }: { onRetry: () => void; live?: boolean; onLive?: () => void }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
@@ -25,10 +25,14 @@ export default function OfflineDemo({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="scroll h-full w-full">
       <div className="mx-auto max-w-[820px] px-5 pt-6 pb-12">
-        <Notice tone="warn" title="Saved example, not live analysis" action={<Button size="sm" variant="outline" onClick={onRetry}>Try the live service again</Button>}>
-          The RADIUM data service is unreachable, so this page shows one result computed earlier by the same code on {snap.generated_utc} (build {snap.build}).
-          Every value below is that service's real output, stored unchanged. Maps and photographs need the live app.
-        </Notice>
+        <div data-saved-example>
+          <Notice tone={live ? "info" : "warn"} title={live ? "Live data is ready" : "Saved example, not live analysis"}
+            action={live ? <Button size="sm" variant="solid" onClick={onLive}>Open the live app</Button> : <Button size="sm" variant="outline" onClick={onRetry}>Try the live service again</Button>}>
+            {live ? "The data service has answered. This page still shows the saved example below; open the live app to run your own comparison."
+              : <>The RADIUM data service has not answered, so this page shows one result computed earlier by the same code on {snap.generated_utc} (build {snap.build}).
+                Every value below is that service's real output, stored unchanged. Maps and photographs need the live app, which opens as soon as the service answers.</>}
+          </Notice>
+        </div>
 
         <h1 className="mt-6 font-serif text-[2rem] leading-tight font-medium tracking-[-0.03em] text-regolith-50">
           {c.planet.place.label} on Mars, and its closest Earth analogs for rover mobility

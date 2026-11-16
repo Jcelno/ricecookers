@@ -1,0 +1,198 @@
+/*
+  RADIUM visual system: "mission control"
+  ---------------------------------------
+  Builds on the basalt / regolith / grade tokens in index.css.
+
+  Type      IBM Plex Mono for telemetry (coordinates, counts, scores, dataset ids).
+            Small uppercase labels with letter-spacing name sections.
+  Depth     base (map) → raised panel (lighter navy, 1 px hairline) → floating (blur, tinted shadow).
+  Worlds    one accent each (Moon silver, Mars rust, Earth blue), used only for a world's icon, its
+            inset frame and its target marker. Grades always use the grade palette.
+  Motion    one rhythm for the whole app: the duration and easing tokens below. Only transform and
+            opacity animate. Every animation has a reduced-motion fallback (a plain fade or nothing).
+*/
+:root {
+  --moon: #cfd9e6;
+  --mars: #dc9877;
+  --earth: #6fbcce;
+  --cannot: #f08a7e;
+  --cannot-bg: rgb(222 93 87 / 0.13);
+  --matches: #86d6b9;
+  --matches-bg: rgb(134 214 185 / 0.12);
+
+  --surface-base: #060c17;
+  --surface-raised: #0d1a2b;
+  --surface-raised-2: #11213a;
+  --grid-line: rgb(150 190 220 / 0.05);
+
+  /* Shared timing: quick feedback, standard move, arrival, travel. */
+  --dur-quick: 180ms;
+  --dur-move: 350ms;
+  --dur-arrive: 600ms;
+  --dur-travel: 900ms;
+  --stagger: 60ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "zero" 1, "tnum" 1;
+  letter-spacing: 0;
+}
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-regolith-400);
+}
+
+/* Faint hairline grid behind maps and the start screen, fading toward the edges. */
+.grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(120% 90% at 50% 40%, #000 35%, transparent 100%);
+}
+/* One or two large soft glows: cool on Moon views (top left), warm on Mars views (bottom right). */
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 8% 0%, rgb(111 168 232 / 0.13), transparent 70%),
+    radial-gradient(55% 50% at 96% 100%, rgb(220 152 119 / 0.1), transparent 70%);
+}
+:root[data-world="moon"] .glow {
+  background: radial-gradient(60% 55% at 8% 0%, rgb(111 168 232 / 0.16), transparent 70%);
+}
+:root[data-world="mars"] .glow {
+  background: radial-gradient(55% 50% at 96% 100%, rgb(220 152 119 / 0.15), transparent 70%);
+}
+
+/* Layering */
+.panel {
+  background: var(--surface-raised);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-lg);
+}
+.panel-selected {
+  border: 1.5px solid var(--color-grade-a);
+  box-shadow: 0 0 0 4px rgb(86 200 245 / 0.1), 0 0 28px -6px rgb(86 200 245 / 0.35);
+}
+.floating {
+  background: color-mix(in srgb, var(--surface-raised-2) 88%, transparent);
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow:
+    0 1px 0 rgb(246 242 233 / 0.06) inset,
+    0 10px 30px -12px rgb(3 10 26 / 0.8),
+    0 30px 70px -30px rgb(20 60 110 / 0.45);
+}
+
+/* World discs: real imagery, lit from the upper left. Used as small identity icons. */
+.world-disc {
+  --d: 28px;
+  position: relative;
+  display: inline-block;
+  width: var(--d);
+  height: var(--d);
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-size: 200% 100%;
+  background-position: 25% 50%;
+  box-shadow:
+    inset calc(var(--d) * -0.18) calc(var(--d) * -0.12) calc(var(--d) * 0.3) rgb(0 0 0 / 0.6),
+    inset calc(var(--d) * 0.05) calc(var(--d) * 0.05) calc(var(--d) * 0.12) rgb(255 255 255 / 0.16),
+    0 0 0 1px rgb(0 0 0 / 0.5);
+  transition: transform var(--dur-quick) var(--ease-spring);
+}
+.world-disc.moon { background-color: #b9c2cf; background-image: url("/worlds/moon.jpg"); background-position: 50% 50%; filter: brightness(1.35) contrast(1.05); }
+.world-disc.mars { background-color: #c98a6a; background-image: url("/worlds/mars.jpg"); background-position: 89% 50%; filter: brightness(1.45) saturate(1.15); }
+.world-disc.earth { background-color: #3f79a8; background-image: url("/worlds/earth.jpg"); background-position: 61% 50%; filter: brightness(1.3) saturate(1.1); }
+.world-disc.dim { opacity: 0.32; filter: grayscale(0.7); }
+.world-disc.dim { opacity: 0.32; }
+
+/* Grade badge: the letter always shows; colour is never the only cue. */
+.grade-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.25em;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  line-height: 1;
+  color: #071019;
+}
+
+/* Telemetry chip row used by the "Earth can't reproduce" strip. */
+.chip-cannot,
+.chip-matches {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.chip-cannot { background: var(--cannot-bg); color: #ffd9d3; box-shadow: inset 0 0 0 1px rgb(240 138 126 / 0.4); }
+.chip-matches { background: var(--matches-bg); color: #d5f5e8; box-shadow: inset 0 0 0 1px rgb(134 214 185 / 0.4); }
+.chip-cannot svg { color: var(--cannot); }
+.chip-matches svg { color: var(--matches); }
+
+/* Skeletons: shown instead of zeros or empty panels while data loads. */
+.skeleton {
+  display: block;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgb(150 190 220 / 0.08), rgb(150 190 220 / 0.16), rgb(150 190 220 / 0.08));
+  animation: skeleton-pulse 1.3s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* Shared entrance moves */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+@keyframes pulse-ring {
+  from { opacity: 0.9; transform: scale(0.35); }
+  to { opacity: 0; transform: scale(2.4); }
+}
+@keyframes draw-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.rise-in { animation: rise-in var(--dur-move) var(--ease-out) both; animation-delay: calc(var(--i, 0) * var(--stagger)); }
+.fade-in { animation: fade-in var(--dur-move) var(--ease-out) both; }
+.pop { animation: pop 400ms var(--ease-bounce) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in { animation-name: fade-in; }
+  .pop, .skeleton { animation: none; }
+  .world-disc { transition: none; }
+}

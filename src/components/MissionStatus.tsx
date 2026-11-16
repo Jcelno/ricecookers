@@ -12,7 +12,7 @@ function UTCClock() {
   return <time aria-live="off" title="Computed from this device's clock">UTC {time}</time>;
 }
 export function MissionStatus() {
-  const shown = usePreference(TELEMETRY_KEY, true);
+  const shown = usePreference(TELEMETRY_KEY, false);
   const meta = useStore(s => s.meta);
   const body = useStore(s => s.body);
   const missionId = useStore(s => s.missionId);

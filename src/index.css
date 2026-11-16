@@ -7,6 +7,9 @@
 @import "@fontsource/ibm-plex-sans-condensed/400.css";
 @import "@fontsource/ibm-plex-sans-condensed/500.css";
 @import "@fontsource/ibm-plex-sans-condensed/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "./styles/system.css";
 
 /*
   RADIUM design tokens
@@ -49,6 +52,7 @@
   --font-cond:
     "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, sans-serif;
   --font-serif: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   --text-2xs: 0.6875rem;
   --text-xs: 0.75rem;
@@ -1131,3 +1135,23 @@ a:focus-visible {
 .radium-shell::before {content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='.6'/%3E%3C/svg%3E");}
 
 .catalog-filters>label {flex:1 1 220px;}
+
+/* Top bar: five plain destinations, then a compact group of tools. */
+.nav-short { display: none; }
+.primary-nav > button:disabled { opacity: 0.45; cursor: default; }
+.header-actions .ctl[aria-current="page"] { color: var(--color-regolith-50); background: #1b2a3e; }
+.workspace-title { flex-shrink: 0; }
+@media (max-width: 1320px) {
+  .app-header { gap: 14px; }
+  .primary-nav { gap: 0; }
+  .primary-nav > button { padding: 0 11px; }
+}
+@media (max-width: 1020px) {
+  .nav-long { display: none; }
+  .nav-short { display: inline; }
+}
+@media (max-width: 760px) {
+  .header-actions { margin-left: auto; }
+  .header-actions .ctl { padding: 0 7px; }
+  .primary-nav > button { padding: 0 3px; font-size: 11.5px; }
+}

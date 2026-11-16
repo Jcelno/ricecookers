@@ -154,7 +154,7 @@ export function applyLink(hash: string) {
   const sheet = q.get("sh");
   if (sheet === "brief" && target && earth) useStore.getState().openBrief(earth);
   else if ((sheet === "scenarios" || sheet === "report") && mission) st.setSheet(sheet);
-  else if (sheet === "methodology" || sheet === "sources") st.setSheet(sheet);
+  else if (sheet === "methodology" || sheet === "sources" || sheet === "findings") st.setSheet(sheet);
 }
 
 /** Full precision preserves the requested site, separate from its coarser scientific analysis cell. */
@@ -191,7 +191,7 @@ export function currentLink(): string {
   }
   if (s.mode === "near") { q.set("nr", String(s.nearRadius)); q.set("nm", s.nearMode); if (s.nearDocOnly) q.set("nd", "1"); }
   if (s.compareList.length) q.set("cl2", JSON.stringify(s.compareList.map(({ body, lat, lon, label, newLead }) => ({ body, lat, lon, label: label.slice(0, 160), ...(body === "earth" && newLead === true ? { newLead: true } : {}) }))));
-  if (s.sheet && s.sheet !== "intro") q.set("sh", s.sheet);
+  if (s.sheet && s.sheet !== "help") q.set("sh", s.sheet);
   return `${location.origin}${location.pathname}${location.search}#${q}`;
 }
 
@@ -199,15 +199,16 @@ export function startLinkSync() {
   let timer = 0;
   let restoring = false;
   const unsub = useStore.subscribe(() => {
-    if (restoring || pendingDemo?.hash === location.hash) return;
+    // The start screen has no view to record: a reload should show it again.
+    if (restoring || pendingDemo?.hash === location.hash || !useStore.getState().started) return;
     clearTimeout(timer);
     timer = window.setTimeout(() => {
-      if (pendingDemo?.hash === location.hash) return;
+      if (pendingDemo?.hash === location.hash || !useStore.getState().started) return;
       const url = currentLink();
       if (url !== location.href) { try { history.replaceState(null, "", url); } catch { /* Copy View Link still works in restricted embeds. */ } }
     }, 350);
   });
-  const restore = () => { clearTimeout(timer); restoring = true; try { applyLink(location.hash); } finally { restoring = false; } };
+  const restore = () => { clearTimeout(timer); restoring = true; try { if (location.hash.length > 1) useStore.setState({ started: true }); applyLink(location.hash); } finally { restoring = false; } };
   window.addEventListener("hashchange", restore);
   return () => { clearTimeout(timer); unsub(); cancelPendingDemo(); window.removeEventListener("hashchange", restore); };
 }

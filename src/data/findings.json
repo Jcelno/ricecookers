@@ -1,0 +1,2102 @@
+{
+ "kind": "computed_findings",
+ "generated_utc": "2026-11-16 01:40 UTC",
+ "generated_date": "16 November 2026",
+ "build": "c8b2e72",
+ "note": "Every value is the unchanged output of the RADIUM API for the request stored beside it. Regenerate with npm run snapshot.",
+ "counts": {
+  "sources": 20,
+  "earth_cells": 341042,
+  "moon_cells": 355896,
+  "mars_cells": 259200,
+  "documented_sites": 17,
+  "tests": null
+ },
+ "famous": [
+  {
+   "id": "shackleton-ridge",
+   "body": "moon",
+   "name": "Shackleton ridge",
+   "lat": -89.45,
+   "lon": -137.31,
+   "line": "Best-lit ground near the south pole, beside Shackleton crater.",
+   "source": "Mazarico et al. 2011, Icarus 211; LOLA polar illumination products"
+  },
+  {
+   "id": "mons-mouton",
+   "body": "moon",
+   "name": "Mons Mouton",
+   "lat": -84.6,
+   "lon": 31.0,
+   "line": "Flat-topped mountain near the south pole, a candidate landing region.",
+   "source": "IAU Gazetteer of Planetary Nomenclature"
+  },
+  {
+   "id": "apollo-11",
+   "body": "moon",
+   "name": "Apollo 11",
+   "lat": 0.67416,
+   "lon": 23.47314,
+   "line": "First crewed landing, 1969, on the basalt plain of Mare Tranquillitatis.",
+   "source": "NASA NSSDCA / mission team"
+  },
+  {
+   "id": "gale",
+   "body": "mars",
+   "name": "Gale crater (Curiosity)",
+   "lat": -4.59,
+   "lon": 137.44,
+   "line": "Curiosity rover landing site, 2012, beside a layered central mound.",
+   "source": "NASA NSSDCA / mission team"
+  },
+  {
+   "id": "jezero",
+   "body": "mars",
+   "name": "Jezero crater (Perseverance)",
+   "lat": 18.4446,
+   "lon": 77.4509,
+   "line": "Perseverance rover landing site, 2021, on a preserved river delta.",
+   "source": "NASA NSSDCA / mission team"
+  },
+  {
+   "id": "arcadia",
+   "body": "mars",
+   "name": "Arcadia Planitia",
+   "lat": 46.66,
+   "lon": -168.0,
+   "line": "Northern plain where radar and fresh craters reveal shallow ice.",
+   "source": "IAU Gazetteer of Planetary Nomenclature"
+  }
+ ],
+ "cards": {
+  "moon": {
+   "site": "shackleton-ridge",
+   "body": "moon",
+   "name": "Shackleton ridge",
+   "lat": -89.45,
+   "lon": -137.31,
+   "coords": "89.44°S, 140.71°W",
+   "place": "15 km W of Spudis",
+   "cell_km": [
+    2.4,
+    2.4
+   ],
+   "purpose": "ice",
+   "purpose_label": "Polar volatiles and drilling",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "moon",
+    "lat": -89.45,
+    "lon": -137.31,
+    "purpose": "ice"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 18,
+    "B": 477,
+    "C": 7967,
+    "D": 157211,
+    "F": 175369
+   },
+   "best": 0.85788843780756,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Karakoram Ra., Xinjiang, China",
+     "lat": 35.875,
+     "lon": 78.875,
+     "coords": "35.88°N, 78.88°E",
+     "score": 0.8578884303569794,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Pamirs, Tajikistan",
+     "lat": 37.875,
+     "lon": 73.125,
+     "coords": "37.88°N, 73.12°E",
+     "score": 0.8277585372328758,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Kunlun Mountains, Xinjiang, China",
+     "lat": 36.625,
+     "lon": 87.375,
+     "coords": "36.62°N, 87.38°E",
+     "score": 0.7286395326256752,
+     "grade": "B",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Svalbard, Bockfjorden",
+    "score": 0.5043849371373653,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "1.62 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 6.1 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "vacuum",
+     "earth": "54,332 Pa",
+     "text": "The Moon has no atmosphere. Vacuum effects on lubricants, seals, dust and heat rejection need a chamber, not a field site."
+    },
+    {
+     "label": "Temperature",
+     "planet": "up to 231 K",
+     "earth": "229–309 K",
+     "text": "Lunar surface temperatures are set by sunlight and radiation to space with no air to moderate them. No place on Earth spans this range, so temperature is not scored for the Moon."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 81 mm of precipitation a year and a peak vegetation index of 0.09. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "29.5 Earth days",
+     "earth": "24 h",
+     "text": "Thermal cycling and lighting follow a different rhythm."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.7936137914657593,
+     "grade": "B",
+     "weight": 0.15
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 0.44999998807907104,
+     "grade": "D",
+     "weight": 0.15
+    },
+    {
+     "id": "ice",
+     "label": "Ice and frozen ground",
+     "score": 0.9729198217391968,
+     "grade": "A",
+     "weight": 0.45
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 0.9341297745704651,
+     "grade": "A",
+     "weight": 0.25
+    }
+   ],
+   "link": "#v=2&m=twin&b=moon&t=moon,-89.45,-137.31&p=ice",
+   "compare_link": "#v=2&m=compare&b=moon&t=moon,-89.45,-137.31&p=ice&e=35.875,78.875&ct=pair"
+  },
+  "mars": {
+   "site": "gale",
+   "body": "mars",
+   "name": "Gale crater (Curiosity)",
+   "lat": -4.59,
+   "lon": 137.44,
+   "coords": "4.75°S, 137.25°E",
+   "place": "13 km NW of Gediz Vallis, in Aeolis Mons",
+   "cell_km": [
+    29.6,
+    29.5
+   ],
+   "purpose": "mobility",
+   "purpose_label": "Rover mobility",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "mars",
+    "lat": -4.59,
+    "lon": 137.44,
+    "purpose": "mobility"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 275,
+    "B": 4091,
+    "C": 21736,
+    "D": 87450,
+    "F": 227490
+   },
+   "best": 0.8959057480096817,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Tibesti Mts., Chad",
+     "lat": 20.375,
+     "lon": 18.125,
+     "coords": "20.38°N, 18.12°E",
+     "score": 0.8959057331085206,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Yemen",
+     "lat": 15.625,
+     "lon": 52.125,
+     "coords": "15.62°N, 52.12°E",
+     "score": 0.8958585647975698,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Danakil, Ethiopia",
+     "lat": 13.125,
+     "lon": 40.875,
+     "coords": "13.12°N, 40.88°E",
+     "score": 0.8945987612009049,
+     "grade": "A",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Pisgah Lava Field",
+    "score": 0.620409332960844,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "3.71 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 2.6 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "820 Pa",
+     "earth": "86,234 Pa",
+     "text": "The air here is about 105 times denser than at the Mars site. Wind forces, heat transfer, parachutes and boiling points cannot be reproduced outdoors."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 34 mm of precipitation a year and a peak vegetation index of 0.09. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "24 h 39 min",
+     "earth": "24 h",
+     "text": "Close to Earth's, one of the few conditions that nearly matches."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.8222559690475464,
+     "grade": "A",
+     "weight": 0.5
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.15
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.2
+    },
+    {
+     "id": "dust",
+     "label": "Airborne dust",
+     "score": 0.8985183238983154,
+     "grade": "A",
+     "weight": 0.15
+    }
+   ],
+   "link": "#v=2&m=twin&b=mars&t=mars,-4.59,137.44&p=mobility",
+   "compare_link": "#v=2&m=compare&b=mars&t=mars,-4.59,137.44&p=mobility&e=20.375,18.125&ct=pair"
+  },
+  "near": {
+   "from": {
+    "lat": 36.17,
+    "lon": -115.14,
+    "label": "Las Vegas, Nevada, United States of America"
+   },
+   "radius_km": 1500.0,
+   "in_radius": 5,
+   "catalogue_size": 17,
+   "request": {
+    "endpoint": "POST /api/analogs/nearby",
+    "lat": 36.17,
+    "lon": -115.14,
+    "radius_km": 1500,
+    "mode": "nearest"
+   },
+   "nearest": [
+    {
+     "name": "Pisgah Lava Field",
+     "country": "USA (California)",
+     "distance_km": 193.82647329821745,
+     "theme": "Lava tubes, thermal cave detection",
+     "lat": 34.746389,
+     "lon": -116.375
+    },
+    {
+     "name": "SP Mountain",
+     "country": "USA (Arizona)",
+     "distance_km": 325.134316666574,
+     "theme": "Basaltic volcanism, mapping and traverse planning",
+     "lat": 35.6,
+     "lon": -111.6
+    },
+    {
+     "name": "Meteor Crater",
+     "country": "USA (Arizona)",
+     "distance_km": 393.5697448211649,
+     "theme": "Simple impact crater",
+     "lat": 35.0333,
+     "lon": -111.017
+    }
+   ]
+  },
+  "rank": {
+   "mission": "lunar_base",
+   "label": "Lunar permanent base",
+   "body": "moon",
+   "cells": 355896,
+   "graded": 355896,
+   "excluded": 27677,
+   "grades": {
+    "A": 1,
+    "B": 1270,
+    "C": 48814,
+    "D": 179249,
+    "F": 98885
+   },
+   "top": [
+    {
+     "place": "22 km N of Hinshelwood",
+     "coords": "89.87°N, 108.43°E",
+     "lat": 89.8748550415039,
+     "lon": 108.43495178222656,
+     "grade": "A",
+     "score": 0.8263737335801125
+    },
+    {
+     "place": "49 km E of Whipple",
+     "coords": "88.22°N, 176.19°W",
+     "lat": 88.21538543701172,
+     "lon": -176.18592834472656,
+     "grade": "B",
+     "score": 0.7836430110037327
+    },
+    {
+     "place": "24 km NE of Erlanger, in Peary",
+     "coords": "87.37°N, 42.56°E",
+     "lat": 87.36771392822266,
+     "lon": 42.563350677490234,
+     "grade": "B",
+     "score": 0.7764478921890259
+    }
+   ],
+   "request": {
+    "endpoint": "POST /api/rank",
+    "mission": "lunar_base"
+   },
+   "link": "#v=2&m=mission&b=moon&mi=lunar_base&ms=candidates"
+  }
+ },
+ "missions": {
+  "lunar_base": {
+   "mission": "lunar_base",
+   "label": "Lunar permanent base",
+   "body": "moon",
+   "cells": 355896,
+   "graded": 355896,
+   "excluded": 27677,
+   "grades": {
+    "A": 1,
+    "B": 1270,
+    "C": 48814,
+    "D": 179249,
+    "F": 98885
+   },
+   "top": [
+    {
+     "place": "22 km N of Hinshelwood",
+     "coords": "89.87°N, 108.43°E",
+     "lat": 89.8748550415039,
+     "lon": 108.43495178222656,
+     "grade": "A",
+     "score": 0.8263737335801125
+    },
+    {
+     "place": "49 km E of Whipple",
+     "coords": "88.22°N, 176.19°W",
+     "lat": 88.21538543701172,
+     "lon": -176.18592834472656,
+     "grade": "B",
+     "score": 0.7836430110037327
+    },
+    {
+     "place": "24 km NE of Erlanger, in Peary",
+     "coords": "87.37°N, 42.56°E",
+     "lat": 87.36771392822266,
+     "lon": 42.563350677490234,
+     "grade": "B",
+     "score": 0.7764478921890259
+    }
+   ],
+   "request": {
+    "endpoint": "POST /api/rank",
+    "mission": "lunar_base"
+   },
+   "link": "#v=2&m=mission&b=moon&mi=lunar_base&ms=candidates"
+  },
+  "mars_robotic": {
+   "mission": "mars_robotic",
+   "label": "Mars robotic landing",
+   "body": "mars",
+   "cells": 259200,
+   "graded": 259200,
+   "excluded": 144222,
+   "grades": {
+    "A": 17953,
+    "B": 84751,
+    "C": 10837,
+    "D": 1402,
+    "F": 35
+   },
+   "top": [
+    {
+     "place": "75 km NE of Shardi, in Ares Vallis",
+     "coords": "10.75°N, 14.25°W",
+     "lat": 10.75,
+     "lon": -14.25,
+     "grade": "A",
+     "score": 0.9005924640223384
+    },
+    {
+     "place": "In Oyama",
+     "coords": "23.75°N, 19.75°W",
+     "lat": 23.75,
+     "lon": -19.75,
+     "grade": "A",
+     "score": 0.895623030140996
+    },
+    {
+     "place": "302 km SW of Eden Patera, in Cydonia Mensae",
+     "coords": "29.75°N, 14.75°W",
+     "lat": 29.75,
+     "lon": -14.75,
+     "grade": "A",
+     "score": 0.8886047285050154
+    }
+   ],
+   "request": {
+    "endpoint": "POST /api/rank",
+    "mission": "mars_robotic"
+   },
+   "link": "#v=2&m=mission&b=mars&mi=mars_robotic&ms=candidates"
+  },
+  "mars_human": {
+   "mission": "mars_human",
+   "label": "Mars human exploration",
+   "body": "mars",
+   "cells": 259200,
+   "graded": 259200,
+   "excluded": 143775,
+   "grades": {
+    "A": 3259,
+    "B": 41037,
+    "C": 56894,
+    "D": 13793,
+    "F": 442
+   },
+   "top": [
+    {
+     "place": "99 km SW of Kyela, in Meridiani Planum",
+     "coords": "2.25°N, 3.25°E",
+     "lat": 2.25,
+     "lon": 3.25,
+     "grade": "A",
+     "score": 0.8985022567212582
+    },
+    {
+     "place": "59 km N of Xainza, in Meridiani Planum",
+     "coords": "1.75°N, 3.75°W",
+     "lat": 1.75,
+     "lon": -3.75,
+     "grade": "A",
+     "score": 0.883690046146512
+    },
+    {
+     "place": "In Trouvelot",
+     "coords": "16.75°N, 12.75°W",
+     "lat": 16.75,
+     "lon": -12.75,
+     "grade": "A",
+     "score": 0.8825031574815512
+    }
+   ],
+   "request": {
+    "endpoint": "POST /api/rank",
+    "mission": "mars_human"
+   },
+   "link": "#v=2&m=mission&b=mars&mi=mars_human&ms=candidates"
+  }
+ },
+ "findings": [
+  {
+   "site": "gale",
+   "body": "mars",
+   "name": "Gale crater (Curiosity)",
+   "lat": -4.59,
+   "lon": 137.44,
+   "coords": "4.75°S, 137.25°E",
+   "place": "13 km NW of Gediz Vallis, in Aeolis Mons",
+   "cell_km": [
+    29.6,
+    29.5
+   ],
+   "purpose": "mobility",
+   "purpose_label": "Rover mobility",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "mars",
+    "lat": -4.59,
+    "lon": 137.44,
+    "purpose": "mobility"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 275,
+    "B": 4091,
+    "C": 21736,
+    "D": 87450,
+    "F": 227490
+   },
+   "best": 0.8959057480096817,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Tibesti Mts., Chad",
+     "lat": 20.375,
+     "lon": 18.125,
+     "coords": "20.38°N, 18.12°E",
+     "score": 0.8959057331085206,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Yemen",
+     "lat": 15.625,
+     "lon": 52.125,
+     "coords": "15.62°N, 52.12°E",
+     "score": 0.8958585647975698,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Danakil, Ethiopia",
+     "lat": 13.125,
+     "lon": 40.875,
+     "coords": "13.12°N, 40.88°E",
+     "score": 0.8945987612009049,
+     "grade": "A",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Pisgah Lava Field",
+    "score": 0.620409332960844,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "3.71 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 2.6 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "820 Pa",
+     "earth": "86,234 Pa",
+     "text": "The air here is about 105 times denser than at the Mars site. Wind forces, heat transfer, parachutes and boiling points cannot be reproduced outdoors."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 34 mm of precipitation a year and a peak vegetation index of 0.09. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "24 h 39 min",
+     "earth": "24 h",
+     "text": "Close to Earth's, one of the few conditions that nearly matches."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.8222559690475464,
+     "grade": "A",
+     "weight": 0.5
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.15
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.2
+    },
+    {
+     "id": "dust",
+     "label": "Airborne dust",
+     "score": 0.8985183238983154,
+     "grade": "A",
+     "weight": 0.15
+    }
+   ],
+   "link": "#v=2&m=twin&b=mars&t=mars,-4.59,137.44&p=mobility",
+   "compare_link": "#v=2&m=compare&b=mars&t=mars,-4.59,137.44&p=mobility&e=20.375,18.125&ct=pair",
+   "id": "gale-mobility"
+  },
+  {
+   "site": "shackleton-ridge",
+   "body": "moon",
+   "name": "Shackleton ridge",
+   "lat": -89.45,
+   "lon": -137.31,
+   "coords": "89.44°S, 140.71°W",
+   "place": "15 km W of Spudis",
+   "cell_km": [
+    2.4,
+    2.4
+   ],
+   "purpose": "ice",
+   "purpose_label": "Polar volatiles and drilling",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "moon",
+    "lat": -89.45,
+    "lon": -137.31,
+    "purpose": "ice"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 18,
+    "B": 477,
+    "C": 7967,
+    "D": 157211,
+    "F": 175369
+   },
+   "best": 0.85788843780756,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Karakoram Ra., Xinjiang, China",
+     "lat": 35.875,
+     "lon": 78.875,
+     "coords": "35.88°N, 78.88°E",
+     "score": 0.8578884303569794,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Pamirs, Tajikistan",
+     "lat": 37.875,
+     "lon": 73.125,
+     "coords": "37.88°N, 73.12°E",
+     "score": 0.8277585372328758,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Kunlun Mountains, Xinjiang, China",
+     "lat": 36.625,
+     "lon": 87.375,
+     "coords": "36.62°N, 87.38°E",
+     "score": 0.7286395326256752,
+     "grade": "B",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Svalbard, Bockfjorden",
+    "score": 0.5043849371373653,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "1.62 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 6.1 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "vacuum",
+     "earth": "54,332 Pa",
+     "text": "The Moon has no atmosphere. Vacuum effects on lubricants, seals, dust and heat rejection need a chamber, not a field site."
+    },
+    {
+     "label": "Temperature",
+     "planet": "up to 231 K",
+     "earth": "229–309 K",
+     "text": "Lunar surface temperatures are set by sunlight and radiation to space with no air to moderate them. No place on Earth spans this range, so temperature is not scored for the Moon."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 81 mm of precipitation a year and a peak vegetation index of 0.09. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "29.5 Earth days",
+     "earth": "24 h",
+     "text": "Thermal cycling and lighting follow a different rhythm."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.7936137914657593,
+     "grade": "B",
+     "weight": 0.15
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 0.44999998807907104,
+     "grade": "D",
+     "weight": 0.15
+    },
+    {
+     "id": "ice",
+     "label": "Ice and frozen ground",
+     "score": 0.9729198217391968,
+     "grade": "A",
+     "weight": 0.45
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 0.9341297745704651,
+     "grade": "A",
+     "weight": 0.25
+    }
+   ],
+   "link": "#v=2&m=twin&b=moon&t=moon,-89.45,-137.31&p=ice",
+   "compare_link": "#v=2&m=compare&b=moon&t=moon,-89.45,-137.31&p=ice&e=35.875,78.875&ct=pair",
+   "id": "ridge-ice"
+  },
+  {
+   "site": "shackleton-ridge",
+   "body": "moon",
+   "name": "Shackleton ridge",
+   "lat": -89.45,
+   "lon": -137.31,
+   "coords": "89.44°S, 140.71°W",
+   "place": "15 km W of Spudis",
+   "cell_km": [
+    2.4,
+    2.4
+   ],
+   "purpose": "general",
+   "purpose_label": "General analog",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "moon",
+    "lat": -89.45,
+    "lon": -137.31,
+    "purpose": "general"
+   },
+   "cells": 335530,
+   "grades": {
+    "A": 0,
+    "B": 57,
+    "C": 2148,
+    "D": 20230,
+    "F": 313095
+   },
+   "best": 0.7629623383283616,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Cordillera Occidental, Peru",
+     "lat": -12.625,
+     "lon": -76.375,
+     "coords": "12.62°S, 76.38°W",
+     "score": 0.762962344288826,
+     "grade": "B",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Queen Elizabeth Islands",
+     "lat": 82.875,
+     "lon": -77.125,
+     "coords": "82.88°N, 77.12°W",
+     "score": 0.754489079117775,
+     "grade": "B",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Open water",
+     "lat": 70.375,
+     "lon": -53.625,
+     "coords": "70.38°N, 53.62°W",
+     "score": 0.7391316682100297,
+     "grade": "B",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Svalbard, Bockfjorden",
+    "score": 0.4889471605420113,
+    "grade": "D"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "1.62 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 6.1 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "vacuum",
+     "earth": "82,744 Pa",
+     "text": "The Moon has no atmosphere. Vacuum effects on lubricants, seals, dust and heat rejection need a chamber, not a field site."
+    },
+    {
+     "label": "Temperature",
+     "planet": "up to 231 K",
+     "earth": "277–310 K",
+     "text": "Lunar surface temperatures are set by sunlight and radiation to space with no air to moderate them. No place on Earth spans this range, so temperature is not scored for the Moon."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 43 mm of precipitation a year and a peak vegetation index of 0.17. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "29.5 Earth days",
+     "earth": "24 h",
+     "text": "Thermal cycling and lighting follow a different rhythm."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.788415789604187,
+     "grade": "B",
+     "weight": 0.35000000000000003
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 0.800000011920929,
+     "grade": "A",
+     "weight": 0.35000000000000003
+    },
+    {
+     "id": "ice",
+     "label": "Ice and frozen ground",
+     "score": 0.33776819705963135,
+     "grade": "F",
+     "weight": 0.10000000000000002
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 0.8661999702453613,
+     "grade": "A",
+     "weight": 0.20000000000000004
+    }
+   ],
+   "link": "#v=2&m=twin&b=moon&t=moon,-89.45,-137.31&p=general",
+   "compare_link": "#v=2&m=compare&b=moon&t=moon,-89.45,-137.31&p=general&e=-12.625,-76.375&ct=pair",
+   "id": "ridge-general"
+  },
+  {
+   "site": "arcadia",
+   "body": "mars",
+   "name": "Arcadia Planitia",
+   "lat": 46.66,
+   "lon": -168.0,
+   "coords": "46.75°N, 167.75°W",
+   "place": "In Arcadia Planitia",
+   "cell_km": [
+    29.6,
+    20.3
+   ],
+   "purpose": "ice",
+   "purpose_label": "Ice and drilling",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "mars",
+    "lat": 46.66,
+    "lon": -168.0,
+    "purpose": "ice"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 0,
+    "B": 72734,
+    "C": 38279,
+    "D": 57985,
+    "F": 172044
+   },
+   "best": 0.7928525447845459,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Dome A (Argus), Antarctica",
+     "lat": -81.625,
+     "lon": 78.875,
+     "coords": "81.62°S, 78.88°E",
+     "score": 0.7928525805473328,
+     "grade": "B",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Enderby Land, Antarctica",
+     "lat": -77.875,
+     "lon": 45.625,
+     "coords": "77.88°S, 45.62°E",
+     "score": 0.7877492308616638,
+     "grade": "B",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "East Antarctica, Antarctica",
+     "lat": -78.125,
+     "lon": 99.375,
+     "coords": "78.12°S, 99.38°E",
+     "score": 0.7873005032539367,
+     "grade": "B",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "University Valley, Dry Valleys",
+    "score": 0.5674382723052985,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "3.71 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 2.6 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "827 Pa",
+     "earth": "58,403 Pa",
+     "text": "The air here is about 71 times denser than at the Mars site. Wind forces, heat transfer, parachutes and boiling points cannot be reproduced outdoors."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 18 mm of precipitation a year. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "24 h 39 min",
+     "earth": "24 h",
+     "text": "Close to Earth's, one of the few conditions that nearly matches."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.9994354248046875,
+     "grade": "A",
+     "weight": 0.1
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 0.5644097924232483,
+     "grade": "C",
+     "weight": 0.1
+    },
+    {
+     "id": "ice",
+     "label": "Ice and frozen ground",
+     "score": 0.9288195371627808,
+     "grade": "A",
+     "weight": 0.35
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 0.5,
+     "grade": "C",
+     "weight": 0.25
+    },
+    {
+     "id": "thermal",
+     "label": "Ground temperature",
+     "score": 0.9319061040878296,
+     "grade": "A",
+     "weight": 0.2
+    }
+   ],
+   "link": "#v=2&m=twin&b=mars&t=mars,46.66,-168.0&p=ice",
+   "compare_link": "#v=2&m=compare&b=mars&t=mars,46.66,-168.0&p=ice&e=-81.625,78.875&ct=pair",
+   "id": "arcadia-ice"
+  }
+ ],
+ "featured": [
+  {
+   "site": "gale",
+   "body": "mars",
+   "name": "Gale crater (Curiosity)",
+   "lat": -4.59,
+   "lon": 137.44,
+   "coords": "4.75°S, 137.25°E",
+   "place": "13 km NW of Gediz Vallis, in Aeolis Mons",
+   "cell_km": [
+    29.6,
+    29.5
+   ],
+   "purpose": "mobility",
+   "purpose_label": "Rover mobility",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "mars",
+    "lat": -4.59,
+    "lon": 137.44,
+    "purpose": "mobility"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 275,
+    "B": 4091,
+    "C": 21736,
+    "D": 87450,
+    "F": 227490
+   },
+   "best": 0.8959057480096817,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Tibesti Mts., Chad",
+     "lat": 20.375,
+     "lon": 18.125,
+     "coords": "20.38°N, 18.12°E",
+     "score": 0.8959057331085206,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Yemen",
+     "lat": 15.625,
+     "lon": 52.125,
+     "coords": "15.62°N, 52.12°E",
+     "score": 0.8958585647975698,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Danakil, Ethiopia",
+     "lat": 13.125,
+     "lon": 40.875,
+     "coords": "13.12°N, 40.88°E",
+     "score": 0.8945987612009049,
+     "grade": "A",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Pisgah Lava Field",
+    "score": 0.620409332960844,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "3.71 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 2.6 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "820 Pa",
+     "earth": "86,234 Pa",
+     "text": "The air here is about 105 times denser than at the Mars site. Wind forces, heat transfer, parachutes and boiling points cannot be reproduced outdoors."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 34 mm of precipitation a year and a peak vegetation index of 0.09. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "24 h 39 min",
+     "earth": "24 h",
+     "text": "Close to Earth's, one of the few conditions that nearly matches."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.8222559690475464,
+     "grade": "A",
+     "weight": 0.5
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.15
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.2
+    },
+    {
+     "id": "dust",
+     "label": "Airborne dust",
+     "score": 0.8985183238983154,
+     "grade": "A",
+     "weight": 0.15
+    }
+   ],
+   "link": "#v=2&m=twin&b=mars&t=mars,-4.59,137.44&p=mobility",
+   "compare_link": "#v=2&m=compare&b=mars&t=mars,-4.59,137.44&p=mobility&e=20.375,18.125&ct=pair"
+  },
+  {
+   "site": "shackleton-ridge",
+   "body": "moon",
+   "name": "Shackleton ridge",
+   "lat": -89.45,
+   "lon": -137.31,
+   "coords": "89.44°S, 140.71°W",
+   "place": "15 km W of Spudis",
+   "cell_km": [
+    2.4,
+    2.4
+   ],
+   "purpose": "ice",
+   "purpose_label": "Polar volatiles and drilling",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "moon",
+    "lat": -89.45,
+    "lon": -137.31,
+    "purpose": "ice"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 18,
+    "B": 477,
+    "C": 7967,
+    "D": 157211,
+    "F": 175369
+   },
+   "best": 0.85788843780756,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Karakoram Ra., Xinjiang, China",
+     "lat": 35.875,
+     "lon": 78.875,
+     "coords": "35.88°N, 78.88°E",
+     "score": 0.8578884303569794,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Pamirs, Tajikistan",
+     "lat": 37.875,
+     "lon": 73.125,
+     "coords": "37.88°N, 73.12°E",
+     "score": 0.8277585372328758,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Kunlun Mountains, Xinjiang, China",
+     "lat": 36.625,
+     "lon": 87.375,
+     "coords": "36.62°N, 87.38°E",
+     "score": 0.7286395326256752,
+     "grade": "B",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Svalbard, Bockfjorden",
+    "score": 0.5043849371373653,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "1.62 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 6.1 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "vacuum",
+     "earth": "54,332 Pa",
+     "text": "The Moon has no atmosphere. Vacuum effects on lubricants, seals, dust and heat rejection need a chamber, not a field site."
+    },
+    {
+     "label": "Temperature",
+     "planet": "up to 231 K",
+     "earth": "229–309 K",
+     "text": "Lunar surface temperatures are set by sunlight and radiation to space with no air to moderate them. No place on Earth spans this range, so temperature is not scored for the Moon."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 81 mm of precipitation a year and a peak vegetation index of 0.09. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "29.5 Earth days",
+     "earth": "24 h",
+     "text": "Thermal cycling and lighting follow a different rhythm."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.7936137914657593,
+     "grade": "B",
+     "weight": 0.15
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 0.44999998807907104,
+     "grade": "D",
+     "weight": 0.15
+    },
+    {
+     "id": "ice",
+     "label": "Ice and frozen ground",
+     "score": 0.9729198217391968,
+     "grade": "A",
+     "weight": 0.45
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 0.9341297745704651,
+     "grade": "A",
+     "weight": 0.25
+    }
+   ],
+   "link": "#v=2&m=twin&b=moon&t=moon,-89.45,-137.31&p=ice",
+   "compare_link": "#v=2&m=compare&b=moon&t=moon,-89.45,-137.31&p=ice&e=35.875,78.875&ct=pair"
+  },
+  {
+   "site": "arcadia",
+   "body": "mars",
+   "name": "Arcadia Planitia",
+   "lat": 46.66,
+   "lon": -168.0,
+   "coords": "46.75°N, 167.75°W",
+   "place": "In Arcadia Planitia",
+   "cell_km": [
+    29.6,
+    20.3
+   ],
+   "purpose": "ice",
+   "purpose_label": "Ice and drilling",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "mars",
+    "lat": 46.66,
+    "lon": -168.0,
+    "purpose": "ice"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 0,
+    "B": 72734,
+    "C": 38279,
+    "D": 57985,
+    "F": 172044
+   },
+   "best": 0.7928525447845459,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Dome A (Argus), Antarctica",
+     "lat": -81.625,
+     "lon": 78.875,
+     "coords": "81.62°S, 78.88°E",
+     "score": 0.7928525805473328,
+     "grade": "B",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Enderby Land, Antarctica",
+     "lat": -77.875,
+     "lon": 45.625,
+     "coords": "77.88°S, 45.62°E",
+     "score": 0.7877492308616638,
+     "grade": "B",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "East Antarctica, Antarctica",
+     "lat": -78.125,
+     "lon": 99.375,
+     "coords": "78.12°S, 99.38°E",
+     "score": 0.7873005032539367,
+     "grade": "B",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "University Valley, Dry Valleys",
+    "score": 0.5674382723052985,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "3.71 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 2.6 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "827 Pa",
+     "earth": "58,403 Pa",
+     "text": "The air here is about 71 times denser than at the Mars site. Wind forces, heat transfer, parachutes and boiling points cannot be reproduced outdoors."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 18 mm of precipitation a year. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "24 h 39 min",
+     "earth": "24 h",
+     "text": "Close to Earth's, one of the few conditions that nearly matches."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.9994354248046875,
+     "grade": "A",
+     "weight": 0.1
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 0.5644097924232483,
+     "grade": "C",
+     "weight": 0.1
+    },
+    {
+     "id": "ice",
+     "label": "Ice and frozen ground",
+     "score": 0.9288195371627808,
+     "grade": "A",
+     "weight": 0.35
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 0.5,
+     "grade": "C",
+     "weight": 0.25
+    },
+    {
+     "id": "thermal",
+     "label": "Ground temperature",
+     "score": 0.9319061040878296,
+     "grade": "A",
+     "weight": 0.2
+    }
+   ],
+   "link": "#v=2&m=twin&b=mars&t=mars,46.66,-168.0&p=ice",
+   "compare_link": "#v=2&m=compare&b=mars&t=mars,46.66,-168.0&p=ice&e=-81.625,78.875&ct=pair"
+  },
+  {
+   "site": "jezero",
+   "body": "mars",
+   "name": "Jezero crater (Perseverance)",
+   "lat": 18.4446,
+   "lon": 77.4509,
+   "coords": "18.25°N, 77.25°E",
+   "place": "10 km E of Una Vallis, in Nili Planum",
+   "cell_km": [
+    29.6,
+    28.1
+   ],
+   "purpose": "astrobiology",
+   "purpose_label": "Habitability limits",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "mars",
+    "lat": 18.4446,
+    "lon": 77.4509,
+    "purpose": "astrobiology"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 21,
+    "B": 12875,
+    "C": 23806,
+    "D": 147986,
+    "F": 156354
+   },
+   "best": 0.8210846185684204,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Andes, Chile",
+     "lat": -28.125,
+     "lon": -70.125,
+     "coords": "28.12°S, 70.12°W",
+     "score": 0.821084626019001,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Mongolian Plateau, Mongolia",
+     "lat": 43.875,
+     "lon": 100.625,
+     "coords": "43.88°N, 100.62°E",
+     "score": 0.8151311635971069,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Kunlun Mountains, Xinjiang, China",
+     "lat": 37.125,
+     "lon": 85.625,
+     "coords": "37.12°N, 85.62°E",
+     "score": 0.8144172299653292,
+     "grade": "A",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Meteor Crater",
+    "score": 0.6519838213920593,
+    "grade": "B"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "3.71 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 2.6 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "690 Pa",
+     "earth": "78,988 Pa",
+     "text": "The air here is about 114 times denser than at the Mars site. Wind forces, heat transfer, parachutes and boiling points cannot be reproduced outdoors."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 49 mm of precipitation a year and a peak vegetation index of 0.10. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "24 h 39 min",
+     "earth": "24 h",
+     "text": "Close to Earth's, one of the few conditions that nearly matches."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.2
+    },
+    {
+     "id": "ice",
+     "label": "Ice and frozen ground",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.2
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.35
+    },
+    {
+     "id": "thermal",
+     "label": "Ground temperature",
+     "score": 0.28433850407600403,
+     "grade": "F",
+     "weight": 0.25
+    }
+   ],
+   "link": "#v=2&m=twin&b=mars&t=mars,18.4446,77.4509&p=astrobiology",
+   "compare_link": "#v=2&m=compare&b=mars&t=mars,18.4446,77.4509&p=astrobiology&e=-28.125,-70.125&ct=pair"
+  },
+  {
+   "site": "apollo-11",
+   "body": "moon",
+   "name": "Apollo 11",
+   "lat": 0.67416,
+   "lon": 23.47314,
+   "coords": "0.75°N, 23.25°E",
+   "place": "In Rimae Hypatia",
+   "cell_km": [
+    15.2,
+    15.2
+   ],
+   "purpose": "mobility",
+   "purpose_label": "Rover mobility",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "moon",
+    "lat": 0.67416,
+    "lon": 23.47314,
+    "purpose": "mobility"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 1622,
+    "B": 10824,
+    "C": 57586,
+    "D": 84310,
+    "F": 186700
+   },
+   "best": 0.9895186424255371,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Eastern Desert, Egypt",
+     "lat": 28.125,
+     "lon": 33.125,
+     "coords": "28.12°N, 33.12°E",
+     "score": 0.9895186424255371,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Namib Desert, Namibia",
+     "lat": -25.375,
+     "lon": 14.875,
+     "coords": "25.38°S, 14.88°E",
+     "score": 0.9760755370644962,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Eastern Desert, Egypt",
+     "lat": 22.125,
+     "lon": 36.625,
+     "coords": "22.12°N, 36.62°E",
+     "score": 0.9742513263926786,
+     "grade": "A",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Meteor Crater",
+    "score": 0.7499623596668243,
+    "grade": "B"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "1.62 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 6.1 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "vacuum",
+     "earth": "98,945 Pa",
+     "text": "The Moon has no atmosphere. Vacuum effects on lubricants, seals, dust and heat rejection need a chamber, not a field site."
+    },
+    {
+     "label": "Temperature",
+     "planet": "95–394 K",
+     "earth": "277–327 K",
+     "text": "Lunar surface temperatures are set by sunlight and radiation to space with no air to moderate them. No place on Earth spans this range, so temperature is not scored for the Moon."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 16 mm of precipitation a year and a peak vegetation index of 0.09. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "29.5 Earth days",
+     "earth": "24 h",
+     "text": "Thermal cycling and lighting follow a different rhythm."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.9851514101028442,
+     "grade": "A",
+     "weight": 0.6
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": null,
+     "grade": null,
+     "weight": 0.15
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.25
+    }
+   ],
+   "link": "#v=2&m=twin&b=moon&t=moon,0.67416,23.47314&p=mobility",
+   "compare_link": "#v=2&m=compare&b=moon&t=moon,0.67416,23.47314&p=mobility&e=28.125,33.125&ct=pair"
+  },
+  {
+   "site": "mons-mouton",
+   "body": "moon",
+   "name": "Mons Mouton",
+   "lat": -84.6,
+   "lon": 31.0,
+   "coords": "84.59°S, 31.25°E",
+   "place": "In Mons Mouton",
+   "cell_km": [
+    2.4,
+    2.4
+   ],
+   "purpose": "ice",
+   "purpose_label": "Polar volatiles and drilling",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "moon",
+    "lat": -84.6,
+    "lon": 31.0,
+    "purpose": "ice"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 30,
+    "B": 787,
+    "C": 15980,
+    "D": 160419,
+    "F": 163826
+   },
+   "best": 0.8574464872479439,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Plateau Of Tibet, Xinjiang, China",
+     "lat": 35.625,
+     "lon": 79.375,
+     "coords": "35.62°N, 79.38°E",
+     "score": 0.8574464932084084,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Pamirs, Tajikistan",
+     "lat": 37.625,
+     "lon": 73.125,
+     "coords": "37.62°N, 73.12°E",
+     "score": 0.8444133147597312,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Kunlun Mountains, Xinjiang, China",
+     "lat": 36.375,
+     "lon": 87.125,
+     "coords": "36.38°N, 87.12°E",
+     "score": 0.8093193367123603,
+     "grade": "A",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "University Valley, Dry Valleys",
+    "score": 0.5381872490048408,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "1.62 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 6.1 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "vacuum",
+     "earth": "54,094 Pa",
+     "text": "The Moon has no atmosphere. Vacuum effects on lubricants, seals, dust and heat rejection need a chamber, not a field site."
+    },
+    {
+     "label": "Temperature",
+     "planet": "up to 232 K",
+     "earth": "230–310 K",
+     "text": "Lunar surface temperatures are set by sunlight and radiation to space with no air to moderate them. No place on Earth spans this range, so temperature is not scored for the Moon."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 76 mm of precipitation a year and a peak vegetation index of 0.06. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "29.5 Earth days",
+     "earth": "24 h",
+     "text": "Thermal cycling and lighting follow a different rhythm."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.9873519539833069,
+     "grade": "A",
+     "weight": 0.15
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 0.15000000596046448,
+     "grade": "F",
+     "weight": 0.15
+    },
+    {
+     "id": "ice",
+     "label": "Ice and frozen ground",
+     "score": 0.998957633972168,
+     "grade": "A",
+     "weight": 0.45
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 0.9492510557174683,
+     "grade": "A",
+     "weight": 0.25
+    }
+   ],
+   "link": "#v=2&m=twin&b=moon&t=moon,-84.6,31.0&p=ice",
+   "compare_link": "#v=2&m=compare&b=moon&t=moon,-84.6,31.0&p=ice&e=35.625,79.375&ct=pair"
+  },
+  {
+   "site": "gale",
+   "body": "mars",
+   "name": "Gale crater (Curiosity)",
+   "lat": -4.59,
+   "lon": 137.44,
+   "coords": "4.75°S, 137.25°E",
+   "place": "13 km NW of Gediz Vallis, in Aeolis Mons",
+   "cell_km": [
+    29.6,
+    29.5
+   ],
+   "purpose": "dust",
+   "purpose_label": "Dust and solar power",
+   "request": {
+    "endpoint": "POST /api/twin",
+    "body": "mars",
+    "lat": -4.59,
+    "lon": 137.44,
+    "purpose": "dust"
+   },
+   "cells": 341042,
+   "grades": {
+    "A": 547,
+    "B": 20741,
+    "C": 17001,
+    "D": 75557,
+    "F": 227196
+   },
+   "best": 0.8669425889849663,
+   "top": [
+    {
+     "rank": 1,
+     "name": "Arabian Peninsula, Yemen",
+     "lat": 13.625,
+     "lon": 46.375,
+     "coords": "13.62°N, 46.38°E",
+     "score": 0.8669425755739212,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 2,
+     "name": "Sahel, Sudan",
+     "lat": 17.875,
+     "lon": 37.125,
+     "coords": "17.88°N, 37.12°E",
+     "score": 0.8622693054378032,
+     "grade": "A",
+     "new_lead": true
+    },
+    {
+     "rank": 3,
+     "name": "Asir Mts., Saudi Arabia",
+     "lat": 20.625,
+     "lon": 42.375,
+     "coords": "20.62°N, 42.38°E",
+     "score": 0.8564541012048721,
+     "grade": "A",
+     "new_lead": true
+    }
+   ],
+   "best_documented": {
+    "name": "Lonar Crater",
+    "score": 0.5237420439720154,
+    "grade": "C"
+   },
+   "documented_scored": 17,
+   "documented_below_top": 17,
+   "breaks_down": [
+    {
+     "label": "Gravity",
+     "planet": "3.71 m/s²",
+     "earth": "9.81 m/s²",
+     "text": "Earth's gravity is 2.6 times stronger. Loads, traction, dust settling and human movement all differ."
+    },
+    {
+     "label": "Air pressure",
+     "planet": "820 Pa",
+     "earth": "95,449 Pa",
+     "text": "The air here is about 116 times denser than at the Mars site. Wind forces, heat transfer, parachutes and boiling points cannot be reproduced outdoors."
+    },
+    {
+     "label": "Radiation",
+     "planet": "unshielded",
+     "earth": "shielded",
+     "text": "With no global magnetic field and little or no air, surface radiation is far higher than anywhere on Earth. RADIUM holds no radiation dataset and does not score it."
+    },
+    {
+     "label": "Water and life",
+     "planet": "none known",
+     "earth": "present",
+     "text": "This Earth cell has 35 mm of precipitation a year and a peak vegetation index of 0.12. Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."
+    },
+    {
+     "label": "Length of day",
+     "planet": "24 h 39 min",
+     "earth": "24 h",
+     "text": "Close to Earth's, one of the few conditions that nearly matches."
+    }
+   ],
+   "dimensions": [
+    {
+     "id": "terrain",
+     "label": "Terrain",
+     "score": 0.7377196550369263,
+     "grade": "B",
+     "weight": 0.10000000000000002
+    },
+    {
+     "id": "geology",
+     "label": "Rock type",
+     "score": 1.0,
+     "grade": "A",
+     "weight": 0.10000000000000002
+    },
+    {
+     "id": "environment",
+     "label": "Bare, dry ground",
+     "score": 0.9656000137329102,
+     "grade": "A",
+     "weight": 0.30000000000000004
+    },
+    {
+     "id": "thermal",
+     "label": "Ground temperature",
+     "score": 0.11677160859107971,
+     "grade": "F",
+     "weight": 0.10000000000000002
+    },
+    {
+     "id": "dust",
+     "label": "Airborne dust",
+     "score": 0.9795336127281189,
+     "grade": "A",
+     "weight": 0.4000000000000001
+    }
+   ],
+   "link": "#v=2&m=twin&b=mars&t=mars,-4.59,137.44&p=dust",
+   "compare_link": "#v=2&m=compare&b=mars&t=mars,-4.59,137.44&p=dust&e=13.625,46.375&ct=pair"
+  }
+ ]
+}

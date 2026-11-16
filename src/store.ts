@@ -19,6 +19,15 @@ const defaultUnits = (): Units => {
   try { return /^(en-US|en-LR|my)/.test(navigator.language) ? "mi" : "km"; } catch { return "km"; }
 };
 export type Status = "idle" | "loading" | "ready" | "error";
+/** What a visitor asked for on the start screen. It is applied once the data service has answered. */
+export type Intent =
+  | { kind: "twin"; body: Planet }
+  | { kind: "near" }
+  | { kind: "rank" }
+  | { kind: "explore" }
+  | { kind: "demo" }
+  | { kind: "link"; hash: string };
+export type Sheet = null | "methodology" | "sources" | "help" | "findings" | "brief" | "scenarios" | "report";
 export type Overlay = { kind: "tiles" | "grid"; id: string } | null;
 
 export interface LayerState {
@@ -42,6 +51,11 @@ interface State {
   meta: Meta | null;
   metaError: string | null;
   pins: Record<Body, Pin[]>;
+  /** False while the question chooser (start screen) is showing. */
+  started: boolean;
+  intent: Intent | null;
+  /** When the app began asking the data service for its catalogue, for honest wake-up messages. */
+  bootAt: number;
 
   body: Body;
   mode: Mode;
@@ -65,6 +79,10 @@ interface State {
   showSuitability: boolean;
 
   twinOrigin: { body: Planet; lat: number; lon: number } | null;
+  /** Find Earth Twins step rail: 1 choose a site, 2 choose what to test, 3 results. */
+  twinStep: 1 | 2 | 3;
+  /** True on a first pass from the start screen: choosing a site leads to step 2 instead of straight to results. */
+  twinGuided: boolean;
   purpose: string;
   twin: TwinResult | null;
   twinStatus: Status;
@@ -107,9 +125,15 @@ interface State {
 
   leftOpen: boolean;
   rightOpen: boolean;
-  sheet: null | "methodology" | "sources" | "intro" | "brief" | "scenarios" | "report";
+  sheet: Sheet;
+  /** The 20-second example is driving the interface. */
+  demo: boolean;
 
   init: () => Promise<void>;
+  enter: (intent: Intent) => void;
+  applyIntent: () => void;
+  startOver: () => void;
+  setTwinStep: (step: 1 | 2 | 3) => void;
   setBody: (b: Body) => void;
   setMode: (m: Mode) => void;
   setLayer: (body: Body, patch: Partial<LayerState>) => void;
@@ -188,10 +212,22 @@ function enrichSite(site: SiteRef, s: State): SavedSite {
     sources: uniqueSources([...(pin?.sources ?? (pin?.link ? [{ title: pin.source || pin.name, url: pin.link, role: "site history" }] : [])), ...cellSources(cell, s)]), context };
 }
 
+/** A shared link, or a test that opts out of first-run screens, goes straight to its view; a bare address shows the question chooser. */
+function arrivedWithView(): boolean {
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get("start") === "1") return false;
+    return location.hash.length > 1 || q.get("tour") === "0" || q.get("start") === "0";
+  } catch { return true; }
+}
+
 export const useStore = create<State>((set, get) => ({
   meta: null,
   metaError: null,
   pins: { moon: [], mars: [], earth: [] },
+  started: arrivedWithView(),
+  intent: null,
+  bootAt: Date.now(),
 
   body: "moon",
   mode: "explore",
@@ -215,6 +251,8 @@ export const useStore = create<State>((set, get) => ({
   showSuitability: true,
 
   twinOrigin: null,
+  twinStep: 1,
+  twinGuided: false,
   purpose: "general",
   twin: null,
   twinStatus: "idle",
@@ -259,8 +297,38 @@ export const useStore = create<State>((set, get) => ({
   // so first-time visitors see what RADIUM is for. It can be closed.
   rightOpen: true,
   sheet: null,
+  demo: false,
+
+  enter: (intent) => {
+    set({ started: true, intent });
+    get().applyIntent();
+  },
+  // Runs when a start-screen choice is made and again when the catalogue arrives, whichever is later.
+  applyIntent: () => {
+    const s = get();
+    const intent = s.intent;
+    if (!intent || !s.meta) return;
+    set({ intent: null });
+    if (intent.kind === "twin") {
+      twinAbort?.abort(); compareAbort?.abort(); cellAbort?.abort();
+      document.documentElement.dataset.world = intent.body;
+      set({ mode: "twin", body: intent.body, twinOrigin: null, twin: null, twinStatus: "idle", twinError: null, picked: null, compare: null, compareStatus: "idle",
+        purpose: "general", twinWeights: null, twinStep: 1, twinGuided: true, selection: null, cell: null, cellStatus: "idle", rightOpen: true });
+      emitTour("view:changed", { mode: "twin" });
+    } else if (intent.kind === "near") get().setMode("near");
+    else if (intent.kind === "rank") { get().setMode("mission"); get().setMissionStep("mission"); }
+    else if (intent.kind === "explore") get().setMode("explore");
+    else if (intent.kind === "demo") set({ demo: true });
+    else if (intent.kind === "link") { try { history.replaceState(null, "", `${location.pathname}${location.search}${intent.hash}`); } catch { /* restricted embed */ } window.dispatchEvent(new HashChangeEvent("hashchange")); }
+  },
+  startOver: () => {
+    set({ started: false, intent: null, demo: false, sheet: null });
+    try { history.replaceState(null, "", `${location.pathname}${location.search}`); } catch { /* restricted embed */ }
+  },
+  setTwinStep: (twinStep) => set({ twinStep }),
 
   init: async () => {
+    set({ metaError: null });
     try {
       const meta = await api.meta();
       const rawWeights: State["rawWeights"] = {};
@@ -272,6 +340,7 @@ export const useStore = create<State>((set, get) => ({
       set({ meta, rawWeights, limitsOn, metaError: null });
       const [moon, mars, earth] = await Promise.all([api.pins("moon"), api.pins("mars"), api.pins("earth")]);
       set({ pins: { moon, mars, earth } });
+      get().applyIntent();
     } catch (e) {
       set({ metaError: message(e) });
     }
@@ -454,7 +523,7 @@ export const useStore = create<State>((set, get) => ({
     const sameTarget = !!o && !!s.twinOrigin && sameSite({ ...o, label: "" }, { ...s.twinOrigin, label: "" });
     if (!sameTarget) { twinAbort?.abort(); compareAbort?.abort(); }
     document.documentElement.dataset.world = body;
-    set({ mode: "twin", body, twinOrigin: o ?? null, purpose, twinWeights: purpose !== s.purpose ? null : s.twinWeights, twin: o && s.twinOrigin && o.lat === s.twinOrigin.lat && o.lon === s.twinOrigin.lon && o.body === s.twinOrigin.body ? s.twin : null, picked: sameTarget ? s.picked : null, compare: sameTarget ? s.compare : null, compareStatus: sameTarget ? s.compareStatus : "idle", rightOpen: true });
+    set({ mode: "twin", body, twinOrigin: o ?? null, twinStep: o ? (s.twinGuided && !sameTarget ? 2 : s.twinGuided ? s.twinStep : 3) : 1, purpose, twinWeights: purpose !== s.purpose ? null : s.twinWeights, twin: o && s.twinOrigin && o.lat === s.twinOrigin.lat && o.lon === s.twinOrigin.lon && o.body === s.twinOrigin.body ? s.twin : null, picked: sameTarget ? s.picked : null, compare: sameTarget ? s.compare : null, compareStatus: sameTarget ? s.compareStatus : "idle", rightOpen: true });
     if (o) {
       if (!s.selection || s.selection.body !== o.body || s.selection.lat !== o.lat || s.selection.lon !== o.lon) void get().select(o.body, o.lat, o.lon);
       void get().runTwin();
@@ -463,7 +532,7 @@ export const useStore = create<State>((set, get) => ({
 
   setPurpose: (purpose) => {
     compareAbort?.abort();
-    set({ purpose, compare: null, compareStatus: "idle", twinWeights: null });
+    set({ purpose, compare: null, compareStatus: "idle", twinWeights: null, twinStep: get().twinOrigin ? 3 : 1, twinGuided: false });
     emitTour("twin:purposeChanged", { purpose });
     if (get().mode === "near" && get().nearLoc) void get().runNearby();
     void get().runTwin().then(() => {
@@ -558,7 +627,7 @@ export const useStore = create<State>((set, get) => ({
     const purpose = purposes.some((p) => p.id === s.purpose) ? s.purpose : "general";
     twinAbort?.abort(); compareAbort?.abort();
     const picked = o && s.mode === "compare" ? s.picked : null;
-    set({ twinOrigin: o, purpose, twin: null, twinStatus: "idle", twinWeights: purpose !== s.purpose ? null : s.twinWeights,
+    set({ twinOrigin: o, twinStep: o ? (s.twinGuided ? 2 : 3) : 1, purpose, twin: null, twinStatus: "idle", twinWeights: purpose !== s.purpose ? null : s.twinWeights,
       picked, compare: null, compareStatus: "idle", ...(o ? { body: o.body } : { nearMode: "nearest" as const }) });
     if (o) {
       document.documentElement.dataset.world = s.mode === "near" ? "earth" : o.body;

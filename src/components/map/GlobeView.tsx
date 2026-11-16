@@ -329,7 +329,7 @@ export const GlobeView = forwardRef<GlobeHandle, Props>(function GlobeView(
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     const stop = () => { cancelAnimationFrame(frame); frame = 0; last = 0; };
     const rotate = (now: number) => {
-      if (!welcome || reduced.matches || viewer.isDestroyed() || useStore.getState().sheet !== "intro") { stop(); return; }
+      if (!welcome || reduced.matches || viewer.isDestroyed()) { stop(); return; }
       if (last) viewer.camera.rotateRight(Math.min((now - last) / 1000, 0.05) * 0.012);
       last = now;
       viewer.scene.requestRender();

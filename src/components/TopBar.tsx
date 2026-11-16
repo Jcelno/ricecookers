@@ -5,6 +5,9 @@ import {
   Database,
   Globe2,
   Link2,
+  MapPinned,
+  NotebookPen,
+  RotateCcw,
   Search as SearchIcon,
   X,
 } from "lucide-react";
@@ -12,11 +15,11 @@ import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { MissionStatus, TELEMETRY_KEY } from "./MissionStatus";
 import { setPreference, usePreference } from "@/lib/preferences";
-import { quickTourSummary } from "@/lib/intro";
-import { onTour } from "@/lib/tour/events";
+import { useNotebook } from "@/lib/notebook";
 import { api } from "@/lib/api";
 import { copyCurrentViewLink } from "@/lib/sharing";
 import { formatCoord } from "@/lib/format";
+import { purposeVerb } from "@/lib/plain";
 import type { Body, SearchHit } from "@/lib/types";
 import { useStore } from "@/store";
 import { Button, cx } from "./ui/primitives";
@@ -27,7 +30,7 @@ import {
 } from "./catalog/SiteCatalog";
 
 function Menu() {
-  const telemetry = usePreference(TELEMETRY_KEY, true);
+  const telemetry = usePreference(TELEMETRY_KEY, false);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -54,7 +57,7 @@ function Menu() {
         aria-haspopup="menu"
       >
         <Database size={16} />
-        <span className="max-lg:hidden">Science & Data</span>
+        <span className="max-2xl:hidden">Science & Data</span>
       </Button>
       {open && (
         <div
@@ -119,8 +122,7 @@ function Share() {
             "Copying…"
           ) : (
             <>
-              <span className="max-sm:hidden">Copy View </span>
-              <span className="sm:hidden">Copy </span>Link
+              <span className="max-2xl:hidden">Copy View Link</span><span className="2xl:hidden max-sm:hidden">Share</span>
             </>
           )}
         </span>
@@ -379,6 +381,7 @@ export function TopBar() {
     useShallow((s) => ({
       body: s.body,
       mode: s.mode,
+      sheet: s.sheet,
       saved: s.saved,
       pins: s.pins,
       twinOrigin: s.twinOrigin,
@@ -391,12 +394,19 @@ export function TopBar() {
       setSheet: s.setSheet,
       setPurpose: s.setPurpose,
       setTarget: s.setTarget,
+      startOver: s.startOver,
     })),
   );
   const [catalog, setCatalog] = useState(false);
-  const [tourProgress, setTourProgress] = useState(quickTourSummary);
-  useEffect(() => onTour(event => { if (event.type === "tutorial:changed") setTourProgress(quickTourSummary()); }), []);
-  const analog = ["twin", "compare", "near"].includes(s.mode);
+  const logged = useNotebook((n) => n.entries.length);
+  const [popped, setPopped] = useState(0);
+  // The Notebook counter pops once for each new entry.
+  const seen = useRef(logged);
+  useEffect(() => {
+    if (logged > seen.current) setPopped((n) => n + 1);
+    seen.current = logged;
+  }, [logged]);
+  const analog = s.mode === "compare" || s.mode === "near";
   useEffect(() => {
     if (!s.saveNotice) return;
     const timer = setTimeout(
@@ -406,7 +416,8 @@ export function TopBar() {
     return () => clearTimeout(timer);
   }, [s.saveNotice]);
   const n =
-    s.saved.sites.length + s.saved.missions.length + s.saved.comparisons.length;
+    s.saved.sites.length + s.saved.missions.length + s.saved.comparisons.length + logged;
+  const sites = Object.values(s.pins).reduce((a, p) => a + p.length, 0);
   const target = s.twinOrigin;
   const targetPin = target
     ? s.pins[target.body].find(
@@ -415,155 +426,154 @@ export function TopBar() {
           Math.abs(p.lon - target.lon) < 0.001,
       )
     : null;
+  const ready = !!s.meta;
   return (
     <>
       <header className="app-header surface" data-tour="navigation">
         <button
           className="brand ctl"
-          aria-label="RADIUM home"
-          onClick={() => s.setMode("explore")}
+          aria-label="RADIUM: start over"
+          title="Start over"
+          onClick={s.startOver}
         >
-          <img src="/radium.svg" alt="" width="30" height="30" />
+          <img src="/radium.svg" alt="" width="28" height="28" />
           <span>
             <strong>RADIUM</strong>
-            <small>NASA Space Apps Challenge</small>
           </span>
         </button>
-        <span className="independent-badge">Independent research tool</span>
         <nav aria-label="Primary navigation" className="primary-nav">
           {(
             [
-              { id: "explore", label: "Explore" },
-              { id: "mission", label: "Mission Planner" },
-              { id: "twin", label: "Earth Analogs" },
-              { id: "saved", label: "Saved" },
+              { id: "twin", label: "Find Earth Twins", short: "Twins" },
+              { id: "mission", label: "Rank Landing Sites", short: "Rank" },
+              { id: "near", label: "Near Me", short: "Near Me" },
+              { id: "findings", label: "Findings", short: "Findings" },
+              { id: "saved", label: "My Notebook", short: "Notebook" },
             ] as const
           ).map((m) => (
             <button
               data-tour={`nav-${m.id}`}
               className="ctl"
               key={m.id}
+              disabled={!ready && m.id !== "findings"}
               aria-current={
-                (m.id === "twin" ? analog : s.mode === m.id)
+                (m.id === "findings" ? s.sheet === "findings" : m.id === "twin" ? s.mode === "twin" || s.mode === "compare" : s.mode === m.id)
                   ? "page"
                   : undefined
               }
-              onClick={() => s.setMode(m.id)}
+              onClick={() => (m.id === "findings" ? s.setSheet("findings") : s.setMode(m.id))}
             >
-              {m.label}
+              <span className="nav-long">{m.label}</span>
+              <span className="nav-short">{m.short}</span>
               {m.id === "saved" && n > 0 && (
-                <span className="nav-count">{n}</span>
+                <span key={popped} className={cx("nav-count", popped > 0 && "pop")} data-notebook-count>{n}</span>
               )}
             </button>
           ))}
         </nav>
         <div className="header-actions">
-          <Share />
+          <Button data-tour="start-over" aria-label="Start over" title="Back to the four questions" onClick={s.startOver}>
+            <RotateCcw size={15} />
+            <span className="max-xl:hidden">Start over</span>
+          </Button>
+          <Button
+            data-tour="nav-explore"
+            aria-label="Explore the globes"
+            title="Explore the globes: every map layer and measurement"
+            aria-current={s.mode === "explore" ? "page" : undefined}
+            disabled={!ready}
+            onClick={() => s.setMode("explore")}
+          >
+            <Globe2 size={16} />
+            <span className="max-xl:hidden">Explore globes</span>
+          </Button>
+          <Button
+            data-tour="catalog-button"
+            aria-label="Research Sites"
+            title="Research Sites: landings, named features and documented analog sites"
+            disabled={!ready}
+            onClick={() => setCatalog(true)}
+          >
+            <MapPinned size={16} />
+            <span className="max-2xl:hidden">Research Sites</span>
+            <span className="mono text-2xs opacity-70" data-site-count>{sites > 0 ? sites : "–"}</span>
+          </Button>
           <Menu />
+          <Share />
           <Button
             data-tour="help"
-            aria-label="Help and interactive tutorial"
-            title={tourProgress.complete ? "Help and interactive tutorial" : `Resume tour (${tourProgress.completedCount} of ${tourProgress.total})`}
-            onClick={() => s.setSheet("intro")}
+            aria-label="Help"
+            title="Help: a searchable field guide"
+            onClick={() => s.setSheet("help")}
           >
             <CircleHelp size={17} />
-            {!tourProgress.complete && <span className="tour-help-dot" aria-hidden="true" />}
             <span className="max-xl:hidden">Help</span>
           </Button>
         </div>
       </header>
-      <div className="workspace-bar" data-tour="workspace">
-        {analog ? (
-          <nav className="workspace-tabs" aria-label="Earth Analogs workspace">
-            {(
-              [
-                { id: "twin", label: "Discover" },
-                { id: "compare", label: "Compare" },
-                { id: "near", label: "Near Me" },
-              ] as const
-            ).map((t) => (
-              <button
-                className="ctl"
-                key={t.id}
-                aria-current={s.mode === t.id ? "page" : undefined}
-                onClick={() => s.setMode(t.id)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
-        ) : (
-          <nav aria-label="World" data-tour="worlds" className="world-switch">
-            {(["moon", "mars", "earth"] as Body[]).map((b) => (
-              <button
-                className="ctl"
-                key={b}
-                aria-pressed={s.body === b}
-                onClick={() => {
-                  s.setBody(b);
-                  if (s.mode === "saved") s.setMode("explore");
-                }}
-              >
-                <span className={`planet-dot ${b}`} />
-                {b[0].toUpperCase() + b.slice(1)}
-              </button>
-            ))}
-          </nav>
-        )}
-        <div className="workspace-context">
+      {ready && s.mode !== "twin" && s.mode !== "saved" && (
+        <div className="workspace-bar" data-tour="workspace">
           {analog ? (
-            <>
-              <RegistrySelect
-                label="Planetary target"
-                placeholder={
-                  target
-                    ? `${target.body === "moon" ? "Moon" : "Mars"}: ${formatCoord(target.lat, target.lon)}`
-                    : undefined
-                }
-                worlds={["moon", "mars"]}
-                value={
-                  targetPin && target ? `${target.body}:${targetPin.id}` : ""
-                }
-                onSelect={(p, b) => {
-                  if (b !== "earth")
-                    s.setTarget({ body: b, lat: p.lat, lon: p.lon });
-                }}
-              />
-              {target && (
-                <label className="registry-select">
-                  <span>Research purpose</span>
-                  <select
-                    data-tour="purpose"
-                    className="field"
-                    aria-label="Research purpose"
-                    value={s.purpose}
-                    onChange={(e) => s.setPurpose(e.target.value)}
-                  >
-                    {s.meta?.purposes[target.body].map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </>
+            <span className="workspace-title eyebrow">{s.mode === "near" ? "Near Me" : "Compare side by side"}</span>
           ) : (
-            <Search />
+            <nav aria-label="World" data-tour="worlds" className="world-switch">
+              {(["moon", "mars", "earth"] as Body[]).map((b) => (
+                <button
+                  className="ctl"
+                  key={b}
+                  aria-pressed={s.body === b}
+                  onClick={() => s.setBody(b)}
+                >
+                  <span className={`world-disc ${b}`} style={{ "--d": "15px" } as React.CSSProperties} />
+                  {b[0].toUpperCase() + b.slice(1)}
+                </button>
+              ))}
+            </nav>
           )}
+          <div className="workspace-context">
+            {analog ? (
+              <>
+                <RegistrySelect
+                  label="Moon or Mars site"
+                  placeholder={
+                    target
+                      ? `${target.body === "moon" ? "Moon" : "Mars"}: ${formatCoord(target.lat, target.lon)}`
+                      : undefined
+                  }
+                  worlds={["moon", "mars"]}
+                  value={
+                    targetPin && target ? `${target.body}:${targetPin.id}` : ""
+                  }
+                  onSelect={(p, b) => {
+                    if (b !== "earth")
+                      s.setTarget({ body: b, lat: p.lat, lon: p.lon });
+                  }}
+                />
+                {target && (
+                  <label className="registry-select">
+                    <span>What to test</span>
+                    <select
+                      data-tour="purpose"
+                      className="field"
+                      aria-label="What to test"
+                      value={s.purpose}
+                      onChange={(e) => s.setPurpose(e.target.value)}
+                    >
+                      {s.meta?.purposes[target.body].map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {purposeVerb(p.id, target.body).label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </>
+            ) : (
+              <Search />
+            )}
+          </div>
         </div>
-        <Button
-          data-tour="catalog-button"
-          variant="outline"
-          onClick={() => setCatalog(true)}
-        >
-          <Globe2 size={15} />
-          <span className="max-sm:hidden">Research </span>Sites
-          <span className="text-2xs opacity-70">
-            {Object.values(s.pins).reduce((a, p) => a + p.length, 0)}
-          </span>
-        </Button>
-      </div>
+      )}
       <MissionStatus />
       {s.saveNotice && (
         <div className="save-toast" role="status">
