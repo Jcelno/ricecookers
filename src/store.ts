@@ -131,6 +131,8 @@ interface State {
   sheet: Sheet;
   /** The 20-second example is driving the interface. */
   demo: boolean;
+  /** The saved example is open: the data service took over 20 s, failed, or stopped answering during the example. */
+  savedExample: boolean;
 
   init: () => Promise<void>;
   enter: (intent: Intent) => void;
@@ -301,6 +303,7 @@ export const useStore = create<State>((set, get) => ({
   rightOpen: true,
   sheet: null,
   demo: false,
+  savedExample: false,
 
   enter: (intent) => {
     set({ started: true, intent });
@@ -325,7 +328,7 @@ export const useStore = create<State>((set, get) => ({
     else if (intent.kind === "link") { try { history.replaceState(null, "", `${location.pathname}${location.search}${intent.hash}`); } catch { /* restricted embed */ } window.dispatchEvent(new HashChangeEvent("hashchange")); }
   },
   startOver: () => {
-    set({ started: false, intent: null, demo: false, sheet: null });
+    set({ started: false, intent: null, demo: false, sheet: null, savedExample: false });
     try { history.replaceState(null, "", `${location.pathname}${location.search}`); } catch { /* restricted embed */ }
   },
   setTwinStep: (twinStep) => set({ twinStep }),

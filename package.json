@@ -24,9 +24,9 @@
     "test:persistence": "node --test tests/test_persistence.mjs",
     "test:sharing": "node tests/browser-sharing.mjs",
     "test:maps-tutorial": "node tests/ui-maps-tutorial.mjs",
-    "test:tour": "node tests/tour.mjs",
+    "test:first-open": "node tests/first-open.mjs",
     "test:evidence": "node --test tests/test_assessment.mjs tests/test_earth_context.mjs",
-    "test:upgrade": "node tests/tour.mjs && node tests/tour-field-guide.mjs && node tests/browser-console.mjs && node tests/browser-map-controls.mjs && node tests/browser-map-resilience.mjs && node tests/discovery-gallery.mjs && node tests/browser-earth-context.mjs && node tests/browser-starters.mjs && node tests/browser-mobile-sheet.mjs && node tests/browser-demos.mjs"
+    "test:upgrade": "node tests/first-open.mjs && node tests/browser-console.mjs && node tests/browser-map-controls.mjs && node tests/browser-map-resilience.mjs && node tests/discovery-gallery.mjs && node tests/browser-earth-context.mjs && node tests/browser-starters.mjs && node tests/browser-mobile-sheet.mjs && node tests/browser-demos.mjs"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",

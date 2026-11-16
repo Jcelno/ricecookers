@@ -12,6 +12,35 @@ RADIUM answers two separate questions with public data from NASA and partner age
 Every number on screen is labelled as observed, inferred, modelled, computed or interpreted, with its source,
 native resolution and limits. Where a dataset has no value, the interface says so. Nothing is invented.
 
+## What a visitor sees first
+
+The first screen asks one thing: **"What do you want to find out?"** Four cards, each a question:
+
+| Card | Worlds | Leads to |
+| --- | --- | --- |
+| Where on Earth is most like the Moon? | Moon to Earth | Find Earth Twins, Moon |
+| Where on Earth is most like Mars? | Mars to Earth | Find Earth Twins, Mars |
+| What can a place near me stand in for? | Earth to Moon or Mars | Near Me |
+| Where should we land or build? | Moon or Mars, no Earth | Rank Landing Sites |
+
+Each card shows one real result, and the Moon, Earth and Mars are drawn from real imagery with a line from
+the site to its twin. Those results are computed by the API at build time (`npm run snapshot` writes
+`src/data/findings.json`), so they cannot drift from the model, and the Findings view re-runs each one
+against the live service while it is open.
+
+Every card opens the same frame: a **step rail** (1 Site, 2 What to test, 3 Results), the map, the results,
+and a fixed **"Earth can't reproduce"** strip. Three clicks (question, site, purpose) reach the top three
+Earth matches side by side; a fourth opens the full comparison.
+
+There is no tutorial to finish. "Watch a 20-second example" drives the real interface with live data
+(Gale crater, rover driving, results, comparison, what Earth can't reproduce). Three tips appear once each,
+at the moment they matter. Help is a searchable reference of 32 topics grouped by task.
+
+The page never waits for the data service: the shell renders at once, a wake-up message appears after
+4 seconds, and after 20 seconds a saved example opens, labelled "Saved example". Counts show a dash until
+real numbers arrive. The map engine loads only when a globe is needed, which cut the first-paint JavaScript
+from 4,536 KB to 395 KB (`node scripts/measure-initial-bundle.mjs`).
+
 ## Run it
 
 Requirements: Node.js 22.18 or newer (including native TypeScript persistence tests), Python 3.9 or newer, and an internet connection (map imagery streams from
@@ -65,6 +94,26 @@ They use live model results; no score or comparison outcome is frozen into a dem
 get a non-blocking tour invitation. Use [the forced tour](http://localhost:3000/?tour=1) to demonstrate the welcome and seven real tasks instead.
 
 ## What you can do
+
+The names below are the earlier ones; in the interface **Earth Analogs** is now **Find Earth Twins**,
+**Mission Planner** is **Rank Landing Sites**, **Saved** is **My Notebook** and purposes are written as verbs
+("Test rover driving"). Internal ids and API fields are unchanged.
+
+- **Find Earth Twins results.** A read-out taken from the response ("Compared 341,042 / 341,042 · 275 grade A"),
+  numbered pins for the top matches, the top three side by side, "New lead" tags for places not in the list of
+  documented analog sites, and "Try next" suggestions built from real results. Dragging a weight bar re-ranks
+  the list and says what moved.
+- **Is it robust?** Each top match reports whether it stays in the top 10 when every weight is varied by ±20%
+  (`POST /api/twin/robustness`).
+- **Does it find places scientists already use?** The Documented analog sites tab shows where each verified site
+  ranks among all Earth places for the chosen site and purpose, misses included (`POST /api/twin/validation`).
+- **Where the analogy breaks down.** Compare shows one bar per condition (gravity, air pressure, temperature,
+  radiation, water and life, length of day) with the Moon or Mars value against Earth's and what a test needs to
+  make up the difference. Nothing on this list is scored.
+- **My Notebook.** Every comparison opened is logged with its grade and date. Counts: twins found, new leads,
+  places Earth can't match. Badges are earned only from real results.
+- **Share this finding.** Compare can draw an image of the pair, its grade and its sources in the browser,
+  from the values on screen. It carries no logo and nothing in it is generated.
 
 - **Explore.** Spin 3D globes of the Moon and Mars drawn from real orbital mosaics (LROC WAC, Kaguya
   Terrain Camera, Viking MDIM 2.1) and a 2D map of Earth (Sentinel-2 cloudless, Blue Marble, Esri World Imagery). Click anywhere
@@ -253,7 +302,14 @@ npm run pipeline                               # fetch (resumable) + build, abou
 - that the top-ranked Mars sites include Gale, Meridiani and Oxia/Mawrth, and that four Artemis III
   candidate-region namesakes (the ridge beside Shackleton, Mons Mouton, Slater, the de Gerlache rim) sit in the
   top 2% of south-polar cells;
-- that removing the reference list of analog sites changes no similarity score.
+- that removing the reference list of analog sites changes no similarity score;
+- that the best match reports no better place, that the robustness verdict equals an independent
+  recomputation and changes no score, and that each documented site's percentile is exact;
+- that conditions Earth cannot reproduce carry numbers, a remedy and a citation, and never enter a score.
+
+Browser checks: `npm run test:first-open` (start screen, three clicks to a comparison in under 30 seconds,
+wake-up and saved-example states, three coach marks shown once, the 20-second example, Help and Findings),
+`npm run test:browser` and `npm run test:upgrade`.
 
 ## Limits to keep in mind
 
@@ -336,6 +392,18 @@ in the app's Data sources page and in `backend/registry.py`.
 | ISC | lucide-react |
 | MIT-CMU | Pillow |
 | SIL OFL 1.1 | Newsreader, IBM Plex Sans and IBM Plex Sans Condensed fonts (via Fontsource) |
+
+### Added after submission
+
+- **Start-screen world images** (`public/worlds/`): LRO WAC global mosaic (NASA/GSFC/Arizona State University) and
+  Viking MDIM 2.1 colour mosaic (NASA/JPL/USGS) via NASA Solar System Treks; Blue Marble shaded relief and bathymetry
+  (NASA Earth Observatory) via NASA GIBS. NASA imagery, public domain with credit. Rebuilt by
+  `scripts/build_world_textures.py`.
+- **IBM Plex Mono** (`@fontsource/ibm-plex-mono`), SIL Open Font License 1.1, like the Plex faces already used.
+- **Radiation reference values**, shown with numbers and never scored: 0.67 mSv/day at Gale crater (Hassler et al.
+  2014, *Science* 343, 1244797); 1.37 mSv/day at Von Kármán crater (Zhang et al. 2020, *Science Advances* 6,
+  eaaz1334); 2.4 mSv/year average natural background on Earth (UNSCEAR 2008 Report). These are published
+  measurements at one place each, not a dataset.
 
 ## Credits
 

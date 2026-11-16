@@ -9,7 +9,7 @@ import { GradeLegend } from "@/components/map/Stage";
 import { Tapes, type TapesHandle } from "@/components/map/Tapes";
 import { Button, cx, GradeTile, IconButton, Notice, Segmented, Spinner, Switch } from "@/components/ui/primitives";
 import { GRADE_HELP, GradeBadge, TwinScoreIcon } from "@/components/ui/ScoreIcons";
-import { overlay } from "@/lib/api";
+import { api, overlay } from "@/lib/api";
 import { badgeFor, categoriesFor, pinCategories } from "@/lib/atlas";
 import { downloadCsv } from "@/lib/csv";
 import { count, famousFor, findings, shortPlace } from "@/lib/findings";
@@ -17,7 +17,7 @@ import { formatCoord, formatKm, GRADE_HEX, pct } from "@/lib/format";
 import { useCountUp, useFlip, useScan } from "@/lib/motion";
 import { useNotebook } from "@/lib/notebook";
 import { coverageText, DIMENSION_PLAIN, dimensionLabel, purposeVerb } from "@/lib/plain";
-import type { Candidate, DocumentedSite, Planet } from "@/lib/types";
+import type { Candidate, DocumentedSite, Planet, Robustness, Validation } from "@/lib/types";
 import { targetLabel, useStore } from "@/store";
 
 import { LeadFilter, TargetContext } from "./TargetContext";
@@ -274,8 +274,47 @@ function TopThree({ list, onPick, picked }: { list: Candidate[]; onPick: (c: Can
   );
 }
 
+/** One request per result set: real answers from the API, or null while loading or if it fails. */
+function useCheck<T>(load: (signal: AbortSignal) => Promise<T>, key: string, on: boolean): T | null {
+  const [data, setData] = useState<{ key: string; value: T } | null>(null);
+  useEffect(() => {
+    if (!on || !key) return;
+    const ctl = new AbortController();
+    load(ctl.signal).then((value) => { if (!ctl.signal.aborted) setData({ key, value }); }, () => undefined);
+    return () => ctl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, on]);
+  return data && data.key === key ? data.value : null;
+}
+
+/** "Does RADIUM find places scientists already use?" Honest about misses as well as hits. */
+function ValidationPanel({ v, world }: { v: Validation | null; world: string }) {
+  if (!v) return <p className="results-note">Checking where documented analog sites rank…</p>;
+  const s = v.summary;
+  return (
+    <section className="validation" aria-label="Does RADIUM find places scientists already use?" data-validation>
+      <h3>Does RADIUM find places scientists already use?</h3>
+      <p>
+        Of {s.scored} verified sites documented for {world}, <b>{s.top_10_percent}</b> rank in the top 10% of Earth for this site and purpose and <b>{s.top_25_percent}</b> in the top 25%;
+        {" "}<b>{s.below_median}</b> fall in the lower half. The list of documented sites is never used in scoring, so this is an independent check.
+      </p>
+      <ul>
+        {v.sites.filter((x) => x.for_this_body).map((x) => (
+          <li key={x.name}>
+            <GradeTile grade={x.grade} size="xs" />
+            <span className="validation-name">{x.name}</span>
+            <span className="validation-bar" aria-hidden><i style={{ transform: `scaleX(${x.percentile ?? 0})` }} /></span>
+            <span className="mono">{x.percentile === null ? "no data" : `top ${Math.max(1, Math.round((1 - x.percentile) * 100))}%`}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="validation-note">{v.note}</p>
+    </section>
+  );
+}
+
 /** The match in focus: the top match by default, or whichever place the visitor picked. */
-function Selected() {
+function Selected({ robust }: { robust: Robustness | null }) {
   const c = useStore((s) => s.compare);
   const status = useStore((s) => s.compareStatus);
   const error = useStore((s) => s.compareError);
@@ -290,6 +329,7 @@ function Selected() {
   const m = c.match;
   const better = c.rank_among?.better_cells ?? null;
   const documented = pins.earth.filter((p) => p.verification_status !== "review_needed").length;
+  const check = robust?.candidates.find((x) => x.rank === rank);
   return (
     <section className={cx("selected panel-selected", status === "loading" && "opacity-70")} aria-label="Selected match" data-selected>
       <header>
@@ -308,6 +348,11 @@ function Selected() {
           : <span className="tag tag-lead" data-coach="new-lead" title={`None of RADIUM's ${documented} documented analog sites lies within 150 km. That does not mean the area has never been studied: it is a candidate to verify with fieldwork and a literature check.`}><Sparkles size={10} aria-hidden />New lead</span>}
         {" "}{c.why} {coverageText(m.coverage)}.
       </p>
+      {check && robust && (
+        <p className="selected-robust" data-robust title={check.lost_when.length ? `Drops out when ${check.lost_when.map((l) => `${dimensionLabel(l.dimension, l.label).toLowerCase()} is weighted ${Math.round(Math.abs(l.change) * 100)}% ${l.change > 0 ? "more" : "less"}`).join(", or ")}.` : "Each weight was raised and lowered by 20%, one at a time, and Earth was re-ranked."}>
+          <b>{check.robust ? "Robust" : check.stays >= check.of / 2 ? "Fairly robust" : "Sensitive to the weights"}:</b> stays in the top {robust.n} in {check.stays} of {check.of} weight variations (each weight ±{Math.round(robust.delta * 100)}%).
+        </p>
+      )}
       <div className="selected-actions">
         <Button variant="solid" data-compare-open onClick={() => setMode("compare")}><Columns2 size={14} /> {rank === 1 ? "Compare #1 side by side" : "Compare side by side"}</Button>
         <Button size="sm" variant="outline" onClick={() => openBrief({ lat: c.earth.cell.lat, lon: c.earth.cell.lon })}><FileText size={13} /> Test brief</Button>
@@ -368,6 +413,12 @@ function Results({ revealed, runKey }: { revealed: boolean; runKey: string }) {
   const listRef = useRef<HTMLOListElement>(null);
   const shown = useMemo(() => (twin?.candidates ?? []).filter((c) => !onlyLeads || c.novel), [twin, onlyLeads]);
   useFlip(listRef, shown.map((c) => c.id).join());
+  // Two checks on the ranking itself, asked once per result set (hooks stay above the early returns below).
+  const ready = !!origin && !!twin && step === 3 && status === "ready" && twin.purpose === purpose;
+  const target = { body: (origin?.body ?? body) as Planet, lat: origin?.lat ?? 0, lon: origin?.lon ?? 0, purpose, ...(custom ? { weights: custom } : {}) };
+  const checkKey = ready ? `${runKey}|${JSON.stringify(custom ?? {})}` : "";
+  const robust = useCheck((signal) => api.robustness({ ...target, n: 10 }, signal), checkKey, ready);
+  const validation = useCheck((signal) => api.validation(target, signal), checkKey, ready && tab === "documented");
 
   // One line that says what a re-weighting did, from the two real rankings.
   const [toast, setToast] = useState<string | null>(null);
@@ -415,6 +466,7 @@ function Results({ revealed, runKey }: { revealed: boolean; runKey: string }) {
   const dist = twin.distribution;
   const verb = purposeVerb(twin.purpose, twin.planet.body);
   const firstLead = shown.findIndex((c) => c.novel);
+
   return (
     <div aria-busy={status === "loading"} className={cx("results", status === "loading" && "results-busy")} data-results>
       <header className="results-head">
@@ -432,7 +484,7 @@ function Results({ revealed, runKey }: { revealed: boolean; runKey: string }) {
 
       {toast && <p className="rerank-toast" role="status" data-rerank-toast>{toast}</p>}
       {tab === "best" && !onlyLeads && shown.length >= 3 && <TopThree list={shown.slice(0, 3)} picked={picked} onPick={(c) => void pickEarth(c.lat, c.lon, true)} />}
-      <Selected />
+      <Selected robust={robust} />
 
       <div className="results-tabs">
         <div role="tablist" aria-label="Lists">
@@ -453,7 +505,7 @@ function Results({ revealed, runKey }: { revealed: boolean; runKey: string }) {
         </>
       ) : (
         <>
-          <p className="results-note">How well-known analog sites score against this particular place and purpose. A famous site can be a poor match here and still be excellent for what it is known for.</p>
+          <ValidationPanel v={validation} world={twin.planet.body === "moon" ? "the Moon" : "Mars"} />
           <ol className="result-list">{twin.documented.map((d) => <DocumentedRow key={d.name} d={d} onClick={() => void pickEarth(d.lat, d.lon, true)} />)}</ol>
         </>
       )}

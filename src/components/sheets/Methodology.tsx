@@ -74,6 +74,12 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
           <p>Primary strength is the highest weighted contribution; limiting factor is the lowest available positive-weight criterion score. Both describe existing criteria and add no new score. Select Decision evidence and resolution to inspect their sources.</p>
           <h3>Earth has limits as an analog</h3>
           <p>Earth cannot reproduce lunar or Martian gravity, atmospheric pressure or radiation. Lunar temperatures are also excluded from similarity. Geology or rover tests may still be useful, provided the experiment accounts for those differences.</p>
+          <p>These conditions are shown as red chips under every result, with numbers and with what a test needs to make up the difference, such as a low-pressure chamber or reduced-gravity offloading. A green chip marks the one condition that nearly matches: the length of the Mars day. Radiation figures are published measurements at one place on each world (Curiosity's RAD instrument at Gale crater; Chang'E-4's LND instrument at Von Kármán crater) against Earth's average natural background. They are reference values, not a map, and nothing on this list is ever scored.</p>
+          <h3>Two checks on every ranking</h3>
+          <p><strong>Is it robust?</strong> Each weight is raised and lowered by 20%, one at a time, and Earth is re-ranked. A match is called robust when it stays among the top 10 in every variation; otherwise the result says how many variations it survives and which weight knocks it out.</p>
+          <p><strong>Does it find places scientists already use?</strong> The Documented analog sites tab shows where each verified documented site ranks among all places on Earth for your site and purpose. The list of documented sites is never used in scoring, so this is an independent check, and sites that rank low are shown as plainly as those that rank high.</p>
+          <h3>Caves, lava tubes and biology are not scored</h3>
+          <p>RADIUM holds no global dataset of caves, lava tubes or living communities at the scale of its grids, so none of these is scored. Documented cave and lava-tube sites appear in Research Sites with their sources, and the rock-type comparison favours volcanic rock, but a volcanic match is not evidence of a cave. A score for these would have to be invented, so there is none.</p>
           <h3>Start from Earth, or add local context</h3>
           <p>What does this resemble? searches Moon and Mars using the existing similarity model for a selected research purpose. It returns research sites and grid matches with coverage, sources and limitations. An Earth-wide analog suitability envelope is Not assessed; no third score is introduced.</p>
           <p>Earth context is optional and never scored. SoilGrids predicts 0–5 cm topsoil at 250 m; failed or missing predictions stay Unavailable. The nearest Smithsonian GVP volcano is a catalog location, with a computed distance. Proximity is not evidence of lava tubes, caves or current hazard.</p>
@@ -273,6 +279,12 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
                 ["Salt flats mislabelled as ice", `${n0(m.earth_reclassified_ice_cells)} cells corrected`, "MODIS classes some bright salt flats as permanent snow. Where mean ground temperature is above 10 °C RADIUM counts that area as barren."],
               ]}
             />
+            <h4>Sensitivity to the weights</h4>
+            <p><code>POST /api/twin/robustness</code> changes each weighted dimension by ±20% (one at a time, 2k variations for k dimensions), re-ranks every Earth land cell with the unchanged model and reports, for each of the top n matches, in how many variations it stays. A match stays when it, or a better-scoring cell within the 500 km separation distance, is still among the top n distinct places. No score is altered.</p>
+            <h4>Documented analog sites as an independent check</h4>
+            <p><code>POST /api/twin/validation</code> returns, for one target and purpose, each verified documented site's score, grade and percentile (the share of Earth land cells scoring lower), with counts in the top 10%, the top 25% and the lower half. A site without data is reported as not analysed, never as zero. The reference list never enters a score.</p>
+            <h4>Conditions Earth cannot reproduce</h4>
+            <p>Each item of the comparison's <code>breaks_down</code> list carries <code>kind</code> (cannot or close), numeric values, the ratio and a <code>remedy</code>. Radiation uses published surface dose-equivalent rates as reference values: 0.67 mSv/day at Gale crater (Hassler et al. 2014), 1.37 mSv/day at Von Kármán crater (Zhang et al. 2020) and 2.4 mSv/year average natural background on Earth (UNSCEAR 2008). None of these fields enters any score.</p>
             <p>
               Automated tests (<code>npm test</code>) also check coordinate handling, the normalisation of weights, the missing-data rules, the grade edges, and that the top-ranked Mars sites include regions real missions selected.
             </p>
@@ -284,6 +296,7 @@ export default function Methodology({ onClose }: { onClose: () => void }) {
               <li>Mars climate at a place. Temperature, pressure, sunlight and dust come from a climate model on a grid of about 330 km and describe a typical year without global dust storms.</li>
               <li>Mineralogy on the ground. Composition is averaged over 60 km on the Moon and several hundred kilometres on Mars; Earth rock type is one dominant class per 55 km.</li>
               <li>That an Earth match has been visited. A match that is not a documented analog site is a lead from the data, to be checked in the field.</li>
+              <li>Whether a place has caves, lava tubes or life. No dataset at this scale is held, so none is scored.</li>
             </ul>
           </div>
         )}

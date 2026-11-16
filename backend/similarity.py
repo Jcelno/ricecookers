@@ -473,7 +473,7 @@ class Twin:
             life.append(f"a peak vegetation index of {ndvi:.2f}")
         items.append({"id": "water_life", "kind": "cannot", "label": "Water and life", "planet": "none known", "earth": "present",
                       "ratio": None, "ratio_text": "present on Earth only", "remedy": "Cannot be removed in the field",
-                      "text": ("This Earth cell has " + " and ".join(life) + ". " if life else "") +
+                      "text": ("This place on Earth has " + " and ".join(life) + ". " if life else "") +
                               "Liquid water, weathering and microbes alter rock and soil in ways that have no counterpart at the planetary site."})
         d_ratio = DAY_HOURS[body] / DAY_HOURS["earth"]
         items.append({"id": "day_length", "kind": "cannot" if body == "moon" else "close", "label": "Length of day", "planet": DAY_LENGTH[body], "earth": DAY_LENGTH["earth"],

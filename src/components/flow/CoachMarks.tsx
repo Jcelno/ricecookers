@@ -52,6 +52,8 @@ export default function CoachMarks() {
       const w = card.current?.offsetWidth ?? 280, h = card.current?.offsetHeight ?? 80;
       if (!anchor) { setOpen(null); setBox(null); return; }
       const r = anchor.getBoundingClientRect();
+      // A tip belongs beside what it explains: while that is scrolled out of view the tip waits out of sight.
+      if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth || r.width === 0) { setBox(null); return; }
       const fit = (v: number, max: number) => Math.max(10, Math.min(v, max));
       if (r.left > w + 28 && innerWidth >= 900) setBox({ side: "left", left: r.left - w - 14, top: fit(r.top + r.height / 2 - h / 2, innerHeight - h - 10) });
       else if (r.top > h + 28) setBox({ side: "top", left: fit(r.left + r.width / 2 - w / 2, innerWidth - w - 10), top: r.top - h - 14 });

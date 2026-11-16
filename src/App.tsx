@@ -100,9 +100,10 @@ export default function App() {
   }, []);
   // After 20 s without an answer the saved example is offered. It stays until the visitor leaves it,
   // even if the live service answers meanwhile: a page should not change under a reader.
-  const [savedOpen, setSavedOpen] = useState(false);
+  const savedOpen = useStore((s) => s.savedExample);
+  const setSavedOpen = (savedExample: boolean) => useStore.setState({ savedExample });
   useEffect(() => {
-    if (boot.phase === "saved" && started) setSavedOpen(true);
+    if (boot.phase === "saved" && started) useStore.setState({ savedExample: true });
   }, [boot.phase, started]);
   const close = () => setSheet(null);
 

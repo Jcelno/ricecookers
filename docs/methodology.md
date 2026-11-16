@@ -243,6 +243,59 @@ hard limit failed; otherwise "Additional analysis required".
 weights and limits, scenario B, atlas colouring and Near Me settings). Values read from a link are validated
 (latitude −90..90, longitude −180..180, weights 0..100, known ids only) and anything else is ignored.
 
+### Sensitivity of a ranking to its weights
+
+`POST /api/twin/robustness` answers one question: does a top match depend on the exact weights? For a purpose
+with k weighted dimensions it builds 2k variations, raising and lowering one weight at a time by 20% (`delta`,
+0 to 0.5), and re-ranks every Earth land cell for each with the unchanged model. For each of the top n matches
+it reports `stays` out of `of` variations and, when it drops out, which weight change caused it.
+
+A match stays when it, or a better-scoring cell within the 500 km separation distance of it, is still among
+the top n distinct places. The second clause matters because listed matches are at least 500 km apart: a
+neighbouring cell overtaking it inside the same region is not a change of answer. A dimension with no data at
+the target, or with zero weight, is not varied. No score is altered and the result feeds no grade.
+Example: for Curiosity's site and rover mobility, the Tibesti match stays in the top 10 in 8 of 8 variations.
+
+### Documented analog sites as an independent check
+
+`POST /api/twin/validation` reports, for one target and purpose, where each verified documented analog site
+falls among all Earth land cells: its score, grade and percentile (the share of cells scoring lower), with
+counts in the top 10%, the top 25% and the lower half for sites documented for that world. A site whose cell
+has no data is reported as not analysed, never as zero.
+
+The reference list never enters a score (section 6), so this is an independent check. It is reported as it
+is, misses included: a site studied for one process, such as a lava tube, can rank low for rover mobility at
+one target and still be an excellent analog for what it is known for. Example: for Curiosity's site and rover
+mobility, 5 of 13 sites documented for Mars rank in the top 10% of Earth and 2 fall in the lower half.
+
+### Conditions Earth cannot reproduce
+
+Gravity, air pressure, radiation, water and life, the length of the day and, for the Moon, temperature are
+reported with every comparison and never scored. Each item now carries `kind` ("cannot", or "close" for the
+Mars day, which is within 3% of Earth's), numeric values where a number exists, the ratio between the worlds
+and `remedy`, the way a test campaign makes up the difference (reduced-gravity offloading, a low-pressure or
+vacuum chamber, a thermal-vacuum chamber, laboratory radiation testing).
+
+Radiation has no dataset in RADIUM. Its numbers are published surface dose-equivalent rates used as reference
+values: 0.67 mSv/day at Gale crater from Curiosity's RAD instrument, August 2012 to June 2013 (Hassler et al.
+2014); 1.37 mSv/day at Von Kármán crater from Chang'E-4's LND instrument (Zhang et al. 2020); and 2.4 mSv/year
+average natural background on Earth (UNSCEAR 2008). Each was measured at one place and time, so the text says
+they are not values for the selected site.
+
+### Caves, lava tubes and biology
+
+The challenge names caves, lava tubes and biology. RADIUM does not score them: it holds no global dataset of
+any of the three at the scale of its grids. Documented cave and lava-tube sites are listed in the site
+catalogue with their sources, and the rock-type dimension favours volcanic rock, but a volcanic match is not
+evidence of a cave. The nearest Holocene volcano is shown as context only.
+
+### Saved results on the start screen
+
+`scripts/build_snapshot.py` runs the API in-process and writes `src/data/findings.json`: the results behind the
+start-screen cards, the Findings view, the famous-site list and the daily featured target, each with the
+request that produced it and a deep link. Nothing in that file is typed by hand. The Findings view re-runs
+every finding against the live service and says whether it reproduced.
+
 ## 8. Data problems found and how they were handled
 
 | Problem | Evidence | Handling |
@@ -293,6 +346,16 @@ sources. The most important: cells are kilometres across; no indicator is a dete
 come from a model; composition products are tens to hundreds of kilometres coarse.
 
 ## References
+
+Added with the radiation reference values:
+
+- Hassler, D. M., et al. (2014). Mars' surface radiation environment measured with the Mars Science
+  Laboratory's Curiosity rover. *Science* 343, 1244797.
+- Zhang, S., et al. (2020). First measurements of the radiation dose on the lunar surface. *Science Advances*
+  6, eaaz1334.
+- United Nations Scientific Committee on the Effects of Atomic Radiation (2008). *Sources and Effects of
+  Ionizing Radiation*, UNSCEAR 2008 Report.
+
 
 Boynton, W. V. et al. (2002), Science 297, 81–85. · Boynton, W. V. et al. (2007), J. Geophys. Res. 112, E12S99. ·
 Feldman, W. C. et al. (2001), J. Geophys. Res. 106, 23231–23251. · Forget, F. et al. (1999), J. Geophys. Res. 104,

@@ -1,3 +1,4 @@
+import { StepRail } from "@/components/flow/Steps";
 import { ArrowLeftRight, Bookmark, Columns2, Download, ExternalLink, FileText, Home, LocateFixed, MapPin, Minus, Plus, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -5,11 +6,11 @@ import { EarthMap, LABEL_ATTRIBUTION } from "@/components/map/LazyEarthMap";
 import type { GlobeHandle, SiteMarker, ViewState } from "@/components/map/GlobeView";
 import { Tapes, type TapesHandle } from "@/components/map/Tapes";
 import { Button, cx, GradeTile, IconButton, Notice, Segmented, Spinner, Switch } from "@/components/ui/primitives";
-import { GRADE_HEX, GRADE_MEANING } from "@/lib/format";
+import { formatCoord, GRADE_HEX, GRADE_MEANING } from "@/lib/format";
 import { api } from "@/lib/api";
 import { downloadCsv } from "@/lib/csv";
 import type { Grade, NearbyDocumented, NearbyRegion, Planet, SearchHit } from "@/lib/types";
-import { useStore } from "@/store";
+import { targetLabel, useStore } from "@/store";
 
 const KM_PER_MI = 1.609344;
 // Round numbers in whichever unit is shown; the request always carries kilometres.
@@ -111,7 +112,7 @@ function Location() {
 
   return (
     <section className="px-4 pt-3 pb-4">
-      <h3 className="text-sm font-semibold text-regolith-50">Your starting point</h3>
+      <h3 id="near-step-1" className="text-sm font-semibold text-regolith-50">Your starting point</h3>
       {nearLoc ? (
         <div className="mt-2 flex items-center gap-2 rounded-sm bg-basalt-800 px-3 py-2 text-sm">
           <MapPin size={15} className="shrink-0 text-world" />
@@ -149,7 +150,7 @@ function Target() {
   const label = target ? targets.find((t) => t.body === target.body && Math.abs(t.lat - target.lat) < 0.05 && Math.abs(t.lon - target.lon) < 0.05)?.name : null;
   return (
     <section className="hair-t px-4 pt-3 pb-4">
-      <h3 className="text-sm font-semibold text-regolith-50">Moon or Mars target</h3>
+      <h3 id="near-step-2" className="text-sm font-semibold text-regolith-50">Moon or Mars site (optional)</h3>
       <p className="mt-1 text-xs leading-snug text-regolith-400">Optional. With a target, each place also gets its Earth Twin similarity grade for the chosen purpose.</p>
       {target ? (
         <div className="mt-2 rounded-sm bg-basalt-800 px-3 py-2">
@@ -374,6 +375,24 @@ function Results() {
 }
 
 /* ------------------------------------------------------------------- view */
+/** The same three-step rail as the other paths. Step 2 is optional: without a Moon or Mars site, places are listed by distance. */
+function NearRail() {
+  const loc = useStore((s) => s.nearLoc);
+  const target = useStore((s) => s.twinOrigin);
+  const result = useStore((s) => s.nearResult);
+  const status = useStore((s) => s.nearStatus);
+  const pins = useStore((s) => s.pins);
+  const found = result ? result.documented.length + result.regions.length : 0;
+  const jump = (id: string) => () => document.getElementById(id)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  return (
+    <StepRail label="Near Me steps" steps={[
+      { title: "Where you are", state: loc ? "done" : "open", onOpen: jump("near-step-1"), summary: loc ? <><span className="placename">{loc.label ?? "Your place"}</span><span className="mono">{formatCoord(loc.lat, loc.lon)}</span></> : "Use your location, type a city or click the map" },
+      { title: "What to match (optional)", state: target ? "done" : loc ? "open" : "todo", onOpen: jump("near-step-2"), summary: target ? <span className="placename">{targetLabel({ pins }, target, formatCoord(target.lat, target.lon))}</span> : "Pick a Moon or Mars site to rank the places near you" },
+      { title: "Nearby places", state: loc && status === "ready" ? "open" : "todo", summary: loc && status === "ready" ? `${found} ${found === 1 ? "place" : "places"} found` : "Listed on the right" },
+    ]} />
+  );
+}
+
 export function NearView() {
   const meta = useStore((s) => s.meta)!;
   const nearLoc = useStore((s) => s.nearLoc);
@@ -401,7 +420,8 @@ export function NearView() {
   return (
     <>
       <aside className="surface hair-r scroll z-20 h-full w-[320px] shrink-0 max-lg:w-[288px] max-md:hidden" aria-label="Near Me settings">
-        <div className="px-4 pt-3"><h2 className="text-md font-semibold text-regolith-50">Near Me</h2></div>
+        <div className="px-4 pt-3 pb-2"><h2 className="text-md font-semibold text-regolith-50">Near Me</h2><p className="mt-1 text-xs leading-relaxed text-regolith-400">Documented analog sites close to a place you choose, and what each is studied for.</p></div>
+        <NearRail />
         <Controls />
       </aside>
       <div className="relative h-full min-w-0 flex-1 overflow-hidden bg-void">

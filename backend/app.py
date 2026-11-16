@@ -555,6 +555,103 @@ def twin_compare(req: CompareRequest):
     })
 
 
+class RobustnessRequest(TwinRequest):
+    delta: float = 0.2      # each dimension's weight is raised and lowered by this fraction, one at a time
+
+
+@app.post("/api/twin/robustness")
+def twin_robustness(req: RobustnessRequest):
+    """Sensitivity check: does each top match stay a top match when the weights are varied?
+
+    The purpose's weights are changed one dimension at a time, up and down by `delta` (20% by default), and
+    Earth is re-ranked for each variation with the same model. A match "stays" when it, or a better-scoring
+    place within the separation distance of it, is still among the top `n` distinct places. No score is
+    altered and nothing here feeds a grade: this only reports how much a ranking depends on the weights.
+    """
+    g, i, j, p, dims, score, cov = twin_setup(req)
+    if score is None:
+        raise HTTPException(422, "No comparable data for this planetary cell.")
+    if not (math.isfinite(req.delta) and 0.0 < req.delta <= 0.5):
+        raise HTTPException(422, "delta must be above 0 and at most 0.5")
+    n = max(3, min(int(req.n), 20))
+    e = store.g["earth"]
+    base_w = req_weights(req) or PURPOSES[req.body][req.purpose]["w"]
+    base = twin.top(score, n)
+    variations = []
+    for d, wd in base_w.items():
+        if dims.get(d) is None or wd <= 0:
+            continue                      # a dimension with no data, or no weight, has nothing to vary
+        for sign in (1.0, -1.0):
+            w = dict(base_w)
+            w[d] = wd * (1.0 + sign * req.delta)
+            varied, _ = twin.combine(dims, w)
+            varied = np.where(twin.valid, varied, np.nan)
+            variations.append({"dimension": d, "label": DIMENSIONS[d]["label"], "change": sign * req.delta,
+                               "picks": twin.top(varied, n), "score": varied})
+    out = []
+    for rank, (ei, ej) in enumerate(base, 1):
+        lat, lon = e.centre(ei, ej)
+        lost = []
+        for v in variations:
+            own = float(v["score"][ei, ej])
+            stays = (ei, ej) in v["picks"] or any(
+                float(v["score"][a, b]) >= own and float(gc_km(lat, lon, *e.centre(a, b), RADIUS_KM["earth"])) <= SEPARATION_KM
+                for a, b in v["picks"])
+            if not stays:
+                lost.append({"dimension": v["dimension"], "label": v["label"], "change": v["change"]})
+        out.append({"id": f"earth:{ei}:{ej}", "rank": rank, "lat": lat, "lon": lon, "place": enames.place(lat, lon),
+                    "stays": len(variations) - len(lost), "of": len(variations), "robust": not lost, "lost_when": lost})
+    return clean({
+        "purpose": req.purpose, "delta": req.delta, "n": n, "separation_km": SEPARATION_KM,
+        "variations": [{"dimension": v["dimension"], "label": v["label"], "change": v["change"]} for v in variations],
+        "candidates": out,
+        "method": ("Each weighted dimension is raised and lowered by the stated fraction, one at a time, and every Earth "
+                   "land cell is re-ranked. A match stays when it, or a better-scoring place within the separation distance, "
+                   "is still among the top places."),
+    })
+
+
+@app.post("/api/twin/validation")
+def twin_validation(req: TwinRequest):
+    """Does RADIUM find places scientists already use?
+
+    For the chosen target and purpose, where each verified documented analog site falls among all Earth land
+    cells: its percentile is the share of cells that score lower. The reference list never enters a score
+    (tests/test_science.py), so this is an independent check, and misses are reported as plainly as hits.
+    """
+    g, i, j, p, dims, score, cov = twin_setup(req)
+    if score is None:
+        raise HTTPException(422, "No comparable data for this planetary cell.")
+    e = store.g["earth"]
+    v = score[np.isfinite(score)]
+    rows = []
+    for site in DOCUMENTED_EARTH:
+        ei, ej = e.index(site["lat"], site["lon"])
+        x = float(score[ei, ej])
+        ok = bool(e.valid[ei, ej]) and math.isfinite(x)
+        rows.append({"name": site["name"], "country": site["country"], "theme": site["theme"], "lat": site["lat"], "lon": site["lon"],
+                     "for_this_body": req.body in site["bodies"], "analysed": ok,
+                     "score": x if ok else None, "grade": grade_of(x) if ok else None,
+                     "percentile": float((v < x).sum() / v.size) if ok and v.size else None,
+                     "better_cells": int((v > x).sum()) if ok else None})
+    rows.sort(key=lambda r: -(r["percentile"] if r["percentile"] is not None else -1.0))
+    own = [r for r in rows if r["for_this_body"] and r["percentile"] is not None]
+    pct = sorted(r["percentile"] for r in own)
+    return clean({
+        "purpose": req.purpose, "cells": int(v.size), "sites": rows,
+        "summary": {
+            "documented_for_this_body": len([r for r in rows if r["for_this_body"]]),
+            "scored": len(own),
+            "top_10_percent": sum(1 for x in pct if x >= 0.90),
+            "top_25_percent": sum(1 for x in pct if x >= 0.75),
+            "below_median": sum(1 for x in pct if x < 0.50),
+            "median_percentile": float(np.median(pct)) if pct else None,
+        },
+        "note": ("Percentile is the share of Earth land cells scoring lower for this target and purpose. A documented site was "
+                 "studied for one process, so a low percentile here does not make it a poor analog for what it is known for."),
+    })
+
+
 class ReverseTwinRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     lat: float

@@ -24,6 +24,7 @@ import {
   writeSaved,
 } from "@/lib/persistence";
 import { useStore } from "@/store";
+import { Notebook } from "./Notebook";
 
 type Entry = {
   kind: SavedKind;
@@ -355,15 +356,15 @@ export function SavedView() {
         <header className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-world">
-              Your research workspace
+              My Notebook
             </p>
             <h1 className="font-serif text-[2.5rem] leading-tight tracking-[-0.035em] text-regolith-50">
-              Keep the discoveries that matter.
+              What you have found.
             </h1>
             <p className="mt-3 max-w-[66ch] text-sm leading-relaxed text-regolith-300">
-              Revisit places, compare environments, and pick up a mission where
-              you left it. Coordinates, evidence and available model settings
-              stay with your research.
+              Every comparison you open is logged here with its grade and date.
+              Star the ones to keep. Places, missions and comparisons you save
+              are listed below with their coordinates, evidence and settings.
             </p>
           </div>
           <Button
@@ -375,6 +376,7 @@ export function SavedView() {
             Export research
           </Button>
         </header>
+        <Notebook />
         <p className="mt-4 flex items-center gap-2 text-xs text-regolith-400">
           <Bookmark size={13} />
           Saved in this browser · export a copy to keep or share your records.

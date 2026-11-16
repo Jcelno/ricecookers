@@ -10,6 +10,9 @@ import { ProfileChart } from "@/components/panels/ProfileChart";
 import { TimelineChart } from "@/components/panels/TimelineChart";
 import { Photos } from "@/components/ui/Photos";
 import { AssessmentChips, AssessmentGrade, DecisionCards } from "@/components/ui/Assessment";
+import { GRADE_HELP, SiteScoreIcon } from "@/components/ui/ScoreIcons";
+import { decisionFactors } from "@/lib/assessment";
+import { coverageText } from "@/lib/plain";
 import { Button, cx, EvidenceGlyph, EvidenceTag, GradeTile, IconButton, Notice, Segmented, Spinner } from "@/components/ui/primitives";
 import { emitTour } from "@/lib/tour/events";
 import { api } from "@/lib/api";
@@ -206,6 +209,43 @@ function MissionTab({ cell }: { cell: CellInfo }) {
   );
 }
 
+/* ---------------------------------------------------------------- lead */
+/** What this place is, and its site score for the default mission in one sentence. */
+function Lead({ cell, site }: { cell: CellInfo; site: ReturnType<typeof useStore.getState>["pins"]["moon"][number] | undefined }) {
+  const meta = useStore((s) => s.meta)!;
+  const world = cell.body === "moon" ? "the Moon" : cell.body === "mars" ? "Mars" : "Earth";
+  const neighbour = !site ? cell.nearby_pins.find((p) => (p.distance_km ?? 99) < 25) : undefined;
+  // "Mars robotic landing" keeps its capital; "Lunar permanent base" reads as "a lunar permanent base".
+  const lc = (t: string) => (/^(Mars|Moon|Earth)\b/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1));
+  const what = site
+    ? site.kind === "landing" ? `Landing site of ${site.name}${site.year ? `, ${site.year}` : ""}. ${site.note}` : site.note
+    : neighbour
+      ? `${neighbour.name}${neighbour.year ? ` (${neighbour.year})` : ""} is ${formatKm(neighbour.distance_km!)} from the centre of this map square. ${neighbour.note}`
+      : `A place on ${world}: ${cell.place.label}.`;
+  const s = cell.suitability;
+  const mission = s ? meta.missions.find((m) => m.id === s.mission) : null;
+  const { primary, limiting } = s ? decisionFactors(s.factors) : { primary: null, limiting: null };
+  const name = (f: { label: string } | null) => f?.label.toLowerCase() ?? "";
+  let verdict: string;
+  if (!s || !mission) verdict = cell.body === "earth" ? "Earth places have no site score: that score is for landing or building on the Moon or Mars. Open “What does this resemble?” to see its Moon and Mars matches." : "Not graded yet.";
+  else if (s.excluded) verdict = `Ruled out for a ${lc(mission.label)}: ${s.failed_limits.map((l) => l.label.toLowerCase()).join("; ")}.`;
+  else if (!s.grade) verdict = `Not enough data to grade for a ${lc(mission.label)} (${coverageText(s.coverage).toLowerCase()}).`;
+  else verdict = `${GRADE_MEANING[s.grade]} for a ${lc(mission.label)}${primary ? `: strongest on ${name(primary)}` : ""}${limiting && limiting.id !== primary?.id ? `, held back by ${name(limiting)}` : ""}.`;
+  return (
+    <section className="px-4 pt-4" aria-label="What this place is" data-site-lead>
+      <p className="text-sm leading-relaxed text-regolith-100">{what}</p>
+      <div className="mt-3 flex items-start gap-3 rounded-lg bg-basalt-800/80 p-3 ring-1 ring-[var(--hair)]">
+        {s && <AssessmentGrade grade={s.grade} coverage={s.coverage} minCoverage={s.min_coverage} excluded={s.excluded} size="lg" />}
+        <div className="min-w-0">
+          <p className="eyebrow flex items-center gap-1.5"><SiteScoreIcon size={13} /> Site score{mission ? ` · ${mission.label}` : ""}</p>
+          <p className="mt-1 text-sm leading-snug font-medium text-regolith-50" data-site-verdict title={s?.score !== null && s?.score !== undefined ? `Score ${s.score.toFixed(2)} on RADIUM's 0 to 1 scale` : undefined}>{verdict}</p>
+          {s?.grade && !s.excluded && <p className="mt-1 text-2xs leading-snug text-regolith-400">{GRADE_HELP.split(". ")[0].replace("match for this purpose", "site for this mission")}.</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------------------------------------------------------------- card */
 export function SiteCard({ cell }: { cell: CellInfo }) {
   const meta = useStore((s) => s.meta)!;
@@ -257,13 +297,15 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
           </div>
           <IconButton label="Clear the selection" onClick={st.clearSelection} className="-mt-1 -mr-2"><X size={16} /></IconButton>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-1.5">
-          <Button size="sm" variant="outline" className="col-span-2 justify-center" data-gallery-open onClick={() => { setTab("overview"); openPhotoGallery(photoKey(cell)); }}>Street View · photo gallery</Button>
-          {cell.body !== "earth" && <Button size="sm" variant="solid" className="justify-center" data-tour="find-twin" onClick={() => st.startTwin({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon })}><ArrowLeftRight size={13} /> Find Earth twins</Button>}
-          {cell.body !== "earth" && <Button size="sm" variant="outline" className="justify-center" onClick={() => { st.setTarget({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon }); st.setMode("near"); }}><Navigation size={13} /> Similar near me</Button>}
-          <Button size="sm" variant="outline" className="justify-center" aria-pressed={inCompare} onClick={() => { st.addCompare(ref); st.setMode("compare"); }}><Columns2 size={13} /> {inCompare ? "In Compare" : "Compare"}</Button>
-          <Button size="sm" variant="outline" className="justify-center" data-tour="save-place" aria-pressed={saved} onClick={() => st.saveSite(ref)} disabled={saved}>{saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />} {saved ? "Saved" : "Save"}</Button>
-          {cell.body !== "earth" && <Button size="sm" variant="outline" className="col-span-2 justify-center" onClick={() => setTab("mission")}><Rocket size={13} /> Plan mission</Button>}
+        {cell.body !== "earth" && (
+          <Button variant="solid" className="mt-3 h-9 w-full justify-center" data-tour="find-twin" onClick={() => st.startTwin({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon })}><ArrowLeftRight size={14} /> Find its Earth twins</Button>
+        )}
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <Button size="sm" variant="outline" data-gallery-open onClick={() => { setTab("overview"); openPhotoGallery(photoKey(cell)); }}>Photos</Button>
+          <Button size="sm" variant="outline" aria-pressed={inCompare} onClick={() => { st.addCompare(ref); st.setMode("compare"); }}><Columns2 size={13} /> {inCompare ? "In Compare" : "Compare"}</Button>
+          <Button size="sm" variant="outline" data-tour="save-place" aria-pressed={saved} onClick={() => st.saveSite(ref)} disabled={saved}>{saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />} {saved ? "Saved" : "Save"}</Button>
+          {cell.body !== "earth" && <Button size="sm" variant="outline" onClick={() => { st.setTarget({ body: cell.body as Planet, lat: ref.lat, lon: ref.lon }); st.setMode("near"); }}><Navigation size={13} /> Near me</Button>}
+          {cell.body !== "earth" && <Button size="sm" variant="outline" onClick={() => setTab("mission")}><Rocket size={13} /> Rank here</Button>}
         </div>
       </header>
 
@@ -275,22 +317,23 @@ export function SiteCard({ cell }: { cell: CellInfo }) {
 
       {tab === "overview" && (
         <div className="anim-fade">
-          {cell.suitability && <section className="space-y-3 px-4 pt-4" aria-label="Mission decision support">
-            <div className="flex items-center gap-3"><AssessmentGrade grade={cell.suitability.grade} coverage={cell.suitability.coverage} minCoverage={cell.suitability.min_coverage} excluded={cell.suitability.excluded} size="lg" /><div className="min-w-0"><p className="text-xs font-medium text-regolith-100">{meta.missions.find(m => m.id === cell.suitability!.mission)?.label}</p><p className="mb-1 text-xs text-regolith-400">{cell.suitability.excluded ? "Ruled out by a hard limit" : "Computed mission suitability"}</p><AssessmentChips coverage={cell.suitability.coverage} factors={cell.suitability.factors} /></div></div>
-            <DecisionCards factors={cell.suitability.factors} />
-          </section>}
+          <Lead cell={cell} site={catalogSite} />
           {cell.body === "earth" && <details className="mx-4 mt-3 rounded-md border border-[var(--hair)]" onToggle={e => setReverseOpen(e.currentTarget.open)}><summary className="row-ctl cursor-pointer rounded-md p-3 text-sm text-regolith-200">What does this resemble?</summary>{reverseOpen && <Suspense fallback={<div className="p-3"><Spinner label="Loading reverse Earth Twin" /></div>}><ReverseTwin lat={ref.lat} lon={ref.lon} /></Suspense>}</details>}
           {cell.body === "earth" && <details className="mx-4 mt-3 rounded-md border border-[var(--hair)]" onToggle={e => setContextOpen(e.currentTarget.open)}><summary className="row-ctl cursor-pointer rounded-md p-3 text-sm text-regolith-200">Context (not scored)</summary>{contextOpen && <Suspense fallback={<div className="p-3"><Spinner label="Loading Earth context" /></div>}><EarthContext lat={ref.lat} lon={ref.lon} /></Suspense>}</details>}
-          {catalogSite && <section className="m-4 rounded-lg bg-basalt-800 p-3 ring-1 ring-[var(--hair)]"><SiteEvidence site={catalogSite} /></section>}
-          <section className="px-4 pt-3">
-            <div className={cx("rounded-md px-3 py-2.5 ring-1", a.tone === "good" ? "bg-[color-mix(in_srgb,var(--color-grade-b)_14%,transparent)] ring-[var(--color-grade-b)]/40" : a.tone === "warn" ? "bg-[color-mix(in_srgb,var(--color-grade-d)_14%,transparent)] ring-[var(--color-grade-d)]/40" : "bg-basalt-800 ring-[var(--hair)]")}>
-              <div className="text-2xs text-regolith-400">Site assessment</div>
-              <div className="text-md font-semibold text-regolith-50">{a.label}</div>
-              <p className="mt-0.5 text-2xs leading-snug text-regolith-300">{a.why}</p>
+          <details className="mx-4 mt-3 rounded-md border border-[var(--hair)]" data-site-evidence>
+            <summary className="row-ctl cursor-pointer rounded-md p-3 text-sm text-regolith-200">Evidence: where this comes from and how sure it is</summary>
+            <div className="space-y-3 px-3 pb-3">
+              {cell.suitability && <div className="space-y-2" aria-label="Mission decision support"><AssessmentChips coverage={cell.suitability.coverage} factors={cell.suitability.factors} /><DecisionCards factors={cell.suitability.factors} /></div>}
+              {catalogSite && <section className="rounded-lg bg-basalt-800 p-3 ring-1 ring-[var(--hair)]"><SiteEvidence site={catalogSite} /></section>}
+              <div className={cx("rounded-md px-3 py-2.5 ring-1", a.tone === "good" ? "bg-[color-mix(in_srgb,var(--color-grade-b)_14%,transparent)] ring-[var(--color-grade-b)]/40" : a.tone === "warn" ? "bg-[color-mix(in_srgb,var(--color-grade-d)_14%,transparent)] ring-[var(--color-grade-d)]/40" : "bg-basalt-800 ring-[var(--hair)]")}>
+                <div className="text-2xs text-regolith-400">Terrain check from the measurements</div>
+                <div className="text-sm font-semibold text-regolith-50">{a.label}</div>
+                <p className="mt-0.5 text-2xs leading-snug text-regolith-300">{a.why}</p>
+              </div>
+              <p className="text-xs leading-relaxed text-regolith-300">{summary(cell, st.tempUnit)}</p>
+              {cell.note && <Notice tone="info">{cell.note}</Notice>}
             </div>
-            <p className="mt-2.5 text-sm leading-relaxed text-regolith-200">{summary(cell, st.tempUnit)}</p>
-          </section>
-          {cell.note && <div className="px-4 pt-2"><Notice tone="info">{cell.note}</Notice></div>}
+          </details>
           <section className="px-4 pt-3">
             <div className="mb-1.5 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-regolith-100">Key measurements</h3>

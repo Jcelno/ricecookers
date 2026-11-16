@@ -155,6 +155,19 @@ export interface CompareResult {
   documented: Candidate["documented"]; rank_among: { better_cells: number; cells: number } | null; why: string | null;
 }
 
+/** Sensitivity of a ranking to its weights (POST /api/twin/robustness). */
+export interface Robustness {
+  purpose: string; delta: number; n: number;
+  variations: { dimension: string; label: string; change: number }[];
+  candidates: { id: string; rank: number; stays: number; of: number; robust: boolean; lost_when: { dimension: string; label: string; change: number }[] }[];
+}
+/** Where documented analog sites fall among all Earth places for one target and purpose (POST /api/twin/validation). */
+export interface Validation {
+  purpose: string; cells: number; note: string;
+  sites: { name: string; country: string; theme: string; lat: number; lon: number; for_this_body: boolean; analysed: boolean; score: number | null; grade: Grade | null; percentile: number | null; better_cells: number | null }[];
+  summary: { documented_for_this_body: number; scored: number; top_10_percent: number; top_25_percent: number; below_median: number; median_percentile: number | null };
+}
+
 export interface Source {
   id: string; body: string; name: string; purpose: string; agency: string; url: string; access: string; format: string;
   coverage: string; variables: string[]; units: string; spatial_resolution: string; temporal_coverage: string; crs: string;

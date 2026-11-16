@@ -14,7 +14,8 @@ try {
   await page.setViewport({ width: 1440, height: 900 });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(process.env.RADIUM_TEST_URL ?? "http://localhost:3000", {
+  // ?tour=0 opens the app directly; the start screen is covered by tests/first-open.mjs.
+  await page.goto(`${process.env.RADIUM_TEST_URL ?? "http://localhost:3000"}/?tour=0`, {
     waitUntil: "domcontentloaded",
   });
   await page.waitForSelector('[data-tour="help"]', { timeout: 60000 });
@@ -94,6 +95,9 @@ try {
     },
     { timeout: 60000 },
   );
+  // The globe now mounts after the catalogue has loaded, so clusters exist from its first frame.
+  // Let the first frames settle before reading a cluster's screen position.
+  await new Promise((r) => setTimeout(r, 2000));
   const globeCluster = await page.evaluate(() => {
     const v = window.__cesium,
       collection = v.dataSources.get(0).clustering._clusterBillboardCollection;
@@ -125,49 +129,20 @@ try {
     globeCluster.height,
   );
   console.log("PASS native globe cluster click zoom");
+  // Help is a reference to search, not a tour: a topic's action opens the real control it describes.
   await page.click('[data-tour="help"]');
-  await page.waitForSelector("[data-tour-welcome]");
+  await page.waitForSelector("[data-help]");
+  assert.equal(await page.$$eval("[data-help-topic]", (els) => els.length), 32, "all 32 field-guide topics are kept");
+  assert.equal(await page.$$eval("[data-help-group]", (els) => els.length), 4, "topics are grouped by task");
+  assert.equal(await page.$("[data-tour-welcome]"), null, "no tour modal");
   await page.evaluate(() =>
-    [...document.querySelectorAll("[data-tour-welcome] button")]
-      .find((b) => b.textContent.includes("Full field guide"))
+    [...document.querySelectorAll('[data-help-topic="choose-destination"] button')]
+      .find((b) => b.textContent.includes("Rank Landing Sites"))
       .click(),
   );
-  await page.waitForSelector('[data-tour-step="pick-world"]');
-  // Clicking panel whitespace must never count as a task. Only a world change does.
-  await page.evaluate(() => document.querySelector('[data-tour="navigation"]')?.click());
-  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("radium.tutorial.v3")).completed.includes("pick-world")), false);
-  await page.evaluate(() =>
-    [...document.querySelectorAll('[data-tour="worlds"] button')]
-      .find((b) => b.textContent.includes("Mars"))
-      .click(),
-  );
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem("radium.tutorial.v3")).completed.includes("pick-world"));
-  await page.waitForSelector('[data-tour-step="workspaces"]');
-  await page.click('[aria-label="Choose tutorial topic"]');
-  await page.evaluate(() =>
-    [...document.querySelectorAll('[role="dialog"] button')]
-      .find((b) => b.textContent.includes("Adjust priorities and limits"))
-      .click(),
-  );
-  await page.waitForSelector('[data-tour-step="priorities"]');
-  await page.evaluate(() =>
-    [...document.querySelectorAll('[data-tour-step="priorities"] button')]
-      .find((b) => b.textContent.includes("Show me"))
-      .click(),
-  );
-  await page.waitForFunction(
-    () => document.querySelector('[data-mission-step-id="priorities"]')?.getAttribute("aria-current") === "step",
-  );
-  await page.screenshot({ path: "temporary screenshots/tutorial-priorities-qa.png" });
-  await page.click('[aria-label="Close tutorial"]');
-  await page.click('[data-tour="help"]');
-  await page.waitForSelector("[data-tour-welcome]");
-  const resume = await page.evaluate(() =>
-    [...document.querySelectorAll("[data-tour-welcome] button")].some((b) => /resume/i.test(b.textContent)),
-  );
-  assert(resume, "tutorial resumes last topic by stable id");
-  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("radium.tutorial.v3")).stepId), "priorities");
-  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => window.__radium.getState().mode === "mission" && !document.querySelector("[data-help]"));
+  await page.waitForSelector('[data-mission-step-id="mission"]');
+  await page.screenshot({ path: "temporary screenshots/help-rank-qa.png" });
   await page.click('[data-tour="nav-explore"]');
   await page.evaluate(() =>
     [...document.querySelectorAll('[data-tour="worlds"] button')]
@@ -186,7 +161,7 @@ try {
   });
   assert(earth.count > 0 && earth.labels && earth.circular);
   console.log(
-    "PASS tutorial real controls, mission step and resume; Earth marker accessibility",
+    "PASS help reference opens real controls; Earth marker accessibility",
     earth,
   );
   const cluster = await page.$('.radium-map-marker[data-cluster="true"]');
@@ -202,23 +177,18 @@ try {
   }
   await page.setViewport({ width: 390, height: 844 });
   await page.click('[data-tour="help"]');
-  await page.waitForSelector("[data-tour-welcome]");
-  await page.evaluate(() =>
-    [...document.querySelectorAll("[data-tour-welcome] button")]
-      .find((b) => b.textContent.includes("Quick tour"))
-      .click(),
-  );
-  await page.waitForSelector("[data-tour-step]");
+  await page.waitForSelector("[data-help]");
+  await new Promise((r) => setTimeout(r, 500)); // the sheet rises 14 px as it opens
   await page.screenshot({
-    path: "temporary screenshots/tutorial-mobile-qa.png",
+    path: "temporary screenshots/help-mobile-qa.png",
   });
   const fits = await page.evaluate(() => {
     const r = document.querySelector('[role="dialog"]').getBoundingClientRect();
-    return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+    return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && document.documentElement.scrollWidth <= innerWidth;
   });
-  assert(fits, "tutorial stays within mobile viewport");
+  assert(fits, "help stays within the phone viewport");
   assert.deepEqual(errors, [], "no uncaught browser errors");
-  console.log("PASS mobile tutorial fit; no uncaught errors");
+  console.log("PASS mobile help fit; no uncaught errors");
 } finally {
   await browser.close();
 }

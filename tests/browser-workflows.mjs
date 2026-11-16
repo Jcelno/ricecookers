@@ -18,7 +18,8 @@ try {
   await page.setViewport({ width: 1440, height: 960 });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(base, { waitUntil: "domcontentloaded" });
+  // ?tour=0 opens the app directly; the start screen is covered by tests/first-open.mjs.
+  await page.goto(`${base}/?tour=0`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(
     () => !!document.querySelector('[data-tour="nav-explore"]'),
     { timeout: 60000 },
@@ -35,23 +36,24 @@ try {
     console.log("PASS", name);
   };
   await run(
-    "Four primary workspaces and connected analog navigation",
+    "Five plain destinations and a three-step Find Earth Twins rail",
     async () => {
       assert.deepEqual(
         await page.$$eval(
-          'nav[aria-label="Primary navigation"] button',
+          'nav[aria-label="Primary navigation"] button .nav-long',
           (els) => els.map((e) => e.textContent),
         ),
-        ["Explore", "Mission Planner", "Earth Analogs", "Saved"],
+        ["Find Earth Twins", "Rank Landing Sites", "Near Me", "Findings", "My Notebook"],
       );
+      for (const tool of ["nav-explore", "catalog-button", "science", "share", "help", "start-over"])
+        assert.ok(await page.$(`.header-actions [data-tour="${tool}"]`), `${tool} sits in the compact right-hand group`);
       await page.click('[data-tour="nav-twin"]');
+      await page.waitForSelector('[data-flow-rail] ol[aria-label="Steps"] > li');
       assert.deepEqual(
-        await page.$$eval(
-          'nav[aria-label="Earth Analogs workspace"] button',
-          (els) => els.map((e) => e.textContent),
-        ),
-        ["Discover", "Compare", "Near Me"],
+        await page.$$eval('[data-flow-rail] .step-title', (els) => els.map((e) => e.textContent)),
+        ["Site", "What to test", "Results"],
       );
+      assert.ok(await page.$("[data-cant-reproduce]"), "the Earth can't reproduce strip is fixed under the flow");
     },
   );
   await run("Catalog supports every curated record and sources", async () => {
@@ -418,7 +420,7 @@ try {
           'nav[aria-label="Primary navigation"] button',
           (els) => els.length,
         ),
-        4,
+        5,
       );
     }
   });
@@ -433,7 +435,7 @@ try {
               '{"sites":[null,{"lat":"bad"}],"missions":[null],"comparisons":[null]}',
             );
       });
-      await page.goto(base, { waitUntil: "domcontentloaded" });
+      await page.goto(`${base}/?tour=0`, { waitUntil: "domcontentloaded" });
       await page.waitForSelector('[data-tour="nav-explore"]', {
         timeout: 60000,
       });

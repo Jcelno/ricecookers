@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button, cx, GradeTile, Notice, Section, Segmented, Spinner, Switch } from "@/components/ui/primitives";
 import { downloadCsv } from "@/lib/csv";
 import { GRADE_MEANING, pct, plural } from "@/lib/format";
+import { StepRail } from "@/components/flow/Steps";
+import { SiteScoreIcon } from "@/components/ui/ScoreIcons";
 import type { Grade, Mission, SiteCard } from "@/lib/types";
 import { RegistrySelect } from "@/components/catalog/SiteCatalog";
 import { AssessmentChips, AssessmentGrade, DecisionCards } from "@/components/ui/Assessment";
@@ -99,9 +101,17 @@ export function MissionPanel() {
   return (
     <div>
       <header className="px-4 pt-4 pb-2">
-        <h2 className="text-md font-semibold text-regolith-50">Mission Planner</h2>
-        <p className="mt-1 text-xs leading-relaxed text-regolith-400">Five steps from a destination to a saved, exportable plan. Grades here are site suitability for the mission, not Earth analog similarity, and not a certification.</p>
-        <ol className="mt-3 grid grid-cols-5 gap-1" aria-label="Steps">
+        <h2 className="flex items-center gap-2 text-md font-semibold text-regolith-50"><SiteScoreIcon size={16} /> Rank Landing Sites</h2>
+        <p className="mt-1 text-xs leading-relaxed text-regolith-400">Which places on the Moon or Mars best serve a mission. Grades here are site scores, never combined with an Earth twin score, and not a certification.</p>
+        <div className="-mx-4 mt-2">
+          <StepRail label="Rank Landing Sites steps" steps={[
+            { title: "Mission", state: step <= 1 ? "open" : "done", onOpen: () => setStep(1), summary: mission.label },
+            { title: "What matters", state: step === 2 ? "open" : step > 2 ? "done" : "todo", onOpen: () => setStep(2), summary: isDefault ? "This mission's priorities" : "Your priorities" },
+            { title: "Ranked sites", state: step >= 3 ? "open" : "todo", onOpen: () => setStep(3), summary: stats ? `${stats.grades.A.toLocaleString("en-US")} of ${stats.cells.toLocaleString("en-US")} places earn an A` : "The best places for this mission" },
+          ]} />
+        </div>
+        <p className="mt-2 text-2xs text-regolith-500">All planner steps</p>
+        <ol className="mt-1 grid grid-cols-5 gap-1" aria-label="Steps">
           {STEPS.map((t, k) => (
             <li key={t}>
               <button data-mission-step={k} data-mission-step-id={STEP_IDS[k]} type="button" onClick={() => setStep(k)} aria-current={step === k ? "step" : undefined}

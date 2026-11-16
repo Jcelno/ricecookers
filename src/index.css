@@ -1155,3 +1155,6 @@ a:focus-visible {
   .header-actions .ctl { padding: 0 7px; }
   .primary-nav > button { padding: 0 3px; font-size: 11.5px; }
 }
+
+.comparison-tools > [role="tablist"] { margin-right: auto; }
+.comparison-tools .registry-select { flex: 0 1 340px; }

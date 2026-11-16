@@ -511,10 +511,10 @@ export function TopBar() {
           </Button>
         </div>
       </header>
-      {ready && s.mode !== "twin" && s.mode !== "saved" && (
+      {ready && s.mode !== "twin" && s.mode !== "saved" && s.mode !== "compare" && (
         <div className="workspace-bar" data-tour="workspace">
           {analog ? (
-            <span className="workspace-title eyebrow">{s.mode === "near" ? "Near Me" : "Compare side by side"}</span>
+            <span className="workspace-title eyebrow">Near Me</span>
           ) : (
             <nav aria-label="World" data-tour="worlds" className="world-switch">
               {(["moon", "mars", "earth"] as Body[]).map((b) => (

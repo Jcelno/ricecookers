@@ -1,4 +1,4 @@
-import type { Body, Brief, Profile, Timeline, CellInfo, CompareResult, Meta, NearbyResult, Pin, Planet, RankResult, SearchHit, Source, TwinResult } from "./types";
+import type { Body, Brief, Profile, Timeline, CellInfo, CompareResult, Meta, NearbyResult, Pin, Planet, RankResult, Robustness, SearchHit, Source, TwinResult, Validation } from "./types";
 
 export class ApiError extends Error {
   constructor(message: string, public status?: number) {
@@ -54,6 +54,8 @@ export const api = {
   twin: (b: { body: Planet; lat: number; lon: number; purpose: string; n?: number; weights?: Record<string, number> }, signal?: AbortSignal) => post<TwinResult>("/api/twin", b, signal),
   compare: (b: { body: Planet; lat: number; lon: number; purpose: string; earth_lat: number; earth_lon: number; weights?: Record<string, number> }, signal?: AbortSignal) =>
     post<CompareResult>("/api/twin/compare", b, signal),
+  robustness: (b: { body: Planet; lat: number; lon: number; purpose: string; n?: number; weights?: Record<string, number> }, signal?: AbortSignal) => post<Robustness>("/api/twin/robustness", b, signal),
+  validation: (b: { body: Planet; lat: number; lon: number; purpose: string; weights?: Record<string, number> }, signal?: AbortSignal) => post<Validation>("/api/twin/validation", b, signal),
   timeline: (body: Body, lat: number, lon: number, signal?: AbortSignal) => request<Timeline>(`/api/timeline?${qs({ body, lat, lon })}`, { signal }),
   profile: (body: Body, lat: number, lon: number, axis: "ns" | "ew", signal?: AbortSignal) =>
     request<Profile>(`/api/profile?${qs({ body, lat, lon, axis })}`, { signal }),
